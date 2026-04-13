@@ -1,0 +1,49 @@
+{
+  "app_id": "mail",
+  "version": "4.3.0",
+  "capabilities": [],
+  "tools": [
+    {
+      "name": "tool_mail_client_chat",
+      "description": "Mail Client — inbox, read, send, reply, forward, search, archive, delete, star, mark read/unread, browse folders, view threads, bulk operations. Connect Google, Microsoft Outlook, Yahoo, AOL, iCloud, or any IMAP/SMTP provider.",
+      "scopes": ["*"],
+      "parameters": {
+        "message": {"type": "string", "required": false},
+        "kwargs":  {"type": "string", "required": true}
+      }
+    },
+    {
+      "name": "skeleton_refresh_mail",
+      "description": "Background inbox cache refresh for all accounts.",
+      "scopes": [],
+      "parameters": {"kwargs": {"type": "string", "required": true}}
+    },
+    {
+      "name": "skeleton_alert_mail",
+      "description": "Alert check for new unread emails.",
+      "scopes": [],
+      "parameters": {"kwargs": {"type": "string", "required": true}}
+    },
+    {
+      "name": "skeleton_refresh_gmail",
+      "description": "Legacy alias → skeleton_refresh_mail.",
+      "scopes": [],
+      "parameters": {"kwargs": {"type": "string", "required": true}}
+    },
+    {
+      "name": "skeleton_alert_gmail",
+      "description": "Legacy alias → skeleton_alert_mail.",
+      "scopes": [],
+      "parameters": {"kwargs": {"type": "string", "required": true}}
+    },
+    {
+      "name": "__panel__inbox",
+      "description": "Panel: Mail",
+      "scopes": [],
+      "parameters": {"params": {"type": "string", "required": true}}
+    }
+  ],
+  "signals": [],
+  "schedules": [],
+  "required_scopes": ["*"]
+}
