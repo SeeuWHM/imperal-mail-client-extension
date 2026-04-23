@@ -57,14 +57,18 @@ async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str
 
 
 async def _switch_active_account(ctx, target_email: str) -> None:
-    """Update is_active in the store so _get_acc returns the right account."""
+    """Update is_active in the store so _get_acc returns the right account.
+
+    Uses _all_accounts() which returns plain dicts with "doc_id" key —
+    Document objects don't support .items() or d["doc_id"].
+    """
     try:
-        docs = await ctx.store.query(COLLECTION)
-        for d in docs:
-            should_be_active = (d.get("email") == target_email)
-            if d.get("is_active") != should_be_active:
-                doc_data = {k: v for k, v in d.items() if k != "doc_id"}
-                await ctx.store.update(COLLECTION, d["doc_id"],
+        accounts = await _all_accounts(ctx)
+        for acc in accounts:
+            should_be_active = (acc.get("email") == target_email)
+            if acc.get("is_active") != should_be_active:
+                doc_data = {k: v for k, v in acc.items() if k != "doc_id"}
+                await ctx.store.update(COLLECTION, acc["doc_id"],
                                        {**doc_data, "is_active": should_be_active})
     except Exception as e:
         log.warning("switch_active_account to %s failed: %s", target_email, e)
@@ -181,9 +185,7 @@ async def inbox_panel(
     # No Select — account switching via right Accounts panel is reliable.
     # Select's param_name injection is fragile; explicit button calls are not.
     account_info = ui.Stack([
-        ui.Text(active_email[:32], variant="caption"),
-        ui.Button("", icon="Users", variant="ghost", size="sm",
-                   on_click=ui.Call("__panel__accounts")),
+        ui.Text(active_email[:36], variant="caption"),
         ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
                    on_click=ui.Call("__panel__inbox", folder=folder, account=active_email)),
     ], direction="horizontal", gap=1)

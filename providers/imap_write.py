@@ -1,13 +1,14 @@
-"""IMAP/SMTP write operations — send, move, flag, purge, save to sent."""
+"""IMAP/SMTP write + search operations — send, move, flag, purge, save to sent, search, folder."""
 from __future__ import annotations
 
+import email as email_lib
 import imaplib
 import logging
 import smtplib
 import time
 from email.mime.text import MIMEText
 
-from .text_utils import _xoauth2_string
+from .text_utils import _xoauth2_string, _decode_header
 from .helpers import IMAP_FOLDER_CANDIDATES
 from .imap_connection import _imap_connect_auth
 
@@ -180,3 +181,75 @@ def _sync_imap_purge(email_addr: str, host: str, port: int, message_id: str,
         return True, ""
     except Exception as e:
         return False, str(e)
+
+
+# ── Search + folder browse (moved from imap_read.py for file size) ──────── #
+
+def _sync_imap_search(email_addr: str, host: str, port: int, query: str, max_results: int = 10,
+                      *, password: str = "", access_token: str = "") -> list[dict] | None:
+    def _map_query(q: str) -> str:
+        ql = q.strip().lower()
+        if ql.startswith("from:"):       return f'FROM "{q[5:].strip()}"'
+        if ql.startswith("to:"):         return f'TO "{q[3:].strip()}"'
+        if ql.startswith("subject:"):    return f'SUBJECT "{q[8:].strip()}"'
+        if ql in ("is:unread", "unread"): return "UNSEEN"
+        if ql in ("is:read",   "read"):   return "SEEN"
+        return f'TEXT "{q.strip()}"'
+    try:
+        imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        imap.select("INBOX")
+        _, uid_data = imap.uid("SEARCH", _map_query(query))
+        uid_list = uid_data[0].split() if uid_data and uid_data[0] else []
+        recent   = uid_list[-max_results:][::-1]
+        messages = []
+        for uid in recent:
+            _, msg_data = imap.uid("FETCH", uid, "(RFC822.HEADER)")
+            if not msg_data or not msg_data[0]: continue
+            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+            if not raw: continue
+            msg = email_lib.message_from_bytes(raw)
+            messages.append({
+                "id":      uid.decode(),
+                "subject": _decode_header(msg.get("Subject", "(no subject)")),
+                "from":    _decode_header(msg.get("From", "unknown")),
+                "date":    msg.get("Date", ""),
+            })
+        imap.logout()
+        return messages
+    except Exception as e:
+        log.warning("IMAP search failed: %s", e)
+        return None
+
+
+def _sync_imap_folder(email_addr: str, host: str, port: int, folder_name: str,
+                      max_results: int = 20, *, password: str = "", access_token: str = "") -> list[dict] | None:
+    try:
+        imap       = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        candidates = IMAP_FOLDER_CANDIDATES.get(folder_name.lower(), [folder_name])
+        selected   = False
+        for candidate in candidates:
+            r, _ = imap.select(f'"{candidate}"', readonly=True)
+            if r == "OK": selected = True; break
+        if not selected: imap.logout(); return []
+        search_criteria = "UNSEEN" if folder_name.lower() == "unread" else "ALL"
+        _, uid_data = imap.uid("SEARCH", search_criteria)
+        uid_list = uid_data[0].split() if uid_data and uid_data[0] else []
+        recent   = uid_list[-max_results:][::-1]
+        messages = []
+        for uid in recent:
+            _, msg_data = imap.uid("FETCH", uid, "(RFC822.HEADER)")
+            if not msg_data or not msg_data[0]: continue
+            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+            if not raw: continue
+            msg = email_lib.message_from_bytes(raw)
+            messages.append({
+                "id":      uid.decode(),
+                "subject": _decode_header(msg.get("Subject", "(no subject)")),
+                "from":    _decode_header(msg.get("From", "unknown")),
+                "date":    msg.get("Date", ""),
+            })
+        imap.logout()
+        return messages
+    except Exception as e:
+        log.warning("IMAP folder browse failed: %s", e)
+        return None

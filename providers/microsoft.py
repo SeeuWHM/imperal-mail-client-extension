@@ -48,13 +48,20 @@ class MicrosoftMailProvider(BaseMailProvider):
         cursor_data: dict | None,
     ) -> tuple[list[dict], dict | None, bool]:
         skip = cursor_data.get("skip", 0) if cursor_data else 0
-        ms_folder = _MS_PAGE_FOLDERS.get(folder.lower(), "inbox")
+        folder_lc = folder.lower()
+        ms_folder = _MS_PAGE_FOLDERS.get(folder_lc, "inbox")
         params: dict = {
             "$top": limit, "$skip": skip,
             "$orderby": "receivedDateTime desc",
             "$select": "id,conversationId,from,subject,bodyPreview,"
                        "receivedDateTime,isRead,flag,hasAttachments",
         }
+        # Outlook has no dedicated "starred" or "unread" mailFolder —
+        # filter flagged/unread messages inside the inbox folder.
+        if folder_lc == "starred":
+            params["$filter"] = "flag/flagStatus eq 'flagged'"
+        elif folder_lc == "unread":
+            params["$filter"] = "isRead eq false"
         resp = await _graph_get(ctx, f"/me/mailFolders/{ms_folder}/messages", acc, params=params)
         resp.raise_for_status()
         data = resp.json()
