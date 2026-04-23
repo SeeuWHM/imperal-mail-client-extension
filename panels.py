@@ -27,11 +27,11 @@ FOLDERS = [
 
 
 async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str) -> None:
-    """Execute a single-message action inline during panel render.
+    """Execute a single-message action BEFORE the inbox list is fetched.
 
-    Called BEFORE the inbox list is fetched so the result is immediately
-    reflected without relying on event publishing (which only works from
-    the full SessionWorkflow / LLM chat path, not from ui.Call / Fast RPC).
+    Called inline so the result is immediately reflected in the render
+    without depending on event publishing (which only works from the
+    full SessionWorkflow / LLM chat path, not from ui.Call / Fast-RPC).
     """
     if not action or not message_id:
         return
@@ -51,10 +51,41 @@ async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str
             await provider.star(ctx, acc, message_id, starred=True)
         elif action == "unstar":
             await provider.star(ctx, acc, message_id, starred=False)
-        # Always invalidate cache after action so the render below sees fresh data.
         await invalidate_inbox(ctx, email)
     except Exception as e:
         log.warning("panel action=%s message=%s failed: %s", action, message_id[:16], e)
+
+
+async def _switch_active_account(ctx, target_email: str) -> None:
+    """Update is_active in the store so _get_acc returns the right account."""
+    try:
+        docs = await ctx.store.query(COLLECTION)
+        for d in docs:
+            should_be_active = (d.get("email") == target_email)
+            if d.get("is_active") != should_be_active:
+                doc_data = {k: v for k, v in d.items() if k != "doc_id"}
+                await ctx.store.update(COLLECTION, d["doc_id"],
+                                       {**doc_data, "is_active": should_be_active})
+    except Exception as e:
+        log.warning("switch_active_account to %s failed: %s", target_email, e)
+
+
+def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
+    """Explicit folder tab buttons — no param_name injection needed.
+
+    Each button has the folder value hardcoded in the Call, so the correct
+    folder is always passed regardless of SDK Select injection behavior.
+    """
+    buttons = [
+        ui.Button(
+            f["label"],
+            variant="primary" if f["key"] == folder else "ghost",
+            size="sm",
+            on_click=ui.Call("__panel__inbox", folder=f["key"], account=active_email),
+        )
+        for f in FOLDERS
+    ]
+    return ui.Stack(buttons, direction="horizontal", wrap=True, gap=1)
 
 
 def _build_email_list(
@@ -87,9 +118,7 @@ def _build_email_list(
     if has_more and next_cursor:
         on_end = ui.Call("__panel__inbox", cursor=next_cursor, folder=folder, account=active_email)
 
-    # Bulk actions: SDK auto-injects selected IDs as `message_ids` list param.
-    # These go through fn_mail_action (separate @chat.function path) because
-    # we cannot embed a variable-length list in a panel call param.
+    # Bulk actions — SDK injects selected IDs as `message_ids` list into fn_mail_action.
     bulk = [
         {"label": "Archive", "icon": "Archive",
          "action": ui.Call("mail_action", action="archive", account=active_email)},
@@ -114,12 +143,6 @@ def _build_email_list(
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
-    # NOTE: refresh="on_event:X" only fires when events are published by the
-    # full SessionWorkflow (LLM chat path). ui.Call from panel buttons goes
-    # through DirectCallWorkflow / Fast-RPC which does NOT publish events.
-    # Single-message actions (do_action param) are handled inline in this
-    # function so the panel re-renders immediately with fresh data — no events.
-    # Bulk actions still use fn_mail_action; refresh on those is best-effort.
     refresh="on_event:mail.received,mail.archived,mail.deleted,mail.mail_action,mail.account_switched,mail.account_connected,mail.account_disconnected",
 )
 async def inbox_panel(
@@ -128,41 +151,50 @@ async def inbox_panel(
     folder: str = "INBOX",
     account: str = "",
     limit: int = 10,
-    # Inline action params — filled by email-viewer action buttons.
-    # The panel executes the action BEFORE fetching the list, so the result
-    # is visible immediately without waiting for event propagation.
+    # Inline action — executed BEFORE fetching (no event dependency).
     do_action: str = "",
     do_message_id: str = "",
+    # Inline account switch — updates DB + uses new account for this render.
+    do_switch_account: str = "",
 ):
     accounts = await _all_accounts(ctx)
     if not accounts:
         return ui.Empty(message="No email accounts connected")
 
+    # ── Inline account switch ─────────────────────────────────────────────── #
+    if do_switch_account:
+        await _switch_active_account(ctx, do_switch_account)
+        # Use the switched account for this render (don't rely on DB re-query).
+        account = do_switch_account
+
     acc, _ = await _get_acc(ctx, account)
     if not acc:
         return ui.Empty(message="No email account available")
 
-    provider    = get_provider(acc)
+    provider     = get_provider(acc)
     active_email = acc.get("email", "")
 
-    # ── Execute inline action before fetching (guarantees fresh render) ──── #
+    # ── Inline single-message action ──────────────────────────────────────── #
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
 
-    acc_options = [{"value": a.get("email", ""), "label": a.get("email", "?")} for a in accounts]
+    # ── Header: account indicator + refresh ───────────────────────────────── #
+    # No Select — account switching via right Accounts panel is reliable.
+    # Select's param_name injection is fragile; explicit button calls are not.
+    account_info = ui.Stack([
+        ui.Text(active_email[:32], variant="caption"),
+        ui.Button("", icon="Users", variant="ghost", size="sm",
+                   on_click=ui.Call("__panel__accounts")),
+        ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
+                   on_click=ui.Call("__panel__inbox", folder=folder, account=active_email)),
+    ], direction="horizontal", gap=1)
 
-    # param_name injects the selected value as the named param in the Call.
-    # Do NOT use account="$value" — that passes the literal string "$value".
-    account_select = ui.Select(
-        options=acc_options, value=active_email, placeholder="Select account",
-        on_change=ui.Call("__panel__inbox", folder=folder),
-        param_name="account",
-    )
+    # ── Folder tabs: explicit buttons, no param_name injection ────────────── #
+    folder_tabs = _build_folder_tabs(folder, active_email)
 
+    # ── Fetch inbox ───────────────────────────────────────────────────────── #
     cursor_data = decode_cursor(cursor) if cursor else None
     clamped     = max(1, min(limit, 100))
 
-    # After an inline action, the cache was already cleared by _execute_panel_action.
-    # get_cached_inbox will return None and fetch fresh from the provider.
     cached = await get_cached_inbox(ctx, active_email, folder, cursor)
     if cached:
         messages, next_cursor_data, has_more = cached
@@ -175,7 +207,10 @@ async def inbox_panel(
                                    messages, next_cursor_data, has_more)
         except Exception as e:
             log.warning("inbox panel fetch_page failed folder=%s: %s", folder, e)
-            return ui.Stack([account_select, ui.Error(message=f"Failed to load {folder}: {e}")])
+            return ui.Stack([
+                account_info, folder_tabs,
+                ui.Error(message=f"Failed to load {folder}: {e}"),
+            ])
 
     for msg in messages:
         if "id" in msg and "message_id" not in msg:
@@ -192,22 +227,7 @@ async def inbox_panel(
 
     email_list = _build_email_list(messages, next_cursor, has_more, folder, active_email, unread_count)
 
-    folder_options = [{"value": f["key"], "label": f["label"]} for f in FOLDERS]
-    folder_select = ui.Select(
-        options=folder_options, value=folder, placeholder="Folder",
-        on_change=ui.Call("__panel__inbox", account=active_email),
-        param_name="folder",
-    )
-
-    refresh_btn = ui.Button(
-        "", icon="RefreshCw", variant="ghost", size="sm",
-        on_click=ui.Call("__panel__inbox", folder=folder, account=active_email),
-    )
-
-    return ui.Stack([
-        ui.Stack([folder_select, account_select, refresh_btn], direction="horizontal"),
-        email_list,
-    ])
+    return ui.Stack([account_info, folder_tabs, email_list])
 
 
 @ext.panel("email_viewer", slot="center", title="Email", icon="Mail")
