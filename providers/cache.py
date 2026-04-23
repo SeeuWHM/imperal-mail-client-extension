@@ -76,7 +76,7 @@ async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
 # ── Redis inbox page cache (B1: keys scoped to tenant+user+email) ─────────── #
 
 REDIS_URL  = os.getenv("REDIS_URL", "")
-_INBOX_TTL = 120
+_INBOX_TTL = 30   # 30s — short enough to avoid stale UI, long enough to buffer rapid re-renders
 _PREFIX    = "mail:inbox:"
 _redis_client = None
 

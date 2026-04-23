@@ -12,7 +12,7 @@ from panels_email_viewer import build_email_viewer
 from panels_accounts import build_accounts_panel
 from panels_add_account import build_add_account_panel
 from panels_compose import build_compose_panel
-from providers.cache import get_cached_inbox, set_cached_inbox
+from providers.cache import get_cached_inbox, set_cached_inbox, invalidate_inbox
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +24,37 @@ FOLDERS = [
     {"key": "trash",   "label": "Trash"},
     {"key": "starred", "label": "Starred"},
 ]
+
+
+async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str) -> None:
+    """Execute a single-message action inline during panel render.
+
+    Called BEFORE the inbox list is fetched so the result is immediately
+    reflected without relying on event publishing (which only works from
+    the full SessionWorkflow / LLM chat path, not from ui.Call / Fast RPC).
+    """
+    if not action or not message_id:
+        return
+    email = acc.get("email", "")
+    try:
+        if action == "archive":
+            await provider.archive(ctx, acc, message_id)
+        elif action == "delete":
+            await provider.delete(ctx, acc, message_id)
+        elif action == "spam":
+            await provider.move(ctx, acc, message_id, "INBOX", "spam")
+        elif action == "mark_read":
+            await provider.mark_read(ctx, acc, message_id, read=True)
+        elif action == "mark_unread":
+            await provider.mark_read(ctx, acc, message_id, read=False)
+        elif action == "star":
+            await provider.star(ctx, acc, message_id, starred=True)
+        elif action == "unstar":
+            await provider.star(ctx, acc, message_id, starred=False)
+        # Always invalidate cache after action so the render below sees fresh data.
+        await invalidate_inbox(ctx, email)
+    except Exception as e:
+        log.warning("panel action=%s message=%s failed: %s", action, message_id[:16], e)
 
 
 def _build_email_list(
@@ -56,6 +87,9 @@ def _build_email_list(
     if has_more and next_cursor:
         on_end = ui.Call("__panel__inbox", cursor=next_cursor, folder=folder, account=active_email)
 
+    # Bulk actions: SDK auto-injects selected IDs as `message_ids` list param.
+    # These go through fn_mail_action (separate @chat.function path) because
+    # we cannot embed a variable-length list in a panel call param.
     bulk = [
         {"label": "Archive", "icon": "Archive",
          "action": ui.Call("mail_action", action="archive", account=active_email)},
@@ -80,31 +114,26 @@ def _build_email_list(
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
-    # Refresh on every event that changes inbox content.
-    # mail.mail_action  — Archive/Delete/Spam from panel buttons (fn_mail_action)
-    # mail.archived     — fn_archive, fn_bulk_archive (via chat)
-    # mail.deleted      — fn_delete, fn_bulk_delete (via chat)
-    # mail.moved        — fn_move
-    # mail.purged       — fn_purge
-    # mail.received     — new email from event poller
-    # mail.account_switched    — active account changed (right panel click)
-    # mail.account_connected   — new account added
-    # mail.account_disconnected — account removed
-    refresh=(
-        "on_event:"
-        "mail.mail_action,"
-        "mail.archived,"
-        "mail.deleted,"
-        "mail.moved,"
-        "mail.purged,"
-        "mail.received,"
-        "mail.account_switched,"
-        "mail.account_connected,"
-        "mail.account_disconnected"
-    ),
+    # NOTE: refresh="on_event:X" only fires when events are published by the
+    # full SessionWorkflow (LLM chat path). ui.Call from panel buttons goes
+    # through DirectCallWorkflow / Fast-RPC which does NOT publish events.
+    # Single-message actions (do_action param) are handled inline in this
+    # function so the panel re-renders immediately with fresh data — no events.
+    # Bulk actions still use fn_mail_action; refresh on those is best-effort.
+    refresh="on_event:mail.received,mail.archived,mail.deleted,mail.mail_action,mail.account_switched,mail.account_connected,mail.account_disconnected",
 )
-async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
-                      account: str = "", limit: int = 10):
+async def inbox_panel(
+    ctx,
+    cursor: str = "",
+    folder: str = "INBOX",
+    account: str = "",
+    limit: int = 10,
+    # Inline action params — filled by email-viewer action buttons.
+    # The panel executes the action BEFORE fetching the list, so the result
+    # is visible immediately without waiting for event propagation.
+    do_action: str = "",
+    do_message_id: str = "",
+):
     accounts = await _all_accounts(ctx)
     if not accounts:
         return ui.Empty(message="No email accounts connected")
@@ -113,21 +142,27 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
     if not acc:
         return ui.Empty(message="No email account available")
 
-    acc_options  = [{"value": a.get("email", ""), "label": a.get("email", "?")} for a in accounts]
+    provider    = get_provider(acc)
     active_email = acc.get("email", "")
 
-    # param_name injects the selected value as "account" into the Call params.
-    # Do NOT put account="$value" in the Call — that passes the literal string "$value".
+    # ── Execute inline action before fetching (guarantees fresh render) ──── #
+    await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
+
+    acc_options = [{"value": a.get("email", ""), "label": a.get("email", "?")} for a in accounts]
+
+    # param_name injects the selected value as the named param in the Call.
+    # Do NOT use account="$value" — that passes the literal string "$value".
     account_select = ui.Select(
         options=acc_options, value=active_email, placeholder="Select account",
         on_change=ui.Call("__panel__inbox", folder=folder),
         param_name="account",
     )
 
-    provider    = get_provider(acc)
     cursor_data = decode_cursor(cursor) if cursor else None
     clamped     = max(1, min(limit, 100))
 
+    # After an inline action, the cache was already cleared by _execute_panel_action.
+    # get_cached_inbox will return None and fetch fresh from the provider.
     cached = await get_cached_inbox(ctx, active_email, folder, cursor)
     if cached:
         messages, next_cursor_data, has_more = cached
@@ -158,7 +193,6 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
     email_list = _build_email_list(messages, next_cursor, has_more, folder, active_email, unread_count)
 
     folder_options = [{"value": f["key"], "label": f["label"]} for f in FOLDERS]
-    # Same fix: param_name injects the selected folder value, no "$value" in the Call.
     folder_select = ui.Select(
         options=folder_options, value=folder, placeholder="Folder",
         on_change=ui.Call("__panel__inbox", account=active_email),
@@ -194,8 +228,6 @@ async def accounts_panel(ctx, show_add: bool = False):
 async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                          account: str = "", prefill_to: str = "",
                          prefill_subject: str = "", reply_all: str = ""):
-    # reply_all comes in as a string from panel params ("True"/"true"/"" etc.)
-    # build_compose_panel expects bool — convert explicitly here at the boundary.
     reply_all_bool = str(reply_all).lower() in ("true", "1", "yes")
     return await build_compose_panel(ctx, mode, message_id, account,
                                       prefill_to, prefill_subject, reply_all_bool)
