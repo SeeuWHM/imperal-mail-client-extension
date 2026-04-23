@@ -59,11 +59,11 @@ def _build_email_list(
     bulk = [
         {"label": "Archive", "icon": "Archive",
          "action": ui.Call("mail_action", action="archive", account=active_email)},
-        {"label": "Delete", "icon": "Trash2",
-         "action": ui.Call("mail_action", action="delete", account=active_email)},
-        {"label": "Read", "icon": "MailOpen",
-         "action": ui.Call("mail_action", action="mark_read", account=active_email)},
-        {"label": "Unread", "icon": "Mail",
+        {"label": "Delete",  "icon": "Trash2",
+         "action": ui.Call("mail_action", action="delete",  account=active_email)},
+        {"label": "Read",    "icon": "MailOpen",
+         "action": ui.Call("mail_action", action="mark_read",   account=active_email)},
+        {"label": "Unread",  "icon": "Mail",
          "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
     ]
 
@@ -73,14 +73,35 @@ def _build_email_list(
         on_end_reached=on_end,
         selectable=True,
         bulk_actions=bulk,
-        total_items=0,   # 0 = hide built-in paginator; infinite scroll via on_end_reached
+        total_items=0,
         extra_info=f"{unread_count} unread" if unread_count > 0 else "",
     )
 
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
-    refresh="on_event:mail.received,mail.archived",
+    # Refresh on every event that changes inbox content.
+    # mail.mail_action  — Archive/Delete/Spam from panel buttons (fn_mail_action)
+    # mail.archived     — fn_archive, fn_bulk_archive (via chat)
+    # mail.deleted      — fn_delete, fn_bulk_delete (via chat)
+    # mail.moved        — fn_move
+    # mail.purged       — fn_purge
+    # mail.received     — new email from event poller
+    # mail.account_switched    — active account changed (right panel click)
+    # mail.account_connected   — new account added
+    # mail.account_disconnected — account removed
+    refresh=(
+        "on_event:"
+        "mail.mail_action,"
+        "mail.archived,"
+        "mail.deleted,"
+        "mail.moved,"
+        "mail.purged,"
+        "mail.received,"
+        "mail.account_switched,"
+        "mail.account_connected,"
+        "mail.account_disconnected"
+    ),
 )
 async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
                       account: str = "", limit: int = 10):
@@ -92,18 +113,20 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
     if not acc:
         return ui.Empty(message="No email account available")
 
-    acc_options = [{"value": a.get("email", ""), "label": a.get("email", "?")} for a in accounts]
+    acc_options  = [{"value": a.get("email", ""), "label": a.get("email", "?")} for a in accounts]
     active_email = acc.get("email", "")
 
+    # param_name injects the selected value as "account" into the Call params.
+    # Do NOT put account="$value" in the Call — that passes the literal string "$value".
     account_select = ui.Select(
         options=acc_options, value=active_email, placeholder="Select account",
-        on_change=ui.Call("__panel__inbox", account="$value", folder=folder),
+        on_change=ui.Call("__panel__inbox", folder=folder),
         param_name="account",
     )
 
-    provider = get_provider(acc)
+    provider    = get_provider(acc)
     cursor_data = decode_cursor(cursor) if cursor else None
-    clamped = max(1, min(limit, 100))
+    clamped     = max(1, min(limit, 100))
 
     cached = await get_cached_inbox(ctx, active_email, folder, cursor)
     if cached:
@@ -126,7 +149,6 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
     provider_key = acc.get("provider", "oauth")
     next_cursor  = encode_cursor(provider_key, next_cursor_data)
 
-    # Get the real folder-level unread count, not just the current page count.
     unread_count = 0
     try:
         unread_count = await provider.get_unread_count(ctx, acc, folder)
@@ -136,9 +158,10 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
     email_list = _build_email_list(messages, next_cursor, has_more, folder, active_email, unread_count)
 
     folder_options = [{"value": f["key"], "label": f["label"]} for f in FOLDERS]
+    # Same fix: param_name injects the selected folder value, no "$value" in the Call.
     folder_select = ui.Select(
         options=folder_options, value=folder, placeholder="Folder",
-        on_change=ui.Call("__panel__inbox", folder="$value", account=active_email),
+        on_change=ui.Call("__panel__inbox", account=active_email),
         param_name="folder",
     )
 
@@ -171,8 +194,11 @@ async def accounts_panel(ctx, show_add: bool = False):
 async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                          account: str = "", prefill_to: str = "",
                          prefill_subject: str = "", reply_all: str = ""):
+    # reply_all comes in as a string from panel params ("True"/"true"/"" etc.)
+    # build_compose_panel expects bool — convert explicitly here at the boundary.
+    reply_all_bool = str(reply_all).lower() in ("true", "1", "yes")
     return await build_compose_panel(ctx, mode, message_id, account,
-                                      prefill_to, prefill_subject, reply_all)
+                                      prefill_to, prefill_subject, reply_all_bool)
 
 
 @ext.panel("add_account", slot="right", title="Add Account", icon="UserPlus")
