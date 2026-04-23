@@ -91,7 +91,7 @@ async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
     if errors:
         return ActionResult.error(f"Some actions failed: {'; '.join(errors)}")
 
-    await invalidate_inbox(acc.get("email", ""))
+    await invalidate_inbox(ctx, acc.get("email", ""))
 
     return ActionResult.success(
         data={"action": params.action, "count": len(ids)},
@@ -176,16 +176,19 @@ async def fn_add_imap(ctx, params: AddImapParams) -> ActionResult:
     if not ok:
         return ActionResult.error(f"IMAP connection failed: {err}", retryable="timeout" in str(err).lower())
 
-    accounts = await _all_accounts(ctx)
-    for d in accounts:
-        await ctx.store.update(COLLECTION, d["doc_id"], {**d, "is_active": False})
-
+    # Create the new account FIRST — if this fails, existing active account is preserved.
     await ctx.store.create(COLLECTION, {
         "email": params.email, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p,
         "smtp_host": smtp_h, "smtp_port": smtp_p,
         "password": _encrypt_password(params.password), "password_encrypted": True,
     })
+    # Now deactivate all other accounts; exclude doc_id from the update payload.
+    accounts = await _all_accounts(ctx)
+    for d in accounts:
+        if d.get("email") != params.email:
+            doc_data = {k: v for k, v in d.items() if k != "doc_id"}
+            await ctx.store.update(COLLECTION, d["doc_id"], {**doc_data, "is_active": False})
 
     return ActionResult.success(
         data={"connected": True, "email": params.email, "imap_server": imap_h},

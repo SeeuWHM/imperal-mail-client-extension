@@ -117,18 +117,10 @@ class GoogleMailProvider(BaseMailProvider):
         email_addr = acc.get("email", "")
         resp = await _api_get(ctx, f"messages/{message_id}", acc, params={"format": "full"})
         if resp.status_code == 404:
-            from .helpers import _all_accounts
-            for other in await _all_accounts(ctx):
-                if other["doc_id"] == acc["doc_id"] or other.get("provider") not in ("oauth", None, ""):
-                    continue
-                try:
-                    r2 = await _api_get(ctx, f"messages/{message_id}", other, params={"format": "full"})
-                    if r2.status_code == 200:
-                        resp = r2; acc = other; email_addr = acc.get("email", ""); break
-                except Exception:
-                    continue
-        if resp.status_code == 404:
-            return self.err(f"Message {message_id} not found in any connected Google account.")
+            return self.err(
+                "Message not found in this account. "
+                "If it belongs to a different account, switch accounts first."
+            )
         resp.raise_for_status()
         msg     = resp.json()
         headers = msg.get("payload", {}).get("headers", [])
@@ -184,17 +176,10 @@ class GoogleMailProvider(BaseMailProvider):
             "format": "metadata", "metadataHeaders": ["From", "Subject", "Message-ID"],
         })
         if meta.status_code == 404:
-            from .helpers import _all_accounts
-            for other in await _all_accounts(ctx):
-                if other["doc_id"] == acc["doc_id"] or other.get("provider") not in ("oauth", None, ""):
-                    continue
-                try:
-                    r2 = await _api_get(ctx, f"messages/{message_id}", other, params={
-                        "format": "metadata", "metadataHeaders": ["From", "Subject", "Message-ID"],
-                    })
-                    if r2.status_code == 200:
-                        meta = r2; acc = other; email_addr = acc.get("email", ""); break
-                except Exception: continue
+            return self.err(
+                "Message not found in this account. "
+                "If it belongs to a different account, switch accounts first."
+            )
         meta.raise_for_status()
         msg        = meta.json()
         headers    = msg.get("payload", {}).get("headers", [])

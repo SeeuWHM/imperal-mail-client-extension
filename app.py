@@ -18,12 +18,6 @@ def _user_id(ctx) -> str:
     return ctx.user.id if hasattr(ctx, "user") and ctx.user else ""
 
 
-def _tenant_id(ctx) -> str:
-    if hasattr(ctx, "user") and ctx.user and hasattr(ctx.user, "tenant_id"):
-        return ctx.user.tenant_id
-    return "default"
-
-
 async def _get_acc(ctx: Context, account: str = ""):
     """Resolve active account and provider. Returns (acc, provider) or (None, None)."""
     acc = await _active_account(ctx, account)

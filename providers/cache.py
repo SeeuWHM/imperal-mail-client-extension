@@ -9,65 +9,75 @@ import os
 log = logging.getLogger(__name__)
 
 
-# ── Skeleton context cache ────────────────────────────────────────────── #
+# ── Context scope helper ──────────────────────────────────────────────────── #
+
+def _ctx_scope(ctx) -> tuple[str, str]:
+    """Return (tenant_id, user_id) from ctx with safe fallbacks."""
+    tenant_id = "default"
+    user_id   = "anon"
+    if ctx and hasattr(ctx, "user") and ctx.user:
+        if hasattr(ctx.user, "tenant_id") and ctx.user.tenant_id:
+            tenant_id = str(ctx.user.tenant_id)
+        if hasattr(ctx.user, "id") and ctx.user.id:
+            user_id = str(ctx.user.id)
+    return tenant_id, user_id
+
+
+# ── Store-backed helpers (B3: now delegate to Redis invalidation) ──────────── #
 
 async def _remove_from_cache(ctx, email: str, message_id: str) -> None:
+    """Invalidate the Redis page cache after a single-message remove operation."""
     try:
-        doc = await ctx.store.get("mail_inbox_cache", email)
-        if doc and doc.data:
-            messages = doc.data.get("messages", [])
-            filtered = [m for m in messages if m.get("message_id") != message_id and m.get("id") != message_id]
-            if len(filtered) != len(messages):
-                await ctx.store.set("mail_inbox_cache", email, {**doc.data, "messages": filtered})
+        await invalidate_inbox(ctx, email)
     except Exception as e:
-        log.debug("_remove_from_cache failed: %s", e)
+        log.debug("_remove_from_cache: %s", e)
 
 
 async def _remove_multiple_from_cache(ctx, email: str, message_ids: list[str]) -> None:
+    """Invalidate the Redis page cache after a bulk remove operation."""
     if not message_ids:
         return
     try:
-        doc = await ctx.store.get("mail_inbox_cache", email)
-        if doc and doc.data:
-            id_set = set(message_ids)
-            messages = doc.data.get("messages", [])
-            filtered = [m for m in messages if m.get("message_id") not in id_set and m.get("id") not in id_set]
-            if len(filtered) != len(messages):
-                await ctx.store.set("mail_inbox_cache", email, {**doc.data, "messages": filtered})
+        await invalidate_inbox(ctx, email)
     except Exception as e:
-        log.debug("_remove_multiple_from_cache failed: %s", e)
+        log.debug("_remove_multiple_from_cache: %s", e)
 
 
 async def _update_read_in_cache(ctx, email: str, message_id: str, is_read: bool = True) -> None:
+    """Invalidate the Redis page cache after a read-state change.
+
+    Surgical per-message Redis patching is impractical without tracking which
+    cursor page contains the message. Full invalidation causes one extra live
+    fetch on next panel load — acceptable trade-off for correctness.
+    """
     try:
-        doc = await ctx.store.get("mail_inbox_cache", email)
-        if doc and doc.data:
-            messages = doc.data.get("messages", [])
-            for m in messages:
-                if m.get("message_id") == message_id or m.get("id") == message_id:
-                    m["unread"] = not is_read
-                    break
-            await ctx.store.set("mail_inbox_cache", email, {**doc.data, "messages": messages})
+        await invalidate_inbox(ctx, email)
     except Exception as e:
-        log.debug("_update_read_in_cache failed: %s", e)
+        log.debug("_update_read_in_cache: %s", e)
 
 
 async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
                           message_id_header: str = "", thread_id: str = "") -> None:
+    """Persist the last-read watermark, stamped with user_id for defence-in-depth."""
     try:
+        _, user_id = _ctx_scope(ctx)
         await ctx.store.set("mail_last_read", "latest", {
-            "message_id": message_id, "subject": subject, "sender": sender,
-            "message_id_header": message_id_header, "thread_id": thread_id,
+            "message_id":        message_id,
+            "subject":           subject,
+            "sender":            sender,
+            "message_id_header": message_id_header,
+            "thread_id":         thread_id,
+            "user_id":           user_id,
         })
     except Exception as e:
         log.debug("_save_last_read failed: %s", e)
 
 
-# ── Redis inbox page cache ─────────────────────────────────────────────── #
+# ── Redis inbox page cache (B1: keys scoped to tenant+user+email) ─────────── #
 
-REDIS_URL = os.getenv("REDIS_URL", "")
+REDIS_URL  = os.getenv("REDIS_URL", "")
 _INBOX_TTL = 120
-_PREFIX = "mail:inbox:"
+_PREFIX    = "mail:inbox:"
 _redis_client = None
 
 
@@ -79,15 +89,17 @@ async def _get_redis():
     return _redis_client
 
 
-def _inbox_key(email: str, folder: str, cursor: str) -> str:
+def _inbox_key(ctx, email: str, folder: str, cursor: str) -> str:
+    """Build a Redis key scoped to tenant + user + email + folder + cursor page."""
+    tenant_id, user_id = _ctx_scope(ctx)
     ch = hashlib.md5(cursor.encode()).hexdigest()[:8] if cursor else "first"
-    return f"{_PREFIX}{email}:{folder}:{ch}"
+    return f"{_PREFIX}{tenant_id}:{user_id}:{email}:{folder}:{ch}"
 
 
-async def get_cached_inbox(email: str, folder: str, cursor: str = "") -> tuple | None:
+async def get_cached_inbox(ctx, email: str, folder: str, cursor: str = "") -> tuple | None:
     try:
-        r = await _get_redis()
-        raw = await r.get(_inbox_key(email, folder, cursor))
+        r   = await _get_redis()
+        raw = await r.get(_inbox_key(ctx, email, folder, cursor))
         if not raw:
             return None
         data = json.loads(raw)
@@ -96,22 +108,29 @@ async def get_cached_inbox(email: str, folder: str, cursor: str = "") -> tuple |
         return None
 
 
-async def set_cached_inbox(email: str, folder: str, cursor: str,
+async def set_cached_inbox(ctx, email: str, folder: str, cursor: str,
                            messages: list, next_cursor, has_more: bool) -> None:
     try:
         r = await _get_redis()
         await r.setex(
-            _inbox_key(email, folder, cursor), _INBOX_TTL,
-            json.dumps({"messages": messages, "next_cursor": next_cursor, "has_more": has_more}, default=str),
+            _inbox_key(ctx, email, folder, cursor),
+            _INBOX_TTL,
+            json.dumps(
+                {"messages": messages, "next_cursor": next_cursor, "has_more": has_more},
+                default=str,
+            ),
         )
     except Exception:
         pass
 
 
-async def invalidate_inbox(email: str, folder: str = "") -> None:
+async def invalidate_inbox(ctx, email: str, folder: str = "") -> None:
+    """Delete all cached pages for this user+email (or a specific folder)."""
     try:
         r = await _get_redis()
-        pattern = f"{_PREFIX}{email}:{folder}:*" if folder else f"{_PREFIX}{email}:*"
+        tenant_id, user_id = _ctx_scope(ctx)
+        base    = f"{_PREFIX}{tenant_id}:{user_id}:{email}"
+        pattern = f"{base}:{folder}:*" if folder else f"{base}:*"
         keys = [k async for k in r.scan_iter(match=pattern, count=100)]
         if keys:
             await r.delete(*keys)

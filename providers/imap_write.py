@@ -35,7 +35,7 @@ def _sync_smtp_send(email_addr: str, password: str, smtp_host: str, smtp_port: i
             smtp.starttls()
             smtp.login(email_addr, password)
 
-        smtp.sendmail(email_addr, all_recipients, msg.as_string())
+        smtp.sendmail(email_addr, all_recipients, msg_bytes)
         smtp.quit()
         return True, "", msg_bytes
     except Exception as e:
@@ -62,7 +62,7 @@ def _sync_smtp_xoauth2_send(email_addr: str, access_token: str, smtp_host: str, 
         if code != 235:
             smtp.quit()
             return False, f"XOAUTH2 AUTH failed ({code}): {resp_bytes.decode() if isinstance(resp_bytes, bytes) else str(resp_bytes)}", b""
-        smtp.sendmail(email_addr, all_recipients, msg.as_string())
+        smtp.sendmail(email_addr, all_recipients, msg_bytes)
         smtp.quit()
         return True, "", msg_bytes
     except Exception as e:
@@ -113,14 +113,40 @@ def _sync_imap_move(email_addr: str, host: str, port: int, message_id: str,
         return False, str(e)
 
 
+_IMAP_FLAG_FOLDER_ORDER = [
+    "INBOX",
+    "Sent", "Sent Items", "[Gmail]/Sent Mail", "INBOX.Sent",
+    "Drafts", "[Gmail]/Drafts", "INBOX.Drafts",
+    "Trash", "[Gmail]/Trash", "Deleted Items", "Deleted Messages",
+    "Junk", "Spam", "[Gmail]/Spam", "Junk Email",
+    "Archive", "[Gmail]/All Mail",
+]
+
+
 def _sync_imap_flag_op(email_addr: str, host: str, port: int, message_id: str,
                        flag: str, add: bool, *, password: str = "", access_token: str = "") -> tuple[bool, str]:
+    """Set or clear an IMAP flag on a message, searching across all common folders."""
+    uid_bytes  = message_id.encode()
+    flag_cmd   = "+FLAGS" if add else "-FLAGS"
+    flag_value = f"\\{flag}"
     try:
         imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
-        imap.select("INBOX")
-        imap.uid("STORE", message_id.encode(), "+FLAGS" if add else "-FLAGS", f"\\{flag}")
+        for folder in _IMAP_FLAG_FOLDER_ORDER:
+            try:
+                r, _ = imap.select(f'"{folder}"')
+                if r != "OK":
+                    continue
+                # Verify the message exists in this folder before flagging
+                _, fetch_data = imap.uid("FETCH", uid_bytes, "(FLAGS)")
+                if not fetch_data or not fetch_data[0]:
+                    continue
+                imap.uid("STORE", uid_bytes, flag_cmd, flag_value)
+                imap.logout()
+                return True, ""
+            except Exception:
+                continue
         imap.logout()
-        return True, ""
+        return False, f"Message UID {message_id} not found in any folder"
     except Exception as e:
         return False, str(e)
 

@@ -9,11 +9,6 @@ from app import _get_acc
 
 log = logging.getLogger(__name__)
 
-BLOCKED_EXTENSIONS = [
-    "exe", "bat", "cmd", "com", "vbs", "js", "msi", "scr", "pif", "reg",
-    "wsf", "cpl", "hta", "inf", "lnk", "ps1", "psm1", "jar", "app", "dmg", "elf",
-]
-
 
 async def build_compose_panel(
     ctx,
@@ -22,16 +17,16 @@ async def build_compose_panel(
     account: str = "",
     prefill_to: str = "",
     prefill_subject: str = "",
-    reply_all: str = "",
+    reply_all: bool = False,
 ) -> ui.UINode:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         return ui.Empty(message="No email account available")
 
-    account_email  = acc.get("email", "")
-    to_value       = prefill_to
-    cc_value       = ""
-    subject_value  = prefill_subject
+    account_email = acc.get("email", "")
+    to_value      = prefill_to
+    cc_value      = ""
+    subject_value = prefill_subject
 
     if mode in ("reply", "forward") and message_id and not prefill_to:
         try:
@@ -59,7 +54,11 @@ async def build_compose_panel(
         except Exception:
             pass
 
-    title = {"reply": f"Reply to {to_value[:40]}", "forward": f"Forward: {subject_value[:40]}", "new": "New Email"}.get(mode, "Compose")
+    title = {
+        "reply":   f"Reply to {to_value[:40]}" if to_value else "Reply",
+        "forward": f"Forward: {subject_value[:40]}" if subject_value else "Forward",
+        "new":     "New Email",
+    }.get(mode, "Compose")
 
     back_target = (
         ui.Call("__panel__email_viewer", message_id=message_id, account=account_email)
@@ -78,10 +77,10 @@ async def build_compose_panel(
                 ui.Input(placeholder="BCC", param_name="bcc"),
                 ui.Input(placeholder="Subject", value=subject_value, param_name="subject"),
                 ui.TextArea(placeholder="Write your message...", rows=12, param_name="body"),
-                ui.FileUpload(
-                    accept="*", max_size_mb=10, max_total_mb=25, max_files=10,
-                    multiple=True, blocked_extensions=BLOCKED_EXTENSIONS, param_name="attachments",
-                ),
+                # Attachments are not yet supported — the platform has no SDK mechanism
+                # to serve binary files from extensions (proxy/download endpoint missing).
+                # FileUpload is removed until that SDK gap is closed.
+                ui.Text("📎 Attachments: coming in a future update", variant="caption"),
             ],
             action="compose_send",
             submit_label="Send",

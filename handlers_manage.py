@@ -108,7 +108,6 @@ async def _run_bulk(ctx, params: BulkParams, operation: str) -> ActionResult:
     if not acc:
         return _no_account_error()
     success, failed, removed = 0, [], []
-    ctx._bulk_skip_cache = True
     try:
         for mid in ids:
             op = {"archive": provider.archive, "delete": provider.delete}.get(operation)
@@ -127,7 +126,7 @@ async def _run_bulk(ctx, params: BulkParams, operation: str) -> ActionResult:
             else:
                 failed.append(f"{mid[:16]}: {r.get('error', '?')}")
     finally:
-        ctx._bulk_skip_cache = False
+        pass  # no cleanup needed
     if removed:
         await _remove_multiple_from_cache(ctx, acc.get("email", ""), removed)
     if failed:

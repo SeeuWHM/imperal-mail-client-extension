@@ -205,13 +205,20 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
 
 @chat.function("reply", action_type="write", event="replied", description="Reply to an email.")
 async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
+    # Auth guard — fail at the front door rather than reaching the store.
+    if not ctx.user or not ctx.user.id or ctx.user.id == "__system__":
+        return ActionResult.error("No authenticated user context.")
     if not params.body:
         return ActionResult.error("Reply body is required.")
     mid = params.message_id
     if not mid:
-        docs = await ctx.store.query("mail_last_read", limit=1)
-        if docs:
-            mid = docs[0].get("message_id", "")
+        # Use ctx.store.get with the fixed-ID "latest" document, not query (unordered).
+        doc = await ctx.store.get("mail_last_read", "latest")
+        if doc:
+            stored_uid = doc.get("user_id", "")
+            if stored_uid and stored_uid != ctx.user.id:
+                return ActionResult.error("auth_mismatch")
+            mid = doc.get("message_id", "")
     if not mid:
         return ActionResult.error("No message_id and no recently read email.")
     acc, provider = await _get_acc(ctx, params.account)

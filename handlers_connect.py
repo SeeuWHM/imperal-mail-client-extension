@@ -121,14 +121,18 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
     ok, err = await asyncio.to_thread(_sync_imap_test, params.email_addr, params.password, imap_h, imap_p)
     if not ok:
         return ActionResult.error(f"IMAP failed: {err}", retryable="timeout" in str(err).lower())
-    accounts = await _all_accounts(ctx)
-    for d in accounts:
-        await ctx.store.update(COLLECTION, d["doc_id"], {**d, "is_active": False})
+    # Create the new account FIRST, then deactivate others.
+    # If create fails, the user still has their existing active account.
     await ctx.store.create(COLLECTION, {
         "email": params.email_addr, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p, "smtp_host": smtp_h, "smtp_port": smtp_p,
         "password": _encrypt_password(params.password), "password_encrypted": True,
     })
+    accounts = await _all_accounts(ctx)
+    for d in accounts:
+        if d.get("email") != params.email_addr:
+            doc_data = {k: v for k, v in d.items() if k != "doc_id"}
+            await ctx.store.update(COLLECTION, d["doc_id"], {**doc_data, "is_active": False})
     try:
         seed = {"email": params.email_addr, "provider": "imap", "imap_host": imap_h, "imap_port": imap_p,
                 "password": params.password, "password_encrypted": False}
@@ -180,13 +184,13 @@ async def fn_switch_account(ctx, params: AccountParams) -> ActionResult:
 @chat.function("disconnect", action_type="destructive", event="account_disconnected",
                description="Remove a connected email account.")
 async def fn_disconnect(ctx, params: AccountParams) -> ActionResult:
-    from providers.helpers import _remove_from_cache
+    from providers.cache import invalidate_inbox
     docs = await ctx.store.query(COLLECTION)
     target = next((d for d in docs if d.id == params.account or d.get("email") == params.account), None)
     if not target:
         return ActionResult.error("Account not found.")
     email = target.get("email", "")
     await ctx.store.delete(COLLECTION, target.id)
-    await _remove_from_cache(ctx, email, "__all__")
+    await invalidate_inbox(ctx, email)
     return ActionResult.success(data={"disconnected": True, "email": email, "remaining": len(docs) - 1},
                                 summary=f"Disconnected {email}")

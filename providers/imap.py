@@ -61,10 +61,16 @@ class ImapMailProvider(BaseMailProvider):
             _sync_smtp_send, email_addr, args["password"],
             smtp_host, smtp_port, to, subject, body, cc, bcc, reply_to_mid)
 
-    def _save_sent_bg(self, email_addr: str, args: dict, msg_bytes: bytes) -> None:
-        asyncio.ensure_future(asyncio.to_thread(
+    async def _save_sent_async(self, email_addr: str, args: dict, msg_bytes: bytes) -> None:
+        """Save sent copy to IMAP Sent folder.
+
+        Awaited directly — asyncio.ensure_future is unreliable inside Temporal
+        activities (the worker runtime may cancel pending tasks on activity return).
+        _save_to_imap_sent already has its own try/except so failures are non-fatal.
+        """
+        await asyncio.to_thread(
             _save_to_imap_sent, email_addr, args["host"], args["port"], msg_bytes,
-            password=args["password"], access_token=args["access_token"]))
+            password=args["password"], access_token=args["access_token"])
 
     async def fetch_inbox(self, ctx: Context, acc: dict, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")
@@ -126,7 +132,7 @@ class ImapMailProvider(BaseMailProvider):
         args = self._imap_args(acc)
         ok, err, msg_bytes = await self._smtp_dispatch(acc, args, email_addr, to, subject, body, cc, bcc)
         if not ok: return self.err(f"SMTP error: {err}")
-        self._save_sent_bg(email_addr, args, msg_bytes)
+        await self._save_sent_async(email_addr, args, msg_bytes)
         return self.ok(sent=True, to=to, subject=subject, from_=email_addr)
 
     async def reply(self, ctx: Context, acc: dict, message_id: str, body: str,
@@ -149,7 +155,7 @@ class ImapMailProvider(BaseMailProvider):
         ok, err, msg_bytes = await self._smtp_dispatch(
             acc, args, email_addr, reply_to, reply_subj, body, cc, bcc, mid_header)
         if not ok: return self.err(f"SMTP reply error: {err}")
-        self._save_sent_bg(email_addr, args, msg_bytes)
+        await self._save_sent_async(email_addr, args, msg_bytes)
         return self.ok(sent=True, to=reply_to, subject=reply_subj,
                        bcc=bcc if bcc else None, from_=email_addr)
 

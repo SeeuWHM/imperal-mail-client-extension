@@ -46,6 +46,7 @@ def _build_email_list(
                 "__panel__email_viewer",
                 message_id=mid,
                 account=active_email,
+                folder=folder,
                 email_list_ids=",".join(msg_ids),
                 current_index=len(msg_ids) - 1,
             ),
@@ -72,7 +73,7 @@ def _build_email_list(
         on_end_reached=on_end,
         selectable=True,
         bulk_actions=bulk,
-        total_items=len(messages),
+        total_items=0,   # 0 = hide built-in paginator; infinite scroll via on_end_reached
         extra_info=f"{unread_count} unread" if unread_count > 0 else "",
     )
 
@@ -104,7 +105,7 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
     cursor_data = decode_cursor(cursor) if cursor else None
     clamped = max(1, min(limit, 100))
 
-    cached = await get_cached_inbox(active_email, folder, cursor)
+    cached = await get_cached_inbox(ctx, active_email, folder, cursor)
     if cached:
         messages, next_cursor_data, has_more = cached
     else:
@@ -112,7 +113,7 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
             messages, next_cursor_data, has_more = await provider.fetch_page(
                 ctx, acc, folder, clamped, cursor_data,
             )
-            await set_cached_inbox(active_email, folder, cursor,
+            await set_cached_inbox(ctx, active_email, folder, cursor,
                                    messages, next_cursor_data, has_more)
         except Exception as e:
             log.warning("inbox panel fetch_page failed folder=%s: %s", folder, e)
@@ -124,7 +125,13 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
 
     provider_key = acc.get("provider", "oauth")
     next_cursor  = encode_cursor(provider_key, next_cursor_data)
-    unread_count = sum(1 for m in messages if m.get("unread"))
+
+    # Get the real folder-level unread count, not just the current page count.
+    unread_count = 0
+    try:
+        unread_count = await provider.get_unread_count(ctx, acc, folder)
+    except Exception:
+        unread_count = sum(1 for m in messages if m.get("unread"))
 
     email_list = _build_email_list(messages, next_cursor, has_more, folder, active_email, unread_count)
 
@@ -148,10 +155,11 @@ async def inbox_panel(ctx, cursor: str = "", folder: str = "INBOX",
 
 @ext.panel("email_viewer", slot="center", title="Email", icon="Mail")
 async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
-                              email_list_ids: str = "", current_index: int = 0):
+                              email_list_ids: str = "", current_index: int = 0,
+                              folder: str = "INBOX"):
     if not message_id:
         return await build_accounts_panel(ctx)
-    return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index)
+    return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index, folder)
 
 
 @ext.panel("accounts", slot="right", title="Accounts", icon="Users")

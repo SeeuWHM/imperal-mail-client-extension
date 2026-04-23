@@ -1,9 +1,7 @@
 """Mail Client · Email Viewer Panel (center overlay)."""
 from __future__ import annotations
 
-import base64
 import logging
-import re
 from html import escape as html_escape
 
 from imperal_sdk import ui
@@ -13,46 +11,32 @@ from providers import get_provider
 
 log = logging.getLogger(__name__)
 
-IMAGE_PROXY = "/api/mail/proxy?url="
-ATTACHMENT_URL = "/api/mail/attachment"
 
+def _attachment_info(attachments: list[dict]) -> list[ui.UINode]:
+    """Render attachment metadata as read-only text items.
 
-def _proxy_images(html: str) -> str:
-    if not html:
-        return html
-
-    def _replace(m):
-        url = m.group(1) or m.group(2)
-        if url.startswith(("data:", "cid:")):
-            return m.group(0)
-        encoded = base64.urlsafe_b64encode(url.encode()).decode()
-        return f'src="{IMAGE_PROXY}{encoded}"'
-
-    return re.sub(r'src="(https?://[^"]+)"|src=\'(https?://[^\']+)\'', _replace, html)
-
-
-def _attachment_buttons(attachments: list[dict], account_email: str, message_id: str) -> list:
-    buttons = []
+    Download endpoints don't exist on the platform yet (SDK gap — no proxy/serve
+    mechanism for binary extension files). Showing honest metadata is better than
+    broken download buttons.
+    """
+    nodes = []
     for att in attachments:
-        att_id   = att.get("id", att.get("attachmentId", ""))
         filename = att.get("filename", "attachment")
         size_kb  = att.get("size_kb", att.get("size", 0))
         if isinstance(size_kb, (int, float)) and size_kb > 1024:
-            size_str = f"{size_kb / 1024:.1f}MB"
+            size_str = f"{size_kb / 1024:.1f} MB"
         else:
-            size_str = f"{size_kb}KB" if size_kb else ""
-        label = filename + (f" ({size_str})" if size_str else "")
-        url = (f"{ATTACHMENT_URL}?id={att_id}&email={account_email}"
-               f"&message_id={message_id}&mode=download")
-        buttons.append(ui.Button(label, icon="Paperclip", variant="outline", size="sm",
-                                  on_click=ui.Open(url=url)))
-    return buttons
+            size_str = f"{size_kb} KB" if size_kb else ""
+        label = f"📎 {filename}" + (f"  ({size_str})" if size_str else "")
+        nodes.append(ui.Text(label, variant="caption"))
+    return nodes
 
 
-def _action_bar(message_id: str, account_email: str, has_cc: bool) -> ui.UINode:
+def _action_bar(message_id: str, account_email: str,
+                has_cc: bool, folder: str = "INBOX") -> ui.UINode:
     buttons = [
         ui.Button("Back", icon="ArrowLeft", variant="ghost", size="sm",
-                   on_click=ui.Call("__panel__inbox")),
+                   on_click=ui.Call("__panel__inbox", folder=folder)),
         ui.Button("Reply", icon="Reply", variant="primary", size="sm",
                    on_click=ui.Call("__panel__compose", mode="reply",
                                     message_id=message_id, account=account_email)),
@@ -61,7 +45,8 @@ def _action_bar(message_id: str, account_email: str, has_cc: bool) -> ui.UINode:
         buttons.append(ui.Button(
             "Reply All", icon="Reply", variant="outline", size="sm",
             on_click=ui.Call("__panel__compose", mode="reply",
-                             message_id=message_id, account=account_email, reply_all="true"),
+                             message_id=message_id, account=account_email,
+                             reply_all=True),
         ))
     buttons.extend([
         ui.Button("Forward", icon="Forward", variant="outline", size="sm",
@@ -83,6 +68,7 @@ def _action_bar(message_id: str, account_email: str, has_cc: bool) -> ui.UINode:
 async def build_email_viewer(
     ctx, message_id: str, account: str = "",
     email_list_ids: str = "", current_index: int = 0,
+    folder: str = "INBOX",
 ) -> ui.UINode:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
@@ -99,10 +85,8 @@ async def build_email_viewer(
     if result.get("RESULT") == "ERROR":
         return ui.Error(message=result.get("error", "Failed to load email"))
 
-    try:
-        await provider.mark_read(ctx, acc, message_id, read=True)
-    except Exception:
-        pass
+    # read_email already marks the message as read internally (Google: removeLabelIds UNREAD,
+    # MS: PATCH isRead, IMAP: STORE +FLAGS \Seen). No second mark_read call needed.
 
     subject     = result.get("subject", "(no subject)")
     from_name   = result.get("from", "Unknown")
@@ -113,11 +97,9 @@ async def build_email_viewer(
     body_type   = result.get("body_type", "html")
     attachments = result.get("attachments", [])
 
-    if body_type == "html" and body:
-        body = _proxy_images(body)
-
     children: list[ui.UINode] = []
-    children.append(_action_bar(message_id, account_email, has_cc=bool(cc_field or to_field)))
+    children.append(_action_bar(message_id, account_email,
+                                has_cc=bool(cc_field), folder=folder))
     children.append(ui.Header(text=subject, level=3))
 
     kv_items = [{"key": "From", "value": from_name}]
@@ -129,15 +111,16 @@ async def build_email_viewer(
     if attachments:
         n = len(attachments)
         children.append(ui.Text(f"{n} attachment{'s' if n > 1 else ''}", variant="caption"))
-        children.append(ui.Stack(
-            _attachment_buttons(attachments, account_email, message_id),
-            direction="horizontal", wrap=True,
-        ))
+        children.append(ui.Stack(_attachment_info(attachments), direction="vertical", gap=1))
 
     children.append(ui.Divider())
 
     if body:
         if body_type == "html":
+            # Render HTML as-is inside the sandboxed iframe. The sandbox attr
+            # blocks scripts; external images load from their original servers
+            # (standard email client behaviour). Image proxy was removed because
+            # the /api/mail/proxy endpoint doesn't exist on the platform.
             children.append(ui.Html(content=body, sandbox=True, theme="light"))
         else:
             safe_text = html_escape(body)
