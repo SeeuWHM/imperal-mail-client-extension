@@ -1,69 +1,46 @@
-"""Mail Client · Shared state & extension setup."""
+"""
+Mail Client — Extension instance + lifecycle (SDK v2.0.0).
+
+Migration notes (2026-04-24, Plan 3 Task 3):
+  * Base class switched from legacy ``ChatExtension`` to v2 ``Extension``.
+    The :class:`~tools.MailExtension` subclass in ``tools.py`` registers
+    every tool via ``@sdk_ext.tool(output_schema=...)``. Webbee Narrator
+    grounds user-facing prose against those schemas kernel-side, so the
+    per-extension ``system_prompt.txt`` is gone.
+  * Panels (``panels.py`` / ``panels_*.py``), skeleton (``skeleton.py``),
+    cache models (``cache_models.py``) + health check keep their v1
+    instance-based decorators (``@ext.panel`` / ``@ext.skeleton`` /
+    ``@ext.cache_model`` / ``@ext.health_check``) — those surfaces are
+    unchanged in v2.0.0 and register against the module-level ``ext``.
+  * Business logic stays in ``handlers_*.py`` as ``impl_*`` functions so
+    the envelope swap (ActionResult → Pydantic return) is minimal.
+  * Context helpers (``_user_id`` / ``_get_acc``) live in ``ctx_helpers``
+    to keep the import graph acyclic — ``tools.py`` imports the handler
+    modules, which imported ``_get_acc`` from here in v1; moving them
+    out breaks the ``app → tools → handlers_* → app`` cycle.
+"""
 from __future__ import annotations
 
 import logging
 
-from imperal_sdk import Extension, Context
-from imperal_sdk.chat import ChatExtension, ActionResult
+from providers.helpers import _all_accounts
 
-from providers import get_provider
-from providers.helpers import _all_accounts, _active_account, COLLECTION
+from tools import MailExtension
 
 log = logging.getLogger("mail")
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────── #
+# ── Extension instance ────────────────────────────────────────────────────────
+#
+# Module-level ``ext`` so v1 instance-based decorators (``@ext.panel`` /
+# ``@ext.skeleton`` / ``@ext.cache_model`` / ``@ext.health_check``) continue
+# to register across panels.py / skeleton.py / cache_models.py without edits.
 
-def _user_id(ctx) -> str:
-    return ctx.user.id if hasattr(ctx, "user") and ctx.user else ""
-
-
-async def _get_acc(ctx: Context, account: str = ""):
-    """Resolve active account and provider. Returns (acc, provider) or (None, None)."""
-    acc = await _active_account(ctx, account)
-    if not acc:
-        return None, None
-    return acc, get_provider(acc)
+ext = MailExtension(app_id="mail", version="5.0.0")
 
 
-def _no_account_error() -> ActionResult:
-    return ActionResult.error("No email account connected. Connect one first.")
+# ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-
-def _wrap_provider_result(result: dict, summary: str) -> ActionResult:
-    """Convert provider dict (RESULT: SUCCESS/ERROR) to ActionResult."""
-    if result.get("RESULT") == "ERROR":
-        err = result.get("error", "Unknown provider error")
-        retryable = any(k in err.lower() for k in ("rate", "timeout", "timed out", "network", "connect"))
-        return ActionResult.error(err, retryable=retryable)
-    data = {k: v for k, v in result.items() if k != "RESULT"}
-    return ActionResult.success(data=data, summary=summary)
-
-
-# ─── System Prompt ────────────────────────────────────────────────────── #
-
-from pathlib import Path as _Path
-SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
-
-
-# ─── Extension ────────────────────────────────────────────────────────── #
-
-ext = Extension("mail", version="4.3.0")
-
-chat = ChatExtension(
-    ext=ext,
-    tool_name="tool_mail_client_chat",
-    description=(
-        "Mail Client — inbox, read, send, reply, forward, search, archive, delete, "
-        "star, mark read/unread, browse folders, view threads, bulk operations. "
-        "Connect Google, Microsoft Outlook, Yahoo, AOL, iCloud, or any IMAP/SMTP provider."
-    ),
-    system_prompt=SYSTEM_PROMPT,
-    model="claude-haiku-4-5-20251001",
-)
-
-
-# ─── Health Check ─────────────────────────────────────────────────────── #
 
 @ext.health_check
 async def health(ctx) -> dict:
@@ -71,14 +48,12 @@ async def health(ctx) -> dict:
     return {"status": "ok", "version": ext.version, "accounts_connected": len(accounts)}
 
 
-# ─── Lifecycle Hooks ──────────────────────────────────────────────────── #
-
 @ext.on_install
 async def on_install(ctx):
-    log.info(f"mail installed for user {ctx.user.id if ctx and hasattr(ctx, 'user') and ctx.user else 'system'}")
+    log.info(
+        f"mail installed for user {ctx.user.id if ctx and hasattr(ctx, 'user') and ctx.user else 'system'}"
+    )
 
-
-# ─── Event Handlers ───────────────────────────────────────────────────── #
 
 @ext.on_event("email.received")
 async def on_email_received(ctx, event):

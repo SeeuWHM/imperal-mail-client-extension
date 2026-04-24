@@ -5,7 +5,7 @@ import logging
 
 from imperal_sdk import ui
 
-from app import _get_acc
+from ctx_helpers import _get_acc
 
 log = logging.getLogger(__name__)
 

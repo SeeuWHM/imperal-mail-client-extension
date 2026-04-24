@@ -41,10 +41,6 @@ def _sync_imap_inbox(email_addr: str, host: str, port: int, max_results: int = 2
     return messages
 
 
-_UID_RE   = re.compile(rb'UID (\d+)')
-_FLAGS_RE = re.compile(rb'FLAGS \(([^)]*)\)')
-
-
 def _sync_imap_fetch_page(email_addr: str, host: str, port: int,
                           imap_folder: str, limit: int,
                           last_uid: int | None,
@@ -55,112 +51,64 @@ def _sync_imap_fetch_page(email_addr: str, host: str, port: int,
     candidates = IMAP_FOLDER_CANDIDATES.get(imap_folder.lower(), [imap_folder])
     if imap_folder.upper() == "INBOX":
         candidates = ["INBOX"]
-
-    count   = 0
     selected = False
     for candidate in candidates:
-        r, data = imap.select(f'"{candidate}"', readonly=True)
+        r, _ = imap.select(f'"{candidate}"', readonly=True)
         if r == "OK":
             selected = True
-            count = int(data[0]) if data and data[0] else 0
             break
-    if not selected or count == 0:
+    if not selected:
         imap.logout()
         return [], None, False
 
-    # Fetch UNSEEN UIDs (fast — only unread, typically a small list)
+    _, uid_data = imap.uid("SEARCH", "ALL")
+    all_uids = uid_data[0].split() if uid_data and uid_data[0] else []
+    if not all_uids:
+        imap.logout()
+        return [], None, False
+
+    uid_ints = sorted([int(u) for u in all_uids], reverse=True)
+    if last_uid is not None:
+        uid_ints = [u for u in uid_ints if u < last_uid]
+
+    page_uids = uid_ints[:limit]
+    if not page_uids:
+        imap.logout()
+        return [], None, False
+
     _, useen_data = imap.uid("SEARCH", "UNSEEN")
     unseen_uids = set(useen_data[0].split()) if useen_data and useen_data[0] else set()
 
-    if last_uid is None:
-        # ── First page optimisation ───────────────────────────────────────────
-        # Fetch by sequence number range instead of SEARCH ALL.
-        # For mailboxes with 16k+ messages SEARCH ALL downloads all UIDs (~100 KB)
-        # and sorts them in Python. Sequence-range FETCH avoids that entirely.
-        start_seq = max(1, count - limit + 1)
-        _, fetch_data = imap.fetch(f"{start_seq}:{count}", "(UID FLAGS RFC822.HEADER)")
-        imap.logout()
+    messages: list[dict] = []
+    for uid_int in page_uids:
+        uid_bytes = str(uid_int).encode()
+        _, msg_data = imap.uid("FETCH", uid_bytes, "(RFC822.HEADER FLAGS)")
+        if not msg_data or not msg_data[0]:
+            continue
+        raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+        if not raw:
+            continue
+        msg = email_lib.message_from_bytes(raw)
+        starred = b"\\Flagged" in (msg_data[0][0] if isinstance(msg_data[0], tuple) else b"")
+        messages.append({
+            "message_id":  str(uid_int),
+            "thread_id":   str(uid_int),
+            "from":        _decode_header(msg.get("From", "unknown")),
+            "subject":     _decode_header(msg.get("Subject", "(no subject)")),
+            "snippet":     "",
+            "date":        msg.get("Date", ""),
+            "unread":      uid_bytes in unseen_uids,
+            "starred":     starred,
+            "has_attachments": False,
+            "labels":      [],
+        })
 
-        pairs: list[tuple[int, bytes, bytes]] = []  # (uid, envelope, header_bytes)
-        for item in (fetch_data or []):
-            if isinstance(item, tuple) and len(item) >= 2:
-                envelope, header_bytes = item[0], item[1]
-                if not isinstance(envelope, bytes) or not header_bytes:
-                    continue
-                uid_m = _UID_RE.search(envelope)
-                if uid_m:
-                    pairs.append((int(uid_m.group(1)), envelope, header_bytes))
-
-        # Sort descending by UID (newest first)
-        pairs.sort(key=lambda t: t[0], reverse=True)
-
-        messages: list[dict] = []
-        for uid_int, envelope, header_bytes in pairs[:limit]:
-            uid_bytes = str(uid_int).encode()
-            msg     = email_lib.message_from_bytes(header_bytes)
-            starred = b"\\Flagged" in envelope
-            messages.append({
-                "message_id":      str(uid_int),
-                "thread_id":       str(uid_int),
-                "from":            _decode_header(msg.get("From", "unknown")),
-                "subject":         _decode_header(msg.get("Subject", "(no subject)")),
-                "snippet":         "",
-                "date":            msg.get("Date", ""),
-                "unread":          uid_bytes in unseen_uids,
-                "starred":         starred,
-                "has_attachments": False,
-                "labels":          [],
-            })
-
-        lowest_uid  = pairs[limit - 1][0] if len(pairs) >= limit else (pairs[-1][0] if pairs else None)
-        has_more    = start_seq > 1 and lowest_uid is not None
-        new_last_uid = lowest_uid if has_more else None
-        return messages, new_last_uid, has_more
-
-    else:
-        # ── Subsequent pages (cursor present) ────────────────────────────────
-        # SEARCH ALL is unavoidable here since we need UIDs < last_uid.
-        # For typical usage this path runs only when user scrolls to page 2+.
-        _, uid_data = imap.uid("SEARCH", "ALL")
-        all_uids = uid_data[0].split() if uid_data and uid_data[0] else []
-        uid_ints = sorted([int(u) for u in all_uids], reverse=True)
-        uid_ints = [u for u in uid_ints if u < last_uid]
-
-        page_uids = uid_ints[:limit]
-        if not page_uids:
-            imap.logout()
-            return [], None, False
-
-        messages = []
-        for uid_int in page_uids:
-            uid_bytes = str(uid_int).encode()
-            _, msg_data = imap.uid("FETCH", uid_bytes, "(RFC822.HEADER FLAGS)")
-            if not msg_data or not msg_data[0]:
-                continue
-            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
-            if not raw:
-                continue
-            msg     = email_lib.message_from_bytes(raw)
-            starred = b"\\Flagged" in (msg_data[0][0] if isinstance(msg_data[0], tuple) else b"")
-            messages.append({
-                "message_id":      str(uid_int),
-                "thread_id":       str(uid_int),
-                "from":            _decode_header(msg.get("From", "unknown")),
-                "subject":         _decode_header(msg.get("Subject", "(no subject)")),
-                "snippet":         "",
-                "date":            msg.get("Date", ""),
-                "unread":          uid_bytes in unseen_uids,
-                "starred":         starred,
-                "has_attachments": False,
-                "labels":          [],
-            })
-
-        imap.logout()
-        lowest_fetched = page_uids[-1] if page_uids else None
-        remaining      = [u for u in uid_ints if u < lowest_fetched] if lowest_fetched else []
-        has_more       = len(remaining) > 0
-        new_last_uid   = lowest_fetched if has_more else None
-        return messages, new_last_uid, has_more
+    imap.logout()
+    lowest_fetched = page_uids[-1] if page_uids else None
+    remaining = [u for u in uid_ints if u < lowest_fetched] if lowest_fetched else []
+    has_more = len(remaining) > 0
+    new_last_uid = lowest_fetched if has_more else None
+    return messages, new_last_uid, has_more
 
 
 def _sync_imap_unread_count(email_addr: str, host: str, port: int,
@@ -263,6 +211,71 @@ def _sync_imap_read(email_addr: str, host: str, port: int, message_id: str,
     return {}
 
 
-# _sync_imap_search and _sync_imap_folder moved to imap_write.py to keep
-# this file under 300 lines. Import them here for backward compatibility.
-from .imap_write import _sync_imap_search, _sync_imap_folder  # noqa: F401, E402
+def _sync_imap_search(email_addr: str, host: str, port: int, query: str, max_results: int = 10,
+                      *, password: str = "", access_token: str = "") -> list[dict] | None:
+    def _map_query(q: str) -> str:
+        ql = q.strip().lower()
+        if ql.startswith("from:"):    return f'FROM "{q[5:].strip()}"'
+        if ql.startswith("to:"):      return f'TO "{q[3:].strip()}"'
+        if ql.startswith("subject:"): return f'SUBJECT "{q[8:].strip()}"'
+        if ql in ("is:unread", "unread"): return "UNSEEN"
+        if ql in ("is:read",   "read"):   return "SEEN"
+        return f'TEXT "{q.strip()}"'
+    try:
+        imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        imap.select("INBOX")
+        _, uid_data = imap.uid("SEARCH", _map_query(query))
+        uid_list = uid_data[0].split() if uid_data and uid_data[0] else []
+        recent   = uid_list[-max_results:][::-1]
+        messages = []
+        for uid in recent:
+            _, msg_data = imap.uid("FETCH", uid, "(RFC822.HEADER)")
+            if not msg_data or not msg_data[0]: continue
+            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+            if not raw: continue
+            msg = email_lib.message_from_bytes(raw)
+            messages.append({
+                "id":      uid.decode(),
+                "subject": _decode_header(msg.get("Subject", "(no subject)")),
+                "from":    _decode_header(msg.get("From", "unknown")),
+                "date":    msg.get("Date", ""),
+            })
+        imap.logout()
+        return messages
+    except Exception as e:
+        log.warning(f"IMAP search failed: {e}")
+        return None
+
+
+def _sync_imap_folder(email_addr: str, host: str, port: int, folder_name: str,
+                      max_results: int = 20, *, password: str = "", access_token: str = "") -> list[dict] | None:
+    try:
+        imap       = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        candidates = IMAP_FOLDER_CANDIDATES.get(folder_name.lower(), [folder_name])
+        selected   = False
+        for candidate in candidates:
+            r, _ = imap.select(f'"{candidate}"', readonly=True)
+            if r == "OK": selected = True; break
+        if not selected: imap.logout(); return []
+        search_criteria = "UNSEEN" if folder_name.lower() == "unread" else "ALL"
+        _, uid_data = imap.uid("SEARCH", search_criteria)
+        uid_list = uid_data[0].split() if uid_data and uid_data[0] else []
+        recent   = uid_list[-max_results:][::-1]
+        messages = []
+        for uid in recent:
+            _, msg_data = imap.uid("FETCH", uid, "(RFC822.HEADER)")
+            if not msg_data or not msg_data[0]: continue
+            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+            if not raw: continue
+            msg = email_lib.message_from_bytes(raw)
+            messages.append({
+                "id":      uid.decode(),
+                "subject": _decode_header(msg.get("Subject", "(no subject)")),
+                "from":    _decode_header(msg.get("From", "unknown")),
+                "date":    msg.get("Date", ""),
+            })
+        imap.logout()
+        return messages
+    except Exception as e:
+        log.warning(f"IMAP folder browse failed: {e}")
+        return None

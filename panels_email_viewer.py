@@ -6,7 +6,8 @@ from html import escape as html_escape
 
 from imperal_sdk import ui
 
-from app import ext, _get_acc
+from app import ext
+from ctx_helpers import _get_acc
 from providers import get_provider
 
 log = logging.getLogger(__name__)

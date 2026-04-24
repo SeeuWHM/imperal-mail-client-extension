@@ -1,7 +1,9 @@
 """Shared helpers for all mail providers.
 
 Constants (OAuth URLs, env vars, storage keys), account helpers,
-IMAP provider detection, cursor encode/decode, and IMAP folder candidates.
+IMAP provider detection, cursor encode/decode, IMAP folder candidates,
+and SDK v1.6.0 ``ctx.cache``-aware helpers for last-read watermark + best-
+effort inbox page invalidation.
 """
 from __future__ import annotations
 
@@ -18,7 +20,6 @@ log = logging.getLogger(__name__)
 # ── Storage constants ──────────────────────────────────────────────────────
 COLLECTION          = "gmail_accounts"   # kept for backwards compat with stored data
 CONTACTS_COLLECTION = "mail_contacts"
-SKELETON_INBOX      = "inbox_cache"
 INBOX_FETCH_SIZE    = 20
 
 # ── Google OAuth / Gmail REST ──────────────────────────────────────────────
@@ -63,16 +64,100 @@ from .token_refresh import (  # noqa: E402, F401
     _refresh_token_if_needed,
     _api_get, _api_post, _graph_get, _graph_post, _graph_patch,
 )
-from .cache import (  # noqa: E402, F401
-    _remove_from_cache, _remove_multiple_from_cache,
-    _update_read_in_cache, _save_last_read,
-)
 from .text_utils import (  # noqa: E402, F401
     _encrypt_password, _decrypt_password,
     _header, _decode_header, _short_sender,
     _strip_html, _decode_body, _decode_body_with_type, _build_message,
     _norm_graph_msg, _xoauth2_string,
 )
+
+
+# ── ctx.cache inbox-page key helpers (SDK v1.6.0) ─────────────────────────
+# Keys must satisfy ``[A-Za-z0-9_\-:]+`` length <= 128 (I-CACHE-KEY-SAFETY).
+# We derive a stable short token per (email, folder, cursor) and hash the
+# cursor so arbitrary cursor payloads (base64/URL-safe) stay within the
+# key grammar.
+import hashlib as _hashlib
+import re as _re
+
+_KEY_SAFE = _re.compile(r"[^A-Za-z0-9_\-]")
+
+
+def _slug(s: str, max_len: int = 24) -> str:
+    """Collapse an arbitrary string to a key-safe short token."""
+    safe = _KEY_SAFE.sub("_", (s or ""))[:max_len]
+    return safe or "none"
+
+
+def _inbox_page_key(email: str, folder: str, cursor: str = "") -> str:
+    """Canonical ctx.cache key for an inbox page.
+
+    Shape: ``inbox:<email-slug>:<folder-slug>:<cursor-hash>``. Stays within
+    the 128-char bound and only uses alphanumerics + ``_-:`` per
+    I-CACHE-KEY-SAFETY.
+    """
+    email_slug  = _slug(email)
+    folder_slug = _slug(folder)
+    if cursor:
+        cur = _hashlib.md5(cursor.encode()).hexdigest()[:10]
+    else:
+        cur = "first"
+    return f"inbox:{email_slug}:{folder_slug}:{cur}"
+
+
+def _unread_summary_key(email: str, folder: str = "INBOX") -> str:
+    return f"unread:{_slug(email)}:{_slug(folder)}"
+
+
+# ── Best-effort cache-bust helpers (thin wrappers over ctx.cache.delete) ─
+# Replaces the Redis SCAN-based invalidation from the deleted providers/cache.py.
+# ctx.cache exposes only per-key delete (no SCAN), so we invalidate the
+# first-page key on write actions — subsequent pages self-expire via TTL.
+# Staleness trade-off is documented in the migration spec.
+
+async def _invalidate_first_page(ctx, email: str, folder: str = "INBOX") -> None:
+    try:
+        if hasattr(ctx, "cache") and ctx.cache is not None:
+            await ctx.cache.delete(_inbox_page_key(email, folder, ""))
+            await ctx.cache.delete(_unread_summary_key(email, folder))
+    except Exception as e:
+        log.debug("_invalidate_first_page(%s/%s): %s", email, folder, e)
+
+
+async def _remove_from_cache(ctx, email: str, message_id: str) -> None:
+    """Invalidate the first-page inbox cache after a single-message remove."""
+    await _invalidate_first_page(ctx, email, "INBOX")
+
+
+async def _remove_multiple_from_cache(ctx, email: str, message_ids: list[str]) -> None:
+    """Invalidate the first-page inbox cache after a bulk remove."""
+    if not message_ids:
+        return
+    await _invalidate_first_page(ctx, email, "INBOX")
+
+
+async def _update_read_in_cache(ctx, email: str, message_id: str, is_read: bool = True) -> None:
+    """Invalidate the first-page inbox cache after a read-state change."""
+    await _invalidate_first_page(ctx, email, "INBOX")
+
+
+async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
+                          message_id_header: str = "", thread_id: str = "") -> None:
+    """Persist the last-read watermark, stamped with user_id for defence-in-depth."""
+    try:
+        user_id = ""
+        if ctx and hasattr(ctx, "user") and ctx.user and hasattr(ctx.user, "id"):
+            user_id = str(ctx.user.id or "")
+        await ctx.store.set("mail_last_read", "latest", {
+            "message_id":        message_id,
+            "subject":           subject,
+            "sender":            sender,
+            "message_id_header": message_id_header,
+            "thread_id":         thread_id,
+            "user_id":           user_id,
+        })
+    except Exception as e:
+        log.debug("_save_last_read failed: %s", e)
 
 
 # ── Account helpers ───────────────────────────────────────────────────────

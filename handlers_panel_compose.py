@@ -1,70 +1,50 @@
-"""Mail Client · Compose send handler for panel."""
+"""Mail Client · Compose send handler for panel (SDK v2.0.0)."""
 from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel, Field
+from ctx_helpers import _get_acc
 
-from app import chat, ActionResult, _get_acc, _no_account_error
+from schemas import ComposeSendResult
 
 log = logging.getLogger(__name__)
 
 
-class ComposeSendParams(BaseModel):
-    """Parameters for compose send from panel."""
-    mode: str = Field(default="new", description="reply, forward, or new")
-    message_id: str = Field(default="", description="Original message ID for reply/forward")
-    to: str = Field(default="", description="Recipient email")
-    subject: str = Field(default="", description="Email subject")
-    body: str = Field(default="", description="Email body")
-    cc: str = Field(default="", description="CC recipients")
-    bcc: str = Field(default="", description="BCC recipients")
-    account: str = Field(default="", description="Send from this account")
-    attachments: list = Field(
-        default_factory=list,
-        description="File attachments (base64) — reserved for future provider support",
-    )
+async def impl_compose_send(
+    ctx, mode: str = "new", message_id: str = "", to: str = "",
+    subject: str = "", body: str = "", cc: str = "", bcc: str = "",
+    account: str = "", attachments: list | None = None,
+) -> ComposeSendResult:
+    if not to:
+        raise RuntimeError("Recipient (to) is required.")
 
-
-@chat.function(
-    "compose_send",
-    action_type="write",
-    event="sent",
-    description="Send email from compose panel (reply/forward/new).",
-)
-async def fn_compose_send(ctx, params: ComposeSendParams) -> ActionResult:
-    if not params.to:
-        return ActionResult.error("Recipient (to) is required.")
-
-    acc, provider = await _get_acc(ctx, params.account)
+    acc, provider = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
+        raise RuntimeError("No email account connected. Connect one first.")
 
     try:
-        if params.mode == "reply" and params.message_id:
+        if mode == "reply" and message_id:
             result = await provider.reply(
-                ctx, acc, message_id=params.message_id, body=params.body,
-                to=params.to, cc=params.cc, bcc=params.bcc,
+                ctx, acc, message_id=message_id, body=body,
+                to=to, cc=cc, bcc=bcc,
             )
-        elif params.mode == "forward" and params.message_id:
+        elif mode == "forward" and message_id:
             result = await provider.forward(
-                ctx, acc, message_id=params.message_id, to=params.to, comment=params.body,
+                ctx, acc, message_id=message_id, to=to, comment=body,
             )
         else:
-            if not params.subject:
-                return ActionResult.error("Subject is required for new emails.")
+            if not subject:
+                raise RuntimeError("Subject is required for new emails.")
             result = await provider.send(
-                ctx, acc, to=params.to, subject=params.subject,
-                body=params.body, cc=params.cc, bcc=params.bcc,
+                ctx, acc, to=to, subject=subject, body=body, cc=cc, bcc=bcc,
             )
+    except RuntimeError:
+        raise
     except Exception as e:
-        log.error("compose_send failed mode=%s: %s", params.mode, e)
-        return ActionResult.error(f"Failed to send: {e}")
+        log.error("compose_send failed mode=%s: %s", mode, e)
+        raise RuntimeError(f"Failed to send: {e}")
 
     if result.get("RESULT") == "ERROR":
-        return ActionResult.error(result.get("error", "Send failed"))
+        raise RuntimeError(result.get("error", "Send failed"))
 
-    return ActionResult.success(
-        data={"sent": True, "to": params.to, "mode": params.mode},
-        summary=f"Email {params.mode} sent to {params.to}",
-    )
+    return ComposeSendResult(sent=True, to=to, mode=mode)

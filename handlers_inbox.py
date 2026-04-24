@@ -1,106 +1,46 @@
-"""Mail Client · Inbox & compose handlers."""
+"""Mail Client · Inbox & compose handlers (SDK v2.0.0)."""
 from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel, Field
-
-from app import chat, ActionResult, _get_acc, _no_account_error, _wrap_provider_result
+from ctx_helpers import _get_acc
 
 from providers import get_provider
-from providers.helpers import SKELETON_INBOX, encode_cursor, decode_cursor
+from providers.helpers import encode_cursor, decode_cursor
+
+from schemas import (
+    EmailBody, InboxPageResult, SearchResult, SendResult, ThreadView,
+)
 
 log = logging.getLogger(__name__)
 
 
-# ─── Models ───────────────────────────────────────────────────────────── #
-
-class InboxParams(BaseModel):
-    """Fetch inbox page with cursor-based pagination."""
-    folder: str        = Field(default="inbox", description="Folder: inbox, sent, spam, trash, drafts, starred")
-    cursor: str | None = Field(default=None, description="Pagination cursor from previous response")
-    limit: int         = Field(default=20, description="Messages per page (max 100)")
-    account: str       = Field(default="", description="Email account to use")
-
-
-class MessageIdParams(BaseModel):
-    """Target a specific email."""
-    message_id: str = Field(description="Email message ID")
-    account: str    = Field(default="", description="Email account")
-
-
-class SearchParams(BaseModel):
-    """Search emails."""
-    query: str       = Field(description="Search query")
-    max_results: int = Field(default=10, description="Max results")
-    account: str     = Field(default="", description="Email account")
-
-
-class FolderParams(BaseModel):
-    """Browse a mail folder with cursor-based pagination."""
-    folder: str        = Field(description="Folder: sent, spam, trash, starred, drafts, all, archive, unread")
-    cursor: str | None = Field(default=None, description="Pagination cursor from previous response")
-    limit: int         = Field(default=20, description="Messages per page (max 100)")
-    account: str       = Field(default="", description="Email account")
-
-
-class ThreadParams(BaseModel):
-    """View an email thread."""
-    thread_id: str = Field(description="Thread ID")
-    account: str   = Field(default="", description="Email account")
-
-
-class SendParams(BaseModel):
-    """Send a new email."""
-    to: str      = Field(description="Recipient email")
-    subject: str = Field(description="Email subject")
-    body: str    = Field(description="Email body")
-    cc: str      = Field(default="", description="CC recipients")
-    bcc: str     = Field(default="", description="BCC recipients")
-    account: str = Field(default="", description="Send from this account")
-
-
-class ReplyParams(BaseModel):
-    """Reply to an email."""
-    message_id: str = Field(default="", description="Message to reply to (uses last read if empty)")
-    body: str       = Field(description="Reply body")
-    to: str         = Field(default="", description="Override reply recipient(s)")
-    cc: str         = Field(default="", description="CC")
-    bcc: str        = Field(default="", description="BCC")
-    account: str    = Field(default="", description="Email account")
-
-
-class ForwardParams(BaseModel):
-    """Forward an email."""
-    message_id: str = Field(description="Message to forward")
-    to: str         = Field(description="Forward recipient")
-    comment: str    = Field(default="", description="Comment to add")
-    account: str    = Field(default="", description="Email account")
-
-
 # ─── Read Handlers ────────────────────────────────────────────────────── #
 
-@chat.function("inbox", action_type="read", description="Show inbox messages with pagination.")
-async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
-    acc, _ = await _get_acc(ctx, params.account)
+
+async def impl_inbox(
+    ctx, folder: str = "inbox", cursor: str = "",
+    limit: int = 20, account: str = "",
+) -> InboxPageResult:
+    acc, _ = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
+        raise RuntimeError("No email account connected. Connect one first.")
 
     provider = get_provider(acc)
-    cursor_data = decode_cursor(params.cursor)
-    clamped_limit = max(1, min(params.limit, 100))
+    cursor_data = decode_cursor(cursor) if cursor else None
+    clamped_limit = max(1, min(limit, 100))
 
     try:
         messages, next_cursor_data, has_more = await provider.fetch_page(
-            ctx, acc, params.folder, clamped_limit, cursor_data,
+            ctx, acc, folder, clamped_limit, cursor_data,
         )
     except Exception as e:
-        log.warning("fetch_page failed folder=%s: %s", params.folder, e)
-        return ActionResult.error(f"Failed to fetch {params.folder}: {e}")
+        log.warning("fetch_page failed folder=%s: %s", folder, e)
+        raise RuntimeError(f"Failed to fetch {folder}: {e}")
 
     unread = 0
     try:
-        unread = await provider.get_unread_count(ctx, acc, params.folder)
+        unread = await provider.get_unread_count(ctx, acc, folder)
     except Exception:
         pass
 
@@ -109,58 +49,64 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
             msg["message_id"] = msg.pop("id")
 
     provider_key = acc.get("provider", "oauth")
-    return ActionResult.success(
-        data={
-            "messages": messages,
-            "cursor": encode_cursor(provider_key, next_cursor_data),
-            "has_more": has_more,
-            "unread_count": unread,
-        },
-        summary=f"{params.folder}: {unread} unread, {len(messages)} shown",
+    return InboxPageResult(
+        messages=messages,
+        cursor=encode_cursor(provider_key, next_cursor_data) or None,
+        has_more=bool(has_more),
+        unread_count=int(unread),
     )
 
 
-@chat.function("read_email", action_type="read", description="Read full email content by message ID.")
-async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
-    acc, provider = await _get_acc(ctx, params.account)
+async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
+    acc, provider = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
-    result = await provider.read_email(ctx, acc, params.message_id)
-    subj = result.get("subject", "") if result.get("RESULT") != "ERROR" else ""
-    return _wrap_provider_result(result, f"Email: {subj}" if subj else "Read email")
+        raise RuntimeError("No email account connected. Connect one first.")
+    result = await provider.read_email(ctx, acc, message_id)
+    if result.get("RESULT") == "ERROR":
+        raise RuntimeError(result.get("error", "Unknown provider error"))
+    data = {k: v for k, v in result.items() if k != "RESULT"}
+    # EmailBody uses alias="from" for the sender field — pydantic accepts
+    # both "from" (alias) and "from_" (attr name) via populate_by_name.
+    return EmailBody.model_validate(data)
 
 
-@chat.function("search", action_type="read", description="Search emails by sender, subject, keywords.")
-async def fn_search(ctx, params: SearchParams) -> ActionResult:
-    acc, provider = await _get_acc(ctx, params.account)
+async def impl_search(
+    ctx, query: str, max_results: int = 10, account: str = "",
+) -> SearchResult:
+    acc, provider = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
-    result = await provider.search(ctx, acc, query=params.query, max_results=params.max_results)
-    total = result.get("total", len(result.get("results", []))) if result.get("RESULT") != "ERROR" else 0
-    return _wrap_provider_result(result, f"Search '{params.query}': {total} results")
+        raise RuntimeError("No email account connected. Connect one first.")
+    result = await provider.search(ctx, acc, query=query, max_results=max_results)
+    if result.get("RESULT") == "ERROR":
+        raise RuntimeError(result.get("error", "Unknown provider error"))
+    results = result.get("results", []) or []
+    total = int(result.get("total", len(results)) or 0)
+    return SearchResult(query=query, results=results, total=total)
 
 
-@chat.function("folder", action_type="read", description="Browse a mail folder with pagination.")
-async def fn_folder(ctx, params: FolderParams) -> ActionResult:
-    acc, _ = await _get_acc(ctx, params.account)
+async def impl_folder(
+    ctx, folder: str, cursor: str = "",
+    limit: int = 20, account: str = "",
+) -> InboxPageResult:
+    acc, _ = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
+        raise RuntimeError("No email account connected. Connect one first.")
 
     provider = get_provider(acc)
-    cursor_data = decode_cursor(params.cursor)
-    clamped_limit = max(1, min(params.limit, 100))
+    cursor_data = decode_cursor(cursor) if cursor else None
+    clamped_limit = max(1, min(limit, 100))
 
     try:
         messages, next_cursor_data, has_more = await provider.fetch_page(
-            ctx, acc, params.folder, clamped_limit, cursor_data,
+            ctx, acc, folder, clamped_limit, cursor_data,
         )
     except Exception as e:
-        log.warning("fetch_page failed folder=%s: %s", params.folder, e)
-        return ActionResult.error(f"Failed to fetch folder '{params.folder}': {e}")
+        log.warning("fetch_page failed folder=%s: %s", folder, e)
+        raise RuntimeError(f"Failed to fetch folder '{folder}': {e}")
 
     unread = 0
     try:
-        unread = await provider.get_unread_count(ctx, acc, params.folder)
+        unread = await provider.get_unread_count(ctx, acc, folder)
     except Exception:
         pass
 
@@ -169,70 +115,104 @@ async def fn_folder(ctx, params: FolderParams) -> ActionResult:
             msg["message_id"] = msg.pop("id")
 
     provider_key = acc.get("provider", "oauth")
-    return ActionResult.success(
-        data={
-            "messages": messages,
-            "cursor": encode_cursor(provider_key, next_cursor_data),
-            "has_more": has_more,
-            "unread_count": unread,
-        },
-        summary=f"Folder '{params.folder}': {unread} unread, {len(messages)} shown",
+    return InboxPageResult(
+        messages=messages,
+        cursor=encode_cursor(provider_key, next_cursor_data) or None,
+        has_more=bool(has_more),
+        unread_count=int(unread),
     )
 
 
-@chat.function("get_thread", action_type="read", description="View full email thread by thread ID.")
-async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
-    acc, provider = await _get_acc(ctx, params.account)
+async def impl_get_thread(ctx, thread_id: str, account: str = "") -> ThreadView:
+    acc, provider = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
-    result = await provider.get_thread(ctx, acc, params.thread_id)
-    total = result.get("total", 0) if result.get("RESULT") != "ERROR" else 0
-    return _wrap_provider_result(result, f"Thread: {total} messages")
+        raise RuntimeError("No email account connected. Connect one first.")
+    result = await provider.get_thread(ctx, acc, thread_id)
+    if result.get("RESULT") == "ERROR":
+        raise RuntimeError(result.get("error", "Unknown provider error"))
+    messages = result.get("messages", []) or []
+    total = int(result.get("total", len(messages)) or 0)
+    return ThreadView(
+        thread_id=result.get("thread_id") or thread_id,
+        subject=result.get("subject"),
+        total=total,
+        messages=messages,
+    )
 
 
 # ─── Write Handlers ───────────────────────────────────────────────────── #
 
-@chat.function("send", action_type="write", event="sent", description="Send a new email.")
-async def fn_send(ctx, params: SendParams) -> ActionResult:
-    if not params.to or not params.subject or not params.body:
-        return ActionResult.error("to, subject, and body are required.")
-    acc, provider = await _get_acc(ctx, params.account)
+
+async def impl_send(
+    ctx, to: str, subject: str, body: str,
+    cc: str = "", bcc: str = "", account: str = "",
+) -> SendResult:
+    if not to or not subject or not body:
+        raise RuntimeError("to, subject, and body are required.")
+    acc, provider = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
-    result = await provider.send(ctx, acc, to=params.to, subject=params.subject, body=params.body, cc=params.cc, bcc=params.bcc)
-    return _wrap_provider_result(result, f"Email sent to {params.to}")
+        raise RuntimeError("No email account connected. Connect one first.")
+    result = await provider.send(
+        ctx, acc, to=to, subject=subject, body=body, cc=cc, bcc=bcc,
+    )
+    if result.get("RESULT") == "ERROR":
+        raise RuntimeError(result.get("error", "Send failed"))
+    return SendResult(
+        sent=True,
+        to=to,
+        subject=subject,
+        message_id=result.get("message_id") or result.get("id"),
+    )
 
 
-@chat.function("reply", action_type="write", event="replied", description="Reply to an email.")
-async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
+async def impl_reply(
+    ctx, body: str, message_id: str = "", to: str = "",
+    cc: str = "", bcc: str = "", account: str = "",
+) -> SendResult:
     # Auth guard — fail at the front door rather than reaching the store.
     if not ctx.user or not ctx.user.id or ctx.user.id == "__system__":
-        return ActionResult.error("No authenticated user context.")
-    if not params.body:
-        return ActionResult.error("Reply body is required.")
-    mid = params.message_id
+        raise RuntimeError("No authenticated user context.")
+    if not body:
+        raise RuntimeError("Reply body is required.")
+    mid = message_id
     if not mid:
         # Use ctx.store.get with the fixed-ID "latest" document, not query (unordered).
         doc = await ctx.store.get("mail_last_read", "latest")
         if doc:
             stored_uid = doc.get("user_id", "")
             if stored_uid and stored_uid != ctx.user.id:
-                return ActionResult.error("auth_mismatch")
+                raise RuntimeError("auth_mismatch")
             mid = doc.get("message_id", "")
     if not mid:
-        return ActionResult.error("No message_id and no recently read email.")
-    acc, provider = await _get_acc(ctx, params.account)
+        raise RuntimeError("No message_id and no recently read email.")
+    acc, provider = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
-    result = await provider.reply(ctx, acc, message_id=mid, body=params.body, to=params.to, cc=params.cc, bcc=params.bcc)
-    reply_to = result.get("to", "") if result.get("RESULT") != "ERROR" else ""
-    return _wrap_provider_result(result, f"Reply sent to {reply_to}" if reply_to else "Reply sent")
+        raise RuntimeError("No email account connected. Connect one first.")
+    result = await provider.reply(
+        ctx, acc, message_id=mid, body=body, to=to, cc=cc, bcc=bcc,
+    )
+    if result.get("RESULT") == "ERROR":
+        raise RuntimeError(result.get("error", "Reply failed"))
+    return SendResult(
+        sent=True,
+        to=result.get("to") or to,
+        message_id=result.get("message_id") or result.get("id"),
+    )
 
 
-@chat.function("forward", action_type="write", event="forwarded", description="Forward an email.")
-async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
-    acc, provider = await _get_acc(ctx, params.account)
+async def impl_forward(
+    ctx, message_id: str, to: str, comment: str = "", account: str = "",
+) -> SendResult:
+    acc, provider = await _get_acc(ctx, account)
     if not acc:
-        return _no_account_error()
-    result = await provider.forward(ctx, acc, message_id=params.message_id, to=params.to, comment=params.comment)
-    return _wrap_provider_result(result, f"Email forwarded to {params.to}")
+        raise RuntimeError("No email account connected. Connect one first.")
+    result = await provider.forward(
+        ctx, acc, message_id=message_id, to=to, comment=comment,
+    )
+    if result.get("RESULT") == "ERROR":
+        raise RuntimeError(result.get("error", "Forward failed"))
+    return SendResult(
+        sent=True,
+        to=to,
+        message_id=result.get("message_id") or result.get("id"),
+    )
