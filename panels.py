@@ -60,15 +60,6 @@ async def inbox_panel(
     if not acc:
         return ui.Empty(message="No email account available")
 
-    # Guard: if the platform re-renders from a mail.account_switched event and
-    # passes the OLD account param, _get_acc resolves it regardless of is_active.
-    # Detect this and fall back to the real active account so we never show
-    # a different user's inbox after an LLM-triggered switch.
-    if account and not acc.get("is_active") and not do_switch_account:
-        acc, _ = await _get_acc(ctx, "")
-        if not acc:
-            return ui.Empty(message="No email account available")
-
     provider     = get_provider(acc)
     active_email = acc.get("email", "")
 
@@ -116,8 +107,17 @@ async def inbox_panel(
             key=_inbox_page_key(active_email, folder, cursor),
             model=InboxPage,
             fetcher=_fetch_page,
-            ttl_seconds=120,
+            ttl_seconds=60,
         )
+        # Integrity guard: if the cached page was stored for a different
+        # account or folder (platform-side key collision or shared namespace),
+        # discard it and fetch fresh so we never show wrong account's messages.
+        if page.account_id != active_email or page.folder != folder:
+            log.warning(
+                "cache integrity mismatch: got %s/%s expected %s/%s — fetching fresh",
+                page.account_id, page.folder, active_email, folder,
+            )
+            page = await _fetch_page()
     except Exception as e:
         log.warning("inbox panel fetch_page failed folder=%s: %s", folder, e)
         return ui.Stack([
@@ -162,7 +162,10 @@ async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
     return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index, folder)
 
 
-@ext.panel("accounts", slot="right", title="Accounts", icon="Users")
+@ext.panel(
+    "accounts", slot="right", title="Accounts", icon="Users",
+    refresh="on_event:mail.account_switched,mail.account_connected,mail.account_disconnected",
+)
 async def accounts_panel(ctx, show_add: bool = False):
     return await build_accounts_panel(ctx, show_add)
 
