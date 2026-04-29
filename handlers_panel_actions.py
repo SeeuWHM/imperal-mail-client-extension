@@ -56,7 +56,8 @@ async def impl_mail_action(ctx, action: str, message_id: str = "",
         "spam":        lambda mid: provider.move(ctx, acc, mid, "INBOX", "spam"),
         "mark_read":   lambda mid: provider.mark_read(ctx, acc, mid, read=True),
         "mark_unread": lambda mid: provider.mark_read(ctx, acc, mid, read=False),
-        "star":        lambda mid: provider.star(ctx, acc, mid),
+        "star":        lambda mid: provider.star(ctx, acc, mid, starred=True),
+        "unstar":      lambda mid: provider.star(ctx, acc, mid, starred=False),
     }
     fn = action_map.get(action)
     if not fn:
@@ -82,13 +83,15 @@ async def impl_folder_counts(ctx, account: str = "") -> FolderCountsResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    counts: dict[str, int] = {}
-    for folder in FOLDER_KEYS:
+
+    async def _get_count(folder: str) -> int:
         try:
-            counts[folder] = int(await provider.get_unread_count(ctx, acc, folder))
+            return int(await provider.get_unread_count(ctx, acc, folder))
         except Exception:
-            counts[folder] = 0
-    return FolderCountsResult(counts=counts)
+            return 0
+
+    results = await asyncio.gather(*[_get_count(f) for f in FOLDER_KEYS])
+    return FolderCountsResult(counts=dict(zip(FOLDER_KEYS, results)))
 
 
 async def impl_get_oauth_url(ctx, provider: str) -> OAuthUrlResult:
@@ -135,7 +138,8 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
         _data = d.data if hasattr(d, "data") else d
         _id = d.id if hasattr(d, "id") else d["doc_id"]
         if _data.get("email") != email:
-            await ctx.store.update(COLLECTION, _id, {**_data, "is_active": False})
+            clean = {k: v for k, v in _data.items() if k != "doc_id"}
+            await ctx.store.update(COLLECTION, _id, {**clean, "is_active": False})
     return ConnectImapResult(connected=True, email=email, imap_server=imap_h)
 
 

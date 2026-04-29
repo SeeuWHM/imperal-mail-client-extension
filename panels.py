@@ -142,7 +142,7 @@ def _build_email_list(
         on_end_reached=on_end,
         selectable=True,
         bulk_actions=bulk,
-        total_items=0,
+        total_items=len(items),
         extra_info=f"{unread_count} unread" if unread_count > 0 else "",
     )
 

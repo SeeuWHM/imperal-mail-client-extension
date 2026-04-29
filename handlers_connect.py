@@ -121,7 +121,8 @@ async def impl_connect_imap(
         _data = d.data if hasattr(d, "data") else d
         _id = d.id if hasattr(d, "id") else d["doc_id"]
         if _data.get("email") != email_addr:
-            await ctx.store.update(COLLECTION, _id, {**_data, "is_active": False})
+            clean = {k: v for k, v in _data.items() if k != "doc_id"}
+            await ctx.store.update(COLLECTION, _id, {**clean, "is_active": False})
     return ConnectImapResult(connected=True, email=email_addr, imap_server=imap_h)
 
 

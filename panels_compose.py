@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from imperal_sdk import ui
 
@@ -41,15 +42,18 @@ async def build_compose_panel(
                         all_recipients = []
                         for addr in (orig_to + "," + orig_cc).split(","):
                             addr = addr.strip()
-                            if addr and account_email not in addr:
-                                all_recipients.append(addr)
+                            if addr:
+                                m = re.match(r'.*<([^>]+)>', addr)
+                                parsed = m.group(1).strip().lower() if m else addr.lower()
+                                if parsed and parsed != account_email.lower():
+                                    all_recipients.append(addr)
                         cc_value = ", ".join(all_recipients)
                     subject_value = (
-                        f"Re: {orig_subject}" if not orig_subject.startswith("Re:") else orig_subject
+                        f"Re: {orig_subject}" if not orig_subject.lower().startswith("re:") else orig_subject
                     )
                 elif mode == "forward":
                     subject_value = (
-                        f"Fwd: {orig_subject}" if not orig_subject.startswith("Fwd:") else orig_subject
+                        f"Fwd: {orig_subject}" if not orig_subject.lower().startswith("fwd:") else orig_subject
                     )
         except Exception:
             pass

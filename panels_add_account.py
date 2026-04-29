@@ -26,9 +26,9 @@ def _step_providers() -> ui.UINode:
     return ui.Stack([
         ui.Header(text="Add Email Account", level=3),
         ui.Button("Connect Google", icon="Mail", variant="outline",
-                  on_click=ui.Send("Connect my Google Gmail account")),
+                  on_click=ui.Call("connect")),
         ui.Button("Connect Microsoft", icon="Mail", variant="outline",
-                  on_click=ui.Send("Connect my Microsoft Outlook account")),
+                  on_click=ui.Call("connect_microsoft")),
         ui.Divider(label="or connect manually"),
         ui.Form(
             children=[ui.Input(placeholder="Enter email address", param_name="email")],
