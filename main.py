@@ -13,7 +13,7 @@ _MODULES = (
     "app", "ctx_helpers", "schemas", "schemas_params",
     "handlers_connect", "handlers_inbox", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
-    "skeleton", "panels", "panels_email_viewer", "panels_compose",
+    "skeleton", "panels", "panels_inbox", "panels_email_viewer", "panels_compose",
     "panels_accounts", "panels_add_account", "cache_models", "cache_model_defs",
 )
 for _m in [k for k in sys.modules if k in _MODULES]:
