@@ -136,14 +136,24 @@ def _build_email_list(
          "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
     ]
 
+    # extra_info shows TOTAL folder unread (from provider.get_unread_count,
+    # not page-level count) + a hint when more pages exist.
+    info_parts = []
+    if unread_count > 0:
+        info_parts.append(f"{unread_count} unread")
+    if has_more:
+        info_parts.append("more messages below")
+    elif messages:
+        info_parts.append(f"{len(messages)} messages")
+
     return ui.List(
         items=items,
         searchable=True,
         on_end_reached=on_end,
         selectable=True,
         bulk_actions=bulk,
-        total_items=len(items),
-        extra_info=f"{unread_count} unread" if unread_count > 0 else "",
+        total_items=0,  # unknown total — avoids misleading page-count in scroller
+        extra_info=" · ".join(info_parts),
     )
 
 
@@ -173,12 +183,25 @@ async def inbox_panel(
     # ── Inline account switch ─────────────────────────────────────────────── #
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
-        # Use the switched account for this render (don't rely on DB re-query).
         account = do_switch_account
+        # Bust ALL folder caches for the newly-active account so the first
+        # render is always fresh — prevents stale data from a prior visit
+        # within the 120-second TTL window.
+        for _fkey in [f["key"] for f in FOLDERS]:
+            await _invalidate_first_page(ctx, account, _fkey)
 
     acc, _ = await _get_acc(ctx, account)
     if not acc:
         return ui.Empty(message="No email account available")
+
+    # Guard: if the platform re-renders from a mail.account_switched event and
+    # passes the OLD account param, _get_acc resolves it regardless of is_active.
+    # Detect this and fall back to the real active account so we never show
+    # a different user's inbox after an LLM-triggered switch.
+    if account and not acc.get("is_active") and not do_switch_account:
+        acc, _ = await _get_acc(ctx, "")
+        if not acc:
+            return ui.Empty(message="No email account available")
 
     provider     = get_provider(acc)
     active_email = acc.get("email", "")
