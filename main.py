@@ -10,7 +10,7 @@ if _dir not in sys.path:
     sys.path.insert(0, _dir)
 
 _MODULES = (
-    "app", "ctx_helpers", "schemas",
+    "app", "ctx_helpers", "schemas", "schemas_params",
     "handlers_connect", "handlers_inbox", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
     "skeleton", "panels", "panels_email_viewer", "panels_compose",
