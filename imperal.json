@@ -1,8 +1,7 @@
 {
   "app_id": "mail",
   "version": "5.0.0",
-  "sdk_version": "2.0.0",
-  "capabilities": [],
+  "capabilities": ["store:read", "store:write", "notify:push"],
   "tools": [
     {
       "name": "connect",

@@ -1,0 +1,7 @@
+Mail module — manage email accounts (Google, Microsoft, Yahoo, IMAP), inbox, folders, search, send, reply, forward, archive, delete, star, move, bulk operations, contacts, threads.
+
+For "show inbox" or "what's new" — call inbox() first with folder="inbox".
+For "reply to that" or "reply to the last email" — call reply() without message_id to use the last-read message.
+For "connect" — call status() first. Only show auth URL if no account is connected.
+For multi-account users — always confirm which account before acting if account is ambiguous.
+Write operations (send, archive, delete) always need the message_id — get it from inbox() or read_email() first.

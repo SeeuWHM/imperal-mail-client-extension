@@ -146,8 +146,8 @@ async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
     """Persist the last-read watermark, stamped with user_id for defence-in-depth."""
     try:
         user_id = ""
-        if ctx and hasattr(ctx, "user") and ctx.user and hasattr(ctx.user, "id"):
-            user_id = str(ctx.user.id or "")
+        if ctx and hasattr(ctx, "user") and ctx.user and hasattr(ctx.user, "imperal_id"):
+            user_id = str(ctx.user.imperal_id or "")
         await ctx.store.set("mail_last_read", "latest", {
             "message_id":        message_id,
             "subject":           subject,

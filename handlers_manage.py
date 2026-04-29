@@ -1,19 +1,19 @@
-"""Mail Client · Email management & bulk operations (SDK v2.0.0)."""
+"""Mail Client · Email management & bulk operations."""
 from __future__ import annotations
 
+from app import chat
+from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 
 from providers.helpers import _remove_multiple_from_cache
 
-from schemas import BulkOperationResult, OperationResult
+from schemas import (
+    BulkOperationResult, OperationResult,
+    MessageIdParams, StarParams, MoveParams, PurgeParams, BulkParams,
+)
 
 
 def _unwrap(result: dict, op: str, message_id: str = "") -> OperationResult:
-    """Convert legacy provider ``RESULT: SUCCESS|ERROR`` dict to OperationResult.
-
-    Raises RuntimeError on provider ERROR so the kernel surfaces a clear
-    failure to the Narrator; returns OperationResult on success.
-    """
     if result.get("RESULT") == "ERROR":
         raise RuntimeError(result.get("error", f"{op} failed"))
     detail = None
@@ -22,15 +22,12 @@ def _unwrap(result: dict, op: str, message_id: str = "") -> OperationResult:
         if v:
             detail = str(v)
             break
-    return OperationResult(
-        ok=True,
-        message_id=message_id or result.get("message_id") or result.get("id"),
-        operation=op,
-        detail=detail,
-    )
+    return OperationResult(ok=True,
+                           message_id=message_id or result.get("message_id") or result.get("id"),
+                           operation=op, detail=detail)
 
 
-# ─── Single Operations ────────────────────────────────────────────────── #
+# ─── impl_* business logic ────────────────────────────────────────────── #
 
 
 async def impl_archive(ctx, message_id: str, account: str = "") -> OperationResult:
@@ -51,67 +48,44 @@ async def impl_mark_read(ctx, message_id: str, account: str = "") -> OperationRe
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(
-        await provider.mark_read(ctx, acc, message_id, read=True),
-        "mark_read", message_id,
-    )
+    return _unwrap(await provider.mark_read(ctx, acc, message_id, read=True), "mark_read", message_id)
 
 
 async def impl_mark_unread(ctx, message_id: str, account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(
-        await provider.mark_read(ctx, acc, message_id, read=False),
-        "mark_unread", message_id,
-    )
+    return _unwrap(await provider.mark_read(ctx, acc, message_id, read=False), "mark_unread", message_id)
 
 
-async def impl_star(
-    ctx, message_id: str, starred: bool = True, account: str = "",
-) -> OperationResult:
+async def impl_star(ctx, message_id: str, starred: bool = True, account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(
-        await provider.star(ctx, acc, message_id, starred=starred),
-        "star" if starred else "unstar", message_id,
-    )
+    return _unwrap(await provider.star(ctx, acc, message_id, starred=starred),
+                   "star" if starred else "unstar", message_id)
 
 
-async def impl_move(
-    ctx, message_id: str, from_folder: str, to_folder: str, account: str = "",
-) -> OperationResult:
+async def impl_move(ctx, message_id: str, from_folder: str, to_folder: str,
+                    account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(
-        await provider.move(
-            ctx, acc, message_id,
-            from_folder=from_folder, to_folder=to_folder,
-        ),
-        "move", message_id,
-    )
+    return _unwrap(await provider.move(ctx, acc, message_id,
+                                       from_folder=from_folder, to_folder=to_folder),
+                   "move", message_id)
 
 
-async def impl_purge(
-    ctx, message_id: str, from_folder: str = "Trash", account: str = "",
-) -> OperationResult:
+async def impl_purge(ctx, message_id: str, from_folder: str = "Trash",
+                     account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(
-        await provider.purge(ctx, acc, message_id, from_folder=from_folder),
-        "purge", message_id,
-    )
+    return _unwrap(await provider.purge(ctx, acc, message_id, from_folder=from_folder),
+                   "purge", message_id)
 
 
-# ─── Bulk Operations ──────────────────────────────────────────────────── #
-
-
-async def _run_bulk(
-    ctx, message_ids: str, operation: str, account: str = "",
-) -> BulkOperationResult:
+async def _run_bulk(ctx, message_ids: str, operation: str, account: str = "") -> BulkOperationResult:
     ids = [i.strip() for i in message_ids.split(",") if i.strip()]
     if not ids:
         raise RuntimeError("No message IDs provided.")
@@ -137,43 +111,149 @@ async def _run_bulk(
             failed.append(f"{mid[:16]}: {r.get('error', '?')}")
     if removed:
         await _remove_multiple_from_cache(ctx, acc.get("email", ""), removed)
-    per_op_field = {
-        "archive": "archived",
-        "delete": "deleted",
-        "read": "marked_read",
-        "unread": "marked_unread",
-    }.get(operation)
-    payload = {
-        "operation": operation,
-        "succeeded": success,
-        "total": len(ids),
-        "failed": len(failed) or None,
-        "errors": failed[:3],
-    }
+    per_op_field = {"archive": "archived", "delete": "deleted",
+                    "read": "marked_read", "unread": "marked_unread"}.get(operation)
+    payload = {"operation": operation, "succeeded": success,
+               "total": len(ids), "failed": len(failed) or None, "errors": failed[:3]}
     if per_op_field:
         payload[per_op_field] = success
     return BulkOperationResult(**payload)
 
 
-async def impl_bulk_archive(
-    ctx, message_ids: str, account: str = "",
-) -> BulkOperationResult:
+async def impl_bulk_archive(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
     return await _run_bulk(ctx, message_ids, "archive", account=account)
 
 
-async def impl_bulk_delete(
-    ctx, message_ids: str, account: str = "",
-) -> BulkOperationResult:
+async def impl_bulk_delete(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
     return await _run_bulk(ctx, message_ids, "delete", account=account)
 
 
-async def impl_bulk_mark_read(
-    ctx, message_ids: str, account: str = "",
-) -> BulkOperationResult:
+async def impl_bulk_mark_read(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
     return await _run_bulk(ctx, message_ids, "read", account=account)
 
 
-async def impl_bulk_mark_unread(
-    ctx, message_ids: str, account: str = "",
-) -> BulkOperationResult:
+async def impl_bulk_mark_unread(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
     return await _run_bulk(ctx, message_ids, "unread", account=account)
+
+
+# ─── @chat.function wrappers ──────────────────────────────────────────── #
+
+
+@chat.function("archive", action_type="write", event="archived",
+               description="Archive an email — moves it out of inbox without deleting.")
+async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
+    try:
+        r = await impl_archive(ctx, message_id=params.message_id, account=params.account)
+        return ActionResult.success(data=r.model_dump(), summary=f"Archived {params.message_id}.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("delete", action_type="write", event="deleted",
+               description="Move an email to Trash. Recoverable until trash is purged.")
+async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
+    try:
+        r = await impl_delete(ctx, message_id=params.message_id, account=params.account)
+        return ActionResult.success(data=r.model_dump(), summary=f"Moved {params.message_id} to Trash.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("mark_read", action_type="write", event="marked_read",
+               description="Mark an email as read.")
+async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
+    try:
+        r = await impl_mark_read(ctx, message_id=params.message_id, account=params.account)
+        return ActionResult.success(data=r.model_dump(), summary=f"Marked {params.message_id} as read.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("mark_unread", action_type="write", event="marked_unread",
+               description="Mark an email as unread.")
+async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
+    try:
+        r = await impl_mark_unread(ctx, message_id=params.message_id, account=params.account)
+        return ActionResult.success(data=r.model_dump(), summary=f"Marked {params.message_id} as unread.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("star", action_type="write", event="starred",
+               description="Star or unstar an email — toggles the starred/important flag.")
+async def fn_star(ctx, params: StarParams) -> ActionResult:
+    try:
+        r = await impl_star(ctx, message_id=params.message_id,
+                            starred=params.starred, account=params.account)
+        action = "Starred" if params.starred else "Unstarred"
+        return ActionResult.success(data=r.model_dump(), summary=f"{action} {params.message_id}.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("move", action_type="write", event="moved",
+               description="Move an email between folders.")
+async def fn_move(ctx, params: MoveParams) -> ActionResult:
+    try:
+        r = await impl_move(ctx, message_id=params.message_id, from_folder=params.from_folder,
+                            to_folder=params.to_folder, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Moved {params.message_id} to {params.to_folder}.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("purge", action_type="destructive", event="purged",
+               description="Permanently delete an email — bypasses Trash, cannot be recovered.")
+async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
+    try:
+        r = await impl_purge(ctx, message_id=params.message_id,
+                             from_folder=params.from_folder, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Permanently deleted {params.message_id}.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("bulk_archive", action_type="write", event="bulk_archived",
+               description="Archive multiple emails at once. Expects comma-separated message IDs.")
+async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
+    try:
+        r = await impl_bulk_archive(ctx, message_ids=params.message_ids, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Archived {r.succeeded} email(s).")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("bulk_delete", action_type="write", event="bulk_deleted",
+               description="Move multiple emails to Trash. Expects comma-separated message IDs.")
+async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
+    try:
+        r = await impl_bulk_delete(ctx, message_ids=params.message_ids, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Deleted {r.succeeded} email(s).")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("bulk_mark_read", action_type="write", event="bulk_marked_read",
+               description="Mark multiple emails as read. Expects comma-separated message IDs.")
+async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
+    try:
+        r = await impl_bulk_mark_read(ctx, message_ids=params.message_ids, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Marked {r.succeeded} email(s) as read.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("bulk_mark_unread", action_type="write", event="bulk_marked_unread",
+               description="Mark multiple emails as unread. Expects comma-separated message IDs.")
+async def fn_bulk_mark_unread(ctx, params: BulkParams) -> ActionResult:
+    try:
+        r = await impl_bulk_mark_unread(ctx, message_ids=params.message_ids, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Marked {r.succeeded} email(s) as unread.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=True)

@@ -1,4 +1,4 @@
-"""Mail Client · Skeleton tools (SDK v1.6.0 convention).
+"""Mail Client · Skeleton tools (SDK v3.x).
 
 Per I-SKELETON-LLM-ONLY: the skeleton carries scalar fields for the classifier
 envelope only — no message lists, no full inbox blobs. Panel rendering reads
@@ -73,11 +73,11 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
             if truly_new:
                 try:
                     new_msgs = [m for m in messages if m.get("id") in truly_new]
+                    subjects = ", ".join(
+                        f'"{m.get("subject", "(no subject)")}"' for m in new_msgs[:2]
+                    )
                     await ctx.notify(
-                        title=f"New mail — {email}",
-                        body=f"{len(truly_new)} new: " + ", ".join(
-                            f'"{m.get("subject", "(no subject)")}"' for m in new_msgs[:2]
-                        ),
+                        f"New mail — {email}: {len(truly_new)} new. {subjects}"
                     )
                 except Exception:
                     pass
