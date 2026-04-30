@@ -124,7 +124,7 @@ async def impl_status(ctx) -> AccountsStatus:
         email = a.get("email", "?")
         unread = 0
         try:
-            summary = await ctx.cache.get(_unread_summary_key(email, "INBOX"), UnreadSummary)
+            summary = await ctx.cache.get(_unread_summary_key(email, "INBOX"), model=UnreadSummary)
             unread = summary.unread_count if summary else int(a.get("unread_count", 0) or 0)
         except Exception:
             unread = int(a.get("unread_count", 0) or 0)
@@ -138,7 +138,8 @@ async def impl_status(ctx) -> AccountsStatus:
 
 
 async def impl_switch_account(ctx, account: str) -> AccountSwitched:
-    docs = await ctx.store.query(COLLECTION)
+    page = await ctx.store.query(COLLECTION)
+    docs = page.items
     if not docs:
         raise RuntimeError("No email account connected.")
     target = next((d for d in docs if d.id == account or d.get("email") == account), None)
@@ -156,7 +157,8 @@ async def impl_switch_account(ctx, account: str) -> AccountSwitched:
 
 
 async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
-    docs = await ctx.store.query(COLLECTION)
+    page = await ctx.store.query(COLLECTION)
+    docs = page.items
     target = next((d for d in docs if d.id == account or d.get("email") == account), None)
     if not target:
         raise RuntimeError("Account not found.")

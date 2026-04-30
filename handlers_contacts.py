@@ -38,11 +38,11 @@ def _parse_email_addr(raw: str) -> tuple[str, str]:
 
 
 async def impl_contacts(ctx, search: str = "", limit: int = 50) -> ContactsList:
-    docs = await ctx.store.query(CONTACTS_COLLECTION, limit=min(limit, 200))
+    page = await ctx.store.query(CONTACTS_COLLECTION, limit=min(limit, 200))
     sq = search.lower() if search else ""
     contacts = [
         ContactEntry(email=d.get("email", ""), name=d.get("name", ""), source=d.get("source", "manual"))
-        for d in docs
+        for d in page.items
         if not sq or sq in d.get("email", "").lower() or sq in d.get("name", "").lower()
     ]
     contacts.sort(key=lambda c: (c.name or c.email))
@@ -54,7 +54,7 @@ async def impl_add_contact(ctx, email: str, name: str = "") -> ContactAdded:
     if "@" not in email_l:
         raise RuntimeError("Valid email address is required.")
     existing = await ctx.store.query(CONTACTS_COLLECTION, where={"email": email_l})
-    if existing:
+    if existing.items:
         raise RuntimeError(f"Contact {email_l} already exists.")
     now = int(_time.time())
     await ctx.store.create(CONTACTS_COLLECTION,
@@ -121,8 +121,8 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
     added, now = 0, int(_time.time())
     for c in deduped:
         exists = await ctx.store.query(CONTACTS_COLLECTION, where={"email": c["email"]})
-        if exists:
-            d = exists[0]
+        if exists.items:
+            d = exists.items[0]
             updates = {"last_seen": now}
             if c.get("name") and not d.get("name"):
                 updates["name"] = c["name"]
@@ -139,10 +139,10 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
 
 async def impl_delete_contact(ctx, email: str) -> ContactDeleted:
     email_l = email.lower().strip()
-    docs = await ctx.store.query(CONTACTS_COLLECTION, where={"email": email_l})
-    if not docs:
+    page = await ctx.store.query(CONTACTS_COLLECTION, where={"email": email_l})
+    if not page.items:
         raise RuntimeError(f"Contact {email_l} not found.")
-    await ctx.store.delete(CONTACTS_COLLECTION, docs[0].id)
+    await ctx.store.delete(CONTACTS_COLLECTION, page.items[0].id)
     return ContactDeleted(deleted=True, email=email_l)
 
 
