@@ -33,10 +33,10 @@ log = logging.getLogger(__name__)
 )
 async def inbox_panel(
     ctx,
-    cursor: str = "",
     folder: str = "INBOX",
     account: str = "",
     limit: int = 25,
+    cursor: str = "",          # explicit pagination cursor — passed only via button clicks
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
@@ -50,9 +50,7 @@ async def inbox_panel(
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
         account = do_switch_account
-        # Bust ALL folder caches for the newly-active account so the first
-        # render is always fresh — prevents stale data from a prior visit
-        # within the 120-second TTL window.
+        cursor = ""  # always start at page 1 of new account
         for _fkey in [f["key"] for f in FOLDERS]:
             await _invalidate_first_page(ctx, account, _fkey)
 
@@ -119,8 +117,9 @@ async def inbox_panel(
             ui.Error(message=f"Failed to load {folder}: {e}"),
         ])
 
-    messages = page.messages
-    has_more = page.has_more
+    messages    = page.messages
+    next_cursor = page.next_cursor or None
+    has_more    = page.has_more
 
     # ── Unread count ──────────────────────────────────────────────────────── #
     async def _fetch_unread() -> UnreadSummary:
@@ -141,7 +140,8 @@ async def inbox_panel(
     except Exception:
         unread_count = sum(1 for m in messages if m.get("unread"))
 
-    email_list = _build_email_list(messages, has_more, folder, active_email, unread_count)
+    email_list = _build_email_list(messages, next_cursor, has_more,
+                                   folder, active_email, unread_count, cursor)
 
     return ui.Stack([account_info, folder_tabs, email_list])
 

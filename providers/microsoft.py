@@ -16,17 +16,20 @@ from .helpers import (
 
 log = logging.getLogger(__name__)
 
-MS_FOLDER_MAP: dict = {
-    "sent":    "sentitems", "spam":    "junkemail",
-    "trash":   "deleteditems", "drafts": "drafts", "draft": "drafts",
-    "all":     "inbox",    "archive": "archive",
-    "unread":  "inbox",    "starred": "inbox",
-}
-
 _MS_PAGE_FOLDERS: dict = {
     "inbox": "inbox", "sent": "sentitems", "spam": "junkemail",
     "trash": "deleteditems", "drafts": "drafts", "archive": "archive",
 }
+
+_MS_DEST_MAP: dict = {
+    "inbox": "inbox", "spam": "junkemail", "junk": "junkemail",
+    "trash": "deleteditems", "deleted": "deleteditems",
+    "archive": "archive", "sent": "sentitems", "drafts": "drafts", "draft": "drafts",
+}
+
+
+def _recips(s: str) -> list[dict]:
+    return [{"emailAddress": {"address": a.strip()}} for a in s.split(",") if a.strip()]
 
 
 class MicrosoftMailProvider(BaseMailProvider):
@@ -139,7 +142,6 @@ class MicrosoftMailProvider(BaseMailProvider):
     async def send(self, ctx: Context, acc: dict, to: str, subject: str, body: str,
                    cc: str = "", bcc: str = "") -> dict:
         email_addr = acc.get("email", "")
-        def _recips(s: str): return [{"emailAddress": {"address": a.strip()}} for a in s.split(",") if a.strip()]
         payload: dict = {
             "message": {
                 "subject": subject, "body": {"contentType": "Text", "content": body},
@@ -156,7 +158,6 @@ class MicrosoftMailProvider(BaseMailProvider):
     async def reply(self, ctx: Context, acc: dict, message_id: str, body: str,
                     to: str = "", cc: str = "", bcc: str = "") -> dict:
         email_addr = acc.get("email", "")
-        def _recips(s: str): return [{"emailAddress": {"address": a.strip()}} for a in s.split(",") if a.strip()]
         payload: dict = {"message": {"body": {"contentType": "Text", "content": body}}}
         if to:  payload["message"]["toRecipients"]  = _recips(to)
         if cc:  payload["message"]["ccRecipients"]  = _recips(cc)
@@ -169,7 +170,6 @@ class MicrosoftMailProvider(BaseMailProvider):
 
     async def forward(self, ctx: Context, acc: dict, message_id: str,
                       to: str, comment: str = "") -> dict:
-        def _recips(s: str): return [{"emailAddress": {"address": a.strip()}} for a in s.split(",") if a.strip()]
         payload: dict = {"toRecipients": _recips(to)}
         if comment: payload["comment"] = comment
         resp = await _graph_post(ctx, f"/me/messages/{message_id}/forward", acc, json=payload)
@@ -231,7 +231,7 @@ class MicrosoftMailProvider(BaseMailProvider):
 
     async def folder(self, ctx: Context, acc: dict, folder_name: str, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")
-        ms_folder  = MS_FOLDER_MAP.get(folder_name.lower(), "inbox")
+        ms_folder  = _MS_PAGE_FOLDERS.get(folder_name.lower(), "inbox")
         params: dict = {
             "$top": min(max_results, 50), "$orderby": "receivedDateTime desc",
             "$select": "id,subject,from,receivedDateTime,isRead",
@@ -270,12 +270,7 @@ class MicrosoftMailProvider(BaseMailProvider):
 
     async def move(self, ctx: Context, acc: dict, message_id: str,
                    from_folder: str = "INBOX", to_folder: str = "INBOX") -> dict:
-        DEST_MAP = {
-            "inbox": "inbox", "spam": "junkemail", "junk": "junkemail",
-            "trash": "deleteditems", "deleted": "deleteditems",
-            "archive": "archive", "sent": "sentitems", "drafts": "drafts", "draft": "drafts",
-        }
-        dest_id = DEST_MAP.get(to_folder.lower(), to_folder)
+        dest_id = _MS_DEST_MAP.get(to_folder.lower(), to_folder)
         try:
             resp = await _graph_post(ctx, f"/me/messages/{message_id}/move", acc,
                                      json={"destinationId": dest_id})

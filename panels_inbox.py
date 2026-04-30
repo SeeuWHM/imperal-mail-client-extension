@@ -81,8 +81,9 @@ def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
 
 def _build_email_list(
     messages: list[dict],
-    has_more: bool, folder: str, active_email: str,
-    unread_count: int = 0,
+    next_cursor: str | None, has_more: bool,
+    folder: str, active_email: str,
+    unread_count: int = 0, current_cursor: str = "",
 ) -> ui.UINode:
     # Build full ID list first so every email gets the complete list for prev/next nav
     msg_ids = [msg.get("message_id", msg.get("id", "")) for msg in messages]
@@ -118,17 +119,13 @@ def _build_email_list(
          "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
     ]
 
-    # extra_info shows TOTAL folder unread (provider.get_unread_count scope = folder,
-    # not page) + pagination hint.
     info_parts = []
     if unread_count > 0:
         info_parts.append(f"{unread_count} unread")
-    if has_more:
-        info_parts.append("more messages below")
-    elif messages:
-        info_parts.append(f"{len(messages)} messages")
+    if messages:
+        info_parts.append(f"{len(messages)} shown")
 
-    return ui.List(
+    email_list = ui.List(
         items=items,
         searchable=True,
         selectable=True,
@@ -136,3 +133,18 @@ def _build_email_list(
         total_items=0,
         extra_info=" · ".join(info_parts),
     )
+
+    # Pagination controls — explicit buttons, no platform state leak
+    nav = []
+    if current_cursor:
+        nav.append(ui.Button("← Back", icon="ChevronLeft", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__inbox", folder=folder, account=active_email,
+                             cursor="")))
+    if has_more and next_cursor:
+        nav.append(ui.Button("Next →", icon="ChevronRight", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__inbox", folder=folder, account=active_email,
+                             cursor=next_cursor)))
+
+    if nav:
+        return ui.Stack([email_list, ui.Stack(nav, direction="horizontal", gap=1)])
+    return email_list
