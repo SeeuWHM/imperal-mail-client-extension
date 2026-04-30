@@ -124,10 +124,13 @@ async def impl_get_thread(ctx, thread_id: str, account: str = "") -> ThreadView:
     )
 
 
-async def impl_send(ctx, to: str, subject: str, body: str,
+async def impl_send(ctx, to: str, subject: str = "", body: str = "",
                     cc: str = "", bcc: str = "", account: str = "") -> SendResult:
-    if not to or not subject or not body:
-        raise RuntimeError("to, subject, and body are required.")
+    if not to or not body:
+        raise RuntimeError("to and body are required.")
+    if not subject:
+        first_line = (body.strip().split('\n')[0] or body.strip())[:60]
+        subject = first_line or "(no subject)"
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")

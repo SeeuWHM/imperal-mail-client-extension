@@ -43,7 +43,7 @@ class ThreadParams(BaseModel):
 
 class SendParams(BaseModel):
     to: str = Field(description="Recipient email address")
-    subject: str = Field(description="Email subject")
+    subject: str = Field(default="", description="Email subject (auto-generated from body if omitted)")
     body: str = Field(description="Email body (plain text)")
     cc: str = Field(default="", description="CC recipients (comma-separated)")
     bcc: str = Field(default="", description="BCC recipients (comma-separated)")
