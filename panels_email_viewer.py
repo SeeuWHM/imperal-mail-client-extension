@@ -32,8 +32,9 @@ def _attachment_info(attachments: list[dict]) -> list[ui.UINode]:
     return nodes
 
 
-def _action_bar(message_id: str, account_email: str,
-                has_cc: bool, folder: str = "INBOX") -> ui.UINode:
+def _action_bar(message_id: str, account_email: str, has_cc: bool,
+                folder: str = "INBOX",
+                email_list_ids: str = "", current_index: int = 0) -> ui.UINode:
     """Action toolbar for the email viewer.
 
     Archive / Spam / Delete call __panel__inbox with do_action + do_message_id.
@@ -42,13 +43,27 @@ def _action_bar(message_id: str, account_email: str,
     (which only works from the full SessionWorkflow / LLM chat path,
     not from ui.Call / Fast-RPC / DirectCallWorkflow).
     """
+    ids = [i for i in email_list_ids.split(",") if i] if email_list_ids else []
+    prev_id = ids[current_index - 1] if current_index > 0 and len(ids) > current_index - 1 else None
+    next_id = ids[current_index + 1] if len(ids) > current_index + 1 else None
+
     buttons = [
         ui.Button("Back", icon="ArrowLeft", variant="ghost", size="sm",
                    on_click=ui.Call("__panel__inbox", folder=folder, account=account_email)),
-        ui.Button("Reply", icon="Reply", variant="primary", size="sm",
-                   on_click=ui.Call("__panel__compose", mode="reply",
-                                    message_id=message_id, account=account_email)),
     ]
+    if prev_id:
+        buttons.append(ui.Button("", icon="ChevronLeft", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__email_viewer", message_id=prev_id,
+                             account=account_email, folder=folder,
+                             email_list_ids=email_list_ids, current_index=current_index - 1)))
+    if next_id:
+        buttons.append(ui.Button("", icon="ChevronRight", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__email_viewer", message_id=next_id,
+                             account=account_email, folder=folder,
+                             email_list_ids=email_list_ids, current_index=current_index + 1)))
+    buttons.append(ui.Button("Reply", icon="Reply", variant="primary", size="sm",
+                   on_click=ui.Call("__panel__compose", mode="reply",
+                                    message_id=message_id, account=account_email)))
     if has_cc:
         buttons.append(ui.Button(
             "Reply All", icon="Reply", variant="outline", size="sm",
@@ -111,7 +126,8 @@ async def build_email_viewer(
 
     children: list[ui.UINode] = []
     children.append(_action_bar(message_id, account_email,
-                                has_cc=bool(cc_field), folder=folder))
+                                has_cc=bool(cc_field), folder=folder,
+                                email_list_ids=email_list_ids, current_index=current_index))
     children.append(ui.Header(text=subject, level=3))
 
     kv_items = [{"key": "From", "value": from_name}]

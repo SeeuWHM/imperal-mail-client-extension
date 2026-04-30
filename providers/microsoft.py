@@ -48,14 +48,20 @@ class MicrosoftMailProvider(BaseMailProvider):
         cursor_data: dict | None,
     ) -> tuple[list[dict], dict | None, bool]:
         skip = cursor_data.get("skip", 0) if cursor_data else 0
-        ms_folder = _MS_PAGE_FOLDERS.get(folder.lower(), "inbox")
         params: dict = {
             "$top": limit, "$skip": skip,
             "$orderby": "receivedDateTime desc",
             "$select": "id,conversationId,from,subject,bodyPreview,"
                        "receivedDateTime,isRead,flag,hasAttachments",
         }
-        resp = await _graph_get(ctx, f"/me/mailFolders/{ms_folder}/messages", acc, params=params)
+        # Starred = flagged messages across all folders (no dedicated mailFolder in Outlook)
+        if folder.lower() == "starred":
+            params["$filter"] = "flag/flagStatus eq 'flagged'"
+            endpoint = "/me/messages"
+        else:
+            ms_folder = _MS_PAGE_FOLDERS.get(folder.lower(), "inbox")
+            endpoint = f"/me/mailFolders/{ms_folder}/messages"
+        resp = await _graph_get(ctx, endpoint, acc, params=params)
         resp.raise_for_status()
         data = resp.json()
         raw_msgs = data.get("value", [])
@@ -65,8 +71,17 @@ class MicrosoftMailProvider(BaseMailProvider):
         return messages, next_cursor, has_more
 
     async def get_unread_count(self, ctx: Context, acc: dict, folder: str = "inbox") -> int:
-        ms_folder = _MS_PAGE_FOLDERS.get(folder.lower(), "inbox")
         try:
+            if folder.lower() == "starred":
+                # Count unread flagged messages
+                resp = await _graph_get(ctx, "/me/messages", acc, params={
+                    "$filter": "flag/flagStatus eq 'flagged' and isRead eq false",
+                    "$top": 1, "$count": "true",
+                    "$select": "id",
+                })
+                resp.raise_for_status()
+                return resp.json().get("@odata.count", 0)
+            ms_folder = _MS_PAGE_FOLDERS.get(folder.lower(), "inbox")
             resp = await _graph_get(ctx, f"/me/mailFolders/{ms_folder}", acc)
             resp.raise_for_status()
             return resp.json().get("unreadItemCount", 0)

@@ -76,7 +76,7 @@ async def impl_mail_action(ctx, action: str, message_id: str = "",
     return MailActionResult(action=action, count=len(ids))
 
 
-FOLDER_KEYS = ["INBOX", "sent", "drafts", "spam", "trash", "starred"]
+FOLDER_KEYS = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
 
 
 async def impl_folder_counts(ctx, account: str = "") -> FolderCountsResult:

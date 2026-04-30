@@ -23,6 +23,8 @@ from providers.helpers import (
     _invalidate_first_page,
     _unread_summary_key,
 )
+
+_ALL_FOLDER_KEYS = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
 from providers.imap import _sync_imap_test
 from cache_model_defs import UnreadSummary
 
@@ -50,15 +52,6 @@ def _oauth_state(ctx, provider: str) -> str:
 
 
 async def impl_connect(ctx) -> ConnectOAuthResult:
-    accounts = await _all_accounts(ctx)
-    oauth = [a for a in accounts if a.get("provider", "oauth") == "oauth"]
-    if oauth:
-        active = next((a for a in oauth if a.get("is_active")), oauth[0])
-        return ConnectOAuthResult(
-            already_connected=True,
-            email=active.get("email"),
-            total=len(accounts),
-        )
     if not GMAIL_CLIENT_ID:
         raise RuntimeError("Google OAuth not configured.")
     url = GOOGLE_AUTH_URL + "?" + urlencode({
@@ -70,11 +63,6 @@ async def impl_connect(ctx) -> ConnectOAuthResult:
 
 
 async def impl_connect_microsoft(ctx) -> ConnectOAuthResult:
-    accounts = await _all_accounts(ctx)
-    ms = [a for a in accounts if a.get("provider") == "microsoft"]
-    if ms:
-        active = next((a for a in ms if a.get("is_active")), ms[0])
-        return ConnectOAuthResult(already_connected=True, email=active.get("email"))
     if not MS_CLIENT_ID:
         raise RuntimeError("Microsoft OAuth not configured.")
     url = MS_AUTH_URL + "?" + urlencode({
@@ -160,7 +148,11 @@ async def impl_switch_account(ctx, account: str) -> AccountSwitched:
         new_active = d.id == target.id
         if d.get("is_active") != new_active:
             await ctx.store.update(COLLECTION, d.id, {**d.data, "is_active": new_active})
-    return AccountSwitched(switched=True, active_account=target.get("email"))
+    target_email = target.get("email", "")
+    if target_email:
+        for fkey in _ALL_FOLDER_KEYS:
+            await _invalidate_first_page(ctx, target_email, fkey)
+    return AccountSwitched(switched=True, active_account=target_email)
 
 
 async def impl_disconnect(ctx, account: str) -> AccountDisconnected:

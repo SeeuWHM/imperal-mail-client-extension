@@ -48,6 +48,47 @@ def _sync_imap_fetch_page(email_addr: str, host: str, port: int,
                           access_token: str = "") -> tuple[list[dict], int | None, bool]:
     imap = _imap_connect_auth(email_addr, host, port,
                                password=password, access_token=access_token)
+    # IMAP has no "starred" folder — flagged messages live in INBOX with \Flagged flag
+    if imap_folder.lower() == "starred":
+        imap.select('"INBOX"', readonly=True)
+        _, uid_data = imap.uid("SEARCH", "FLAGGED")
+        all_uids = uid_data[0].split() if uid_data and uid_data[0] else []
+        if not all_uids:
+            imap.logout()
+            return [], None, False
+        # Skip the folder-selection block below; uid_ints handled after this branch
+        uid_ints = sorted([int(u) for u in all_uids], reverse=True)
+        if last_uid is not None:
+            uid_ints = [u for u in uid_ints if u < last_uid]
+        page_uids = uid_ints[:limit]
+        if not page_uids:
+            imap.logout()
+            return [], None, False
+        _, useen_data = imap.uid("SEARCH", "UNSEEN")
+        unseen_uids = set(useen_data[0].split()) if useen_data and useen_data[0] else set()
+        messages: list[dict] = []
+        for uid_int in page_uids:
+            uid_bytes = str(uid_int).encode()
+            _, msg_data = imap.uid("FETCH", uid_bytes, "(RFC822.HEADER FLAGS)")
+            if not msg_data or not msg_data[0]:
+                continue
+            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+            if not raw:
+                continue
+            msg = email_lib.message_from_bytes(raw)
+            messages.append({
+                "message_id": str(uid_int), "thread_id": str(uid_int),
+                "from":    _decode_header(msg.get("From", "unknown")),
+                "subject": _decode_header(msg.get("Subject", "(no subject)")),
+                "snippet": "", "date": msg.get("Date", ""),
+                "unread":  uid_bytes in unseen_uids, "starred": True,
+                "has_attachments": False, "labels": [],
+            })
+        imap.logout()
+        lowest = page_uids[-1] if page_uids else None
+        remaining = [u for u in uid_ints if u < lowest] if lowest else []
+        return messages, (lowest if remaining else None), bool(remaining)
+
     candidates = IMAP_FOLDER_CANDIDATES.get(imap_folder.lower(), [imap_folder])
     if imap_folder.upper() == "INBOX":
         candidates = ["INBOX"]
@@ -116,21 +157,28 @@ def _sync_imap_unread_count(email_addr: str, host: str, port: int,
                             password: str = "",
                             access_token: str = "") -> int:
     imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
-    candidates = IMAP_FOLDER_CANDIDATES.get(imap_folder.lower(), [imap_folder])
-    if imap_folder.upper() == "INBOX":
-        candidates = ["INBOX"]
     count = 0
-    for candidate in candidates:
-        try:
-            r, data = imap.status(f'"{candidate}"', "(UNSEEN)")
-            if r == "OK" and data and data[0]:
-                match = re.search(rb"UNSEEN\s+(\d+)", data[0])
-                if match:
-                    count = int(match.group(1))
-                break
-        except Exception:
-            continue
-    imap.logout()
+    try:
+        if imap_folder.lower() == "starred":
+            imap.select('"INBOX"', readonly=True)
+            _, uid_data = imap.uid("SEARCH", "FLAGGED UNSEEN")
+            count = len(uid_data[0].split()) if uid_data and uid_data[0] else 0
+        else:
+            candidates = IMAP_FOLDER_CANDIDATES.get(imap_folder.lower(), [imap_folder])
+            if imap_folder.upper() == "INBOX":
+                candidates = ["INBOX"]
+            for candidate in candidates:
+                try:
+                    r, data = imap.status(f'"{candidate}"', "(UNSEEN)")
+                    if r == "OK" and data and data[0]:
+                        match = re.search(rb"UNSEEN\s+(\d+)", data[0])
+                        if match:
+                            count = int(match.group(1))
+                        break
+                except Exception:
+                    continue
+    finally:
+        imap.logout()
     return count
 
 

@@ -38,11 +38,7 @@ async def build_accounts_panel(ctx, show_add: bool = False) -> ui.UINode:
             subtitle=PROVIDER_LABELS.get(provider, "Unknown"),
             avatar=ui.Avatar(fallback=initial, size="sm"),
             badge=ui.Badge("Active", color="green") if is_active else None,
-            # Call __panel__inbox with do_switch_account so the inbox panel:
-            # 1. Updates is_active in the store (previously used fn switch_account which
-            #    went through DirectCallWorkflow — no event published, left panel ignored)
-            # 2. Re-renders the inbox list for the switched account immediately
-            on_click=ui.Call("__panel__inbox", do_switch_account=email),
+            on_click=ui.Call("switch_account", account=email),
         ))
 
     return ui.Stack([

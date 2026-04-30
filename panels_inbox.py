@@ -16,6 +16,7 @@ FOLDERS = [
     {"key": "spam",    "label": "Spam"},
     {"key": "trash",   "label": "Trash"},
     {"key": "starred", "label": "Starred"},
+    {"key": "archive", "label": "Archive"},
 ]
 
 
