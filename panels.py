@@ -34,7 +34,6 @@ log = logging.getLogger(__name__)
 async def inbox_panel(
     ctx,
     folder: str = "INBOX",
-    account: str = "",
     limit: int = 25,
     cursor: str = "",
     prev_cursor: str = "",
@@ -42,23 +41,26 @@ async def inbox_panel(
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
-    **_unused_kwargs,
+    **_unused_kwargs,  # absorb any stale `account=` the platform injects
 ):
     accounts = await _all_accounts(ctx)
     if not accounts:
         return ui.Empty(message="No email accounts connected")
 
-    # ── Inline account switch (fallback — primary path is __panel__accounts) ─ #
+    # ── Account switch: update store FIRST, then resolve from store ──────────
+    # Never trust the `account` HTTP param — platform injects stale values
+    # from previous paginated renders. Always resolve from is_active in store.
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
-        account = do_switch_account
         cursor = ""
         prev_cursor = ""
         page_num = 0
         for _fkey in [f["key"] for f in FOLDERS]:
-            await _invalidate_first_page(ctx, account, _fkey)
+            await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
-    acc, _ = await _get_acc(ctx, account if account else "")
+    # Read active account purely from store — immune to platform param injection
+    from providers.helpers import _active_account as _resolve_active
+    acc = await _resolve_active(ctx, "")
     if not acc:
         return ui.Empty(message="No email account available")
 
@@ -72,7 +74,8 @@ async def inbox_panel(
     account_info = ui.Stack([
         ui.Text(active_email[:32], variant="caption"),
         ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
-                   on_click=ui.Call("__panel__inbox", folder=folder, account=active_email)),
+                   on_click=ui.Call("__panel__inbox", folder=folder, cursor="",
+                                    prev_cursor="", page_num=0)),
     ], direction="horizontal", gap=1)
 
     folder_tabs = _build_folder_tabs(folder, active_email)

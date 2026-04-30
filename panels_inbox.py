@@ -72,7 +72,7 @@ def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
             f["label"],
             variant="primary" if f["key"] == folder else "ghost",
             size="sm",
-            on_click=ui.Call("__panel__inbox", folder=f["key"], account=active_email,
+            on_click=ui.Call("__panel__inbox", folder=f["key"],
                              cursor="", prev_cursor="", page_num=0),
         )
         for f in FOLDERS
@@ -140,14 +140,14 @@ def _build_email_list(
     if page_num > 0:
         nav.append(ui.Button(
             "Previous", icon="ChevronLeft", size="sm", variant="ghost",
-            on_click=ui.Call("__panel__inbox", folder=folder, account=active_email,
+            on_click=ui.Call("__panel__inbox", folder=folder,
                              cursor=prev_cursor, prev_cursor="", page_num=page_num - 1),
         ))
     nav.append(ui.Text(f"Page {page_num + 1}", variant="caption"))
     if has_more and next_cursor:
         nav.append(ui.Button(
             "Next", icon="ChevronRight", size="sm", variant="ghost",
-            on_click=ui.Call("__panel__inbox", folder=folder, account=active_email,
+            on_click=ui.Call("__panel__inbox", folder=folder,
                              cursor=next_cursor, prev_cursor=current_cursor,
                              page_num=page_num + 1),
         ))
