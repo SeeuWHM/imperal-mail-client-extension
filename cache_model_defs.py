@@ -55,12 +55,13 @@ class UnreadSummary(BaseModel):
 
 
 class InboxMessages(BaseModel):
-    """Flat list of up to 150 messages for a folder — powers native ui.List pagination."""
+    """Flat list of messages for a folder — powers native ui.List pagination."""
     account_id: str
     folder: str
     messages: list[dict[str, Any]] = Field(default_factory=list)
-    total_in_folder: int = 0   # from get_folder_stats — used for info display
-    unread_in_folder: int = 0  # total unread in folder (not per-page)
+    total_in_folder: int = 0    # from get_folder_stats
+    unread_in_folder: int = 0   # total unread in folder (not per-page)
+    next_cursor: str = ""       # encoded cursor for fetching the next batch
     fetched_at: datetime
 
 

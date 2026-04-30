@@ -145,11 +145,14 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
                 except Exception:
                     break
             try:
+                # Store next_cursor so the panel can "load more" beyond 150
+                final_cursor = encode_cursor(acc.get("provider", "oauth"), cursor_data_pw) if cursor_data_pw else ""
                 inbox_msgs = InboxMessages(
                     account_id=email, folder="INBOX",
                     messages=all_msgs[:150],
                     total_in_folder=total,
                     unread_in_folder=unread,
+                    next_cursor=final_cursor,
                     fetched_at=datetime.now(timezone.utc),
                 )
                 await ctx.cache.set(_inbox_messages_key(email, "INBOX"),

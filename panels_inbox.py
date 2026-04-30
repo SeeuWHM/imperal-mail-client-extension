@@ -77,6 +77,8 @@ def _build_email_list(
     active_email: str,
     folder: str,
     unread_count: int = 0,
+    has_more: bool = False,
+    folder_for_more: str = "INBOX",
 ) -> ui.UINode:
     """Build email list using ui.List native pagination (page_size=25).
 
@@ -119,13 +121,19 @@ def _build_email_list(
 
     info = f"{unread_count} unread" if unread_count > 0 else ""
 
-    return ui.Stack([
-        ui.Text(info, variant="caption") if info else ui.Stack([]),
-        ui.List(
-            items=items,
-            page_size=25,
-            searchable=True,
-            selectable=True,
-            bulk_actions=bulk,
-        ),
-    ], gap=1)
+    children = []
+    if info:
+        children.append(ui.Text(info, variant="caption"))
+    children.append(ui.List(
+        items=items,
+        page_size=25,
+        searchable=True,
+        selectable=True,
+        bulk_actions=bulk,
+    ))
+    if has_more:
+        children.append(ui.Button(
+            f"Load 75 more", icon="ChevronDown", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__inbox", folder=folder_for_more, load_more=True),
+        ))
+    return ui.Stack(children, gap=1)
