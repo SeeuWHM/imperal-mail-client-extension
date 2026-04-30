@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
-    refresh="interval:30s",
+    refresh="on_event:mail.received,mail.archived,mail.deleted,mail.mail_action,mail.account_switched,mail.account_connected,mail.account_disconnected",
 )
 async def inbox_panel(
     ctx,
@@ -65,7 +65,11 @@ async def inbox_panel(
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
 
     # ── Header ────────────────────────────────────────────────────────────── #
-    account_info = ui.Text(active_email[:32], variant="caption")
+    account_info = ui.Stack([
+        ui.Text(active_email[:32], variant="caption"),
+        ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
+                   on_click=ui.Call("__panel__inbox", folder=folder, account=active_email)),
+    ], direction="horizontal", gap=1)
 
     folder_tabs = _build_folder_tabs(folder, active_email)
 

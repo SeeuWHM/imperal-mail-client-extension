@@ -1,6 +1,7 @@
 """IMAP read operations — inbox, fetch page, unread count."""
 from __future__ import annotations
 
+import email as email_lib
 import logging
 import re
 

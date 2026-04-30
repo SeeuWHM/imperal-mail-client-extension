@@ -130,7 +130,6 @@ def _build_email_list(
         searchable=True,
         selectable=True,
         bulk_actions=bulk,
-        total_items=0,
         extra_info=" · ".join(info_parts),
     )
 
