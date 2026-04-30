@@ -71,6 +71,14 @@ class BaseMailProvider(ABC):
     async def move(self, ctx: Context, acc: dict, message_id: str,
                    from_folder: str = "INBOX", to_folder: str = "INBOX") -> dict: ...
 
+    async def get_folder_stats(self, ctx: Context, acc: dict, folder: str = "inbox") -> dict:
+        """Return {'total': int, 'unread': int} for the given folder.
+
+        Default implementation returns unread from get_unread_count; total=0.
+        Override in providers that have a cheap API for total count.
+        """
+        return {"total": 0, "unread": await self.get_unread_count(ctx, acc, folder)}
+
     async def purge(self, ctx: Context, acc: dict, message_id: str,
                     from_folder: str = "Trash") -> dict:
         return self.err("Permanent deletion not implemented for this provider")

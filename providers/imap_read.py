@@ -17,6 +17,34 @@ from .imap_read_message import (  # noqa: F401
 log = logging.getLogger(__name__)
 
 
+def _sync_imap_folder_stats(email_addr: str, host: str, port: int, imap_folder: str,
+                             *, password: str = "", access_token: str = "") -> dict:
+    """Return {'total': int, 'unread': int} via IMAP STATUS command."""
+    imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+    try:
+        candidates = IMAP_FOLDER_CANDIDATES.get(imap_folder.lower(), [imap_folder])
+        if imap_folder.upper() == "INBOX":
+            candidates = ["INBOX"]
+        for candidate in candidates:
+            try:
+                r, data = imap.status(f'"{candidate}"', "(MESSAGES UNSEEN)")
+                if r == "OK" and data and data[0]:
+                    import re as _re
+                    m_total  = _re.search(rb"MESSAGES\s+(\d+)", data[0])
+                    m_unseen = _re.search(rb"UNSEEN\s+(\d+)", data[0])
+                    total  = int(m_total.group(1))  if m_total  else 0
+                    unread = int(m_unseen.group(1)) if m_unseen else 0
+                    return {"total": total, "unread": unread}
+            except Exception:
+                continue
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass
+    return {"total": 0, "unread": 0}
+
+
 def _sync_imap_inbox(email_addr: str, host: str, port: int, max_results: int = 20,
                      *, password: str = "", access_token: str = "") -> list[dict]:
     imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)

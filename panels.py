@@ -6,12 +6,15 @@ from datetime import datetime, timezone
 
 from imperal_sdk import ui
 
+import math
+
 from app import ext
 from ctx_helpers import _get_acc
 from providers import get_provider
 from providers.helpers import (
     _all_accounts, encode_cursor, decode_cursor,
     _inbox_page_key, _unread_summary_key, _invalidate_first_page,
+    _inbox_manifest_key,
 )
 from panels_inbox import (
     FOLDERS,
@@ -22,7 +25,7 @@ from panels_email_viewer import build_email_viewer
 from panels_accounts import build_accounts_panel
 from panels_add_account import build_add_account_panel
 from panels_compose import build_compose_panel
-from cache_models import InboxPage, UnreadSummary
+from cache_model_defs import InboxManifest, InboxPage, UnreadSummary
 
 log = logging.getLogger(__name__)
 
@@ -80,8 +83,26 @@ async def inbox_panel(
 
     folder_tabs = _build_folder_tabs(folder, active_email)
 
+    # ── Load manifest (best-effort) ───────────────────────────────────────── #
+    manifest: InboxManifest | None = None
+    try:
+        manifest = await ctx.cache.get(_inbox_manifest_key(active_email, folder), InboxManifest)
+    except Exception:
+        pass
+
+    # Resolve effective cursor from manifest when possible
+    if manifest and folder == "INBOX" and page_num < len(manifest.cursors):
+        effective_cursor = manifest.cursors[page_num]
+    else:
+        effective_cursor = cursor
+
+    # Compute total pages
+    total_pages = 0
+    if manifest and manifest.total > 0 and manifest.page_size > 0:
+        total_pages = math.ceil(manifest.total / manifest.page_size)
+
     # ── Fetch inbox page ──────────────────────────────────────────────────── #
-    cursor_data = decode_cursor(cursor) if cursor else None
+    cursor_data = decode_cursor(effective_cursor) if effective_cursor else None
     clamped     = max(1, min(limit, 100))
 
     async def _fetch_page() -> InboxPage:
@@ -98,7 +119,7 @@ async def inbox_panel(
         return InboxPage(
             account_id=active_email,
             folder=folder,
-            cursor=cursor or "",
+            cursor=effective_cursor or "",
             messages=norm,
             next_cursor=next_cur,
             has_more=bool(has_more),
@@ -112,7 +133,7 @@ async def inbox_panel(
             page = await _fetch_page()
         else:
             page = await ctx.cache.get_or_fetch(
-                key=_inbox_page_key(active_email, folder, cursor),
+                key=_inbox_page_key(active_email, folder, effective_cursor),
                 model=InboxPage,
                 fetcher=_fetch_page,
                 ttl_seconds=60,
@@ -132,27 +153,44 @@ async def inbox_panel(
     has_more    = page.has_more
 
     # ── Unread count ──────────────────────────────────────────────────────── #
-    async def _fetch_unread() -> UnreadSummary:
+    # Prefer manifest unread (fresh from skeleton) over separate cache entry
+    if manifest and folder == "INBOX":
+        unread_count = manifest.unread
+    else:
+        async def _fetch_unread() -> UnreadSummary:
+            try:
+                count = await provider.get_unread_count(ctx, acc, folder)
+            except Exception:
+                count = sum(1 for m in messages if m.get("unread"))
+            return UnreadSummary(
+                account_id=active_email, folder=folder, unread_count=int(count or 0))
+
         try:
-            count = await provider.get_unread_count(ctx, acc, folder)
+            summary = await ctx.cache.get_or_fetch(
+                key=_unread_summary_key(active_email, folder),
+                model=UnreadSummary,
+                fetcher=_fetch_unread,
+                ttl_seconds=30,
+            )
+            unread_count = summary.unread_count
         except Exception:
-            count = sum(1 for m in messages if m.get("unread"))
-        return UnreadSummary(account_id=active_email, folder=folder, unread_count=int(count or 0))
+            unread_count = sum(1 for m in messages if m.get("unread"))
 
-    try:
-        summary = await ctx.cache.get_or_fetch(
-            key=_unread_summary_key(active_email, folder),
-            model=UnreadSummary,
-            fetcher=_fetch_unread,
-            ttl_seconds=30,
-        )
-        unread_count = summary.unread_count
-    except Exception:
-        unread_count = sum(1 for m in messages if m.get("unread"))
+    # Resolve prev_cursor from manifest when possible
+    if manifest and folder == "INBOX" and page_num > 0 and page_num - 1 < len(manifest.cursors):
+        effective_prev_cursor = manifest.cursors[page_num - 1]
+    else:
+        effective_prev_cursor = prev_cursor
 
-    email_list = _build_email_list(messages, next_cursor, has_more,
-                                   folder, active_email, unread_count,
-                                   cursor, prev_cursor, page_num)
+    email_list = _build_email_list(
+        messages, next_cursor, has_more,
+        folder, active_email, unread_count,
+        total=manifest.total if manifest else 0,
+        current_cursor=effective_cursor,
+        prev_cursor=effective_prev_cursor,
+        page_num=page_num,
+        total_pages=total_pages,
+    )
 
     return ui.Stack([account_info, folder_tabs, email_list])
 

@@ -84,8 +84,9 @@ def _build_email_list(
     messages: list[dict],
     next_cursor: str | None, has_more: bool,
     folder: str, active_email: str,
-    unread_count: int = 0,
+    unread_count: int = 0, total: int = 0,
     current_cursor: str = "", prev_cursor: str = "", page_num: int = 0,
+    total_pages: int = 0,
 ) -> ui.UINode:
     # Build full ID list first so every email gets the complete list for prev/next nav
     msg_ids = [msg.get("message_id", msg.get("id", "")) for msg in messages]
@@ -121,38 +122,51 @@ def _build_email_list(
          "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
     ]
 
+    # Info line: total messages · unread count · shown count
     info_parts = []
+    if total > 0:
+        info_parts.append(f"{total} messages")
     if unread_count > 0:
         info_parts.append(f"{unread_count} unread")
     if messages:
         info_parts.append(f"{len(messages)} shown")
+    info = " · ".join(info_parts)
 
     email_list = ui.List(
         items=items,
         searchable=True,
         selectable=True,
         bulk_actions=bulk,
-        extra_info=" · ".join(info_parts),
     )
 
-    # Pagination — exact developer/transactions pattern
-    nav = []
-    if page_num > 0:
-        nav.append(ui.Button(
-            "Previous", icon="ChevronLeft", size="sm", variant="ghost",
-            on_click=ui.Call("__panel__inbox", folder=folder,
-                             cursor=prev_cursor, prev_cursor="", page_num=page_num - 1),
-        ))
-    nav.append(ui.Text(f"Page {page_num + 1}", variant="caption"))
-    if has_more and next_cursor:
-        nav.append(ui.Button(
-            "Next", icon="ChevronRight", size="sm", variant="ghost",
-            on_click=ui.Call("__panel__inbox", folder=folder,
-                             cursor=next_cursor, prev_cursor=current_cursor,
-                             page_num=page_num + 1),
-        ))
+    # Pagination — < N / N > style with icon-only prev/next buttons
+    page_display = page_num + 1
+    total_display = total_pages if total_pages > 0 else "?"
+    nav = [
+        ui.Button(
+            "", icon="ChevronLeft", size="sm", variant="ghost",
+            disabled=page_num == 0,
+            on_click=ui.Call(
+                "__panel__inbox", folder=folder,
+                cursor=prev_cursor, prev_cursor="", page_num=page_num - 1,
+            ) if page_num > 0 else ui.Call(
+                "__panel__inbox", folder=folder, cursor="", page_num=0,
+            ),
+        ),
+        ui.Text(f"{page_display} / {total_display}", variant="caption"),
+        ui.Button(
+            "", icon="ChevronRight", size="sm", variant="ghost",
+            disabled=not has_more and not next_cursor,
+            on_click=ui.Call(
+                "__panel__inbox", folder=folder,
+                cursor=next_cursor or "", prev_cursor=current_cursor,
+                page_num=page_num + 1,
+            ),
+        ),
+    ]
 
     return ui.Stack([
+        ui.Text(info, variant="caption") if info else ui.Stack([]),
         email_list,
         ui.Stack(nav, direction="horizontal", gap=1),
     ])

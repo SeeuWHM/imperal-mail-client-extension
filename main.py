@@ -14,7 +14,8 @@ _MODULES = (
     "handlers_connect", "handlers_inbox", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
     "skeleton", "panels", "panels_inbox", "panels_email_viewer", "panels_compose",
-    "panels_accounts", "panels_add_account", "cache_models", "cache_model_defs",
+    "panels_accounts", "panels_add_account", "panels_schedule",
+    "cache_models", "cache_model_defs",
 )
 for _m in [k for k in sys.modules if k in _MODULES]:
     del sys.modules[_m]
@@ -37,3 +38,4 @@ import panels_compose             # noqa: E402, F401
 import panels_accounts            # noqa: E402, F401
 import panels_add_account         # noqa: E402, F401
 import panels                     # noqa: E402, F401
+import panels_schedule            # noqa: E402, F401

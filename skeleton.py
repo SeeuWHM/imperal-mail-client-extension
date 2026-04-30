@@ -8,6 +8,7 @@ The refresh tool continues to fetch the latest inbox so it can:
 1. Surface ``unread_total`` + per-account ``unread_count`` for the classifier.
 2. Diff against ``last_message_ids`` stored per-account (ctx.store) to fire
    ``ctx.notify(...)`` for genuinely new messages.
+3. Cache page 1 + InboxManifest for true pagination in the inbox panel.
 
 It does NOT call ``ctx.skeleton.update(...)`` — the kernel persists the
 returned dict via the ``skeleton_save_section`` activity.
@@ -16,11 +17,16 @@ from __future__ import annotations
 
 import logging
 import time as _time
+from datetime import datetime, timezone
 
 from app import ext
 
 from providers import get_provider
-from providers.helpers import _all_accounts, _refresh_token_if_needed, COLLECTION, INBOX_FETCH_SIZE
+from providers.helpers import (
+    _all_accounts, _refresh_token_if_needed, COLLECTION, INBOX_FETCH_SIZE,
+    _inbox_page_key, _inbox_manifest_key, encode_cursor,
+)
+from cache_model_defs import InboxManifest, InboxPage
 
 log = logging.getLogger("mail")
 
@@ -47,11 +53,30 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
 
         try:
             acc = await _refresh_token_if_needed(ctx, acc)
-            result = await get_provider(acc).fetch_inbox(ctx, acc, INBOX_FETCH_SIZE)
-            messages = result.get("messages", [])
-            unread = int(result.get("unread_count", 0))
-            curr_ids = {m["id"] for m in messages if m.get("id")}
+            provider = get_provider(acc)
+
+            # Get folder stats (total + unread) via dedicated API endpoint
+            try:
+                stats = await provider.get_folder_stats(ctx, acc, "INBOX")
+                total = stats.get("total", 0)
+                unread = int(stats.get("unread", 0))
+            except Exception:
+                total = 0
+                unread = 0
+
+            # Fetch page 1 via fetch_page (gives us next_cursor for manifest)
+            messages, next_cursor_data, has_more = await provider.fetch_page(
+                ctx, acc, "INBOX", INBOX_FETCH_SIZE, None)
+            curr_ids = {
+                m.get("id", m.get("message_id", ""))
+                for m in messages
+                if m.get("id") or m.get("message_id")
+            }
             truly_new = curr_ids - prev_ids
+
+            # Fall back to counting unread from messages if stats returned 0
+            if unread == 0:
+                unread = sum(1 for m in messages if m.get("unread"))
 
             unread_total += unread
             per_account.append({
@@ -59,6 +84,45 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
                 "unread_count": unread,
                 "message_count": len(messages),
             })
+
+            # Normalise message_id field
+            norm = []
+            for m in messages:
+                if "id" in m and "message_id" not in m:
+                    m = {**m, "message_id": m["id"]}
+                norm.append(m)
+
+            # Build page 1 cache entry
+            provider_key = acc.get("provider", "oauth")
+            next_cur = encode_cursor(provider_key, next_cursor_data) or ""
+            page1 = InboxPage(
+                account_id=email, folder="INBOX", cursor="",
+                messages=norm, next_cursor=next_cur,
+                has_more=bool(has_more),
+                fetched_at=datetime.now(timezone.utc),
+            )
+            try:
+                await ctx.cache.set(_inbox_page_key(email, "INBOX", ""), page1, ttl_seconds=120)
+            except Exception as e:
+                log.debug("skeleton: cache page1 failed for %s: %s", email, e)
+
+            # Build and cache manifest
+            cursors = [""]  # page 1 always has cursor ""
+            if next_cur and has_more:
+                cursors.append(next_cur)  # cursor for page 2 is known
+            manifest = InboxManifest(
+                account_id=email, folder="INBOX",
+                total=total, unread=unread,
+                page_size=INBOX_FETCH_SIZE,
+                cursors=cursors,
+                preloaded=1,
+                fetched_at=datetime.now(timezone.utc),
+            )
+            try:
+                await ctx.cache.set(
+                    _inbox_manifest_key(email, "INBOX"), manifest, ttl_seconds=120)
+            except Exception as e:
+                log.debug("skeleton: cache manifest failed for %s: %s", email, e)
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {
@@ -72,7 +136,10 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
 
             if truly_new:
                 try:
-                    new_msgs = [m for m in messages if m.get("id") in truly_new]
+                    new_msgs = [
+                        m for m in messages
+                        if m.get("id") in truly_new or m.get("message_id") in truly_new
+                    ]
                     subjects = ", ".join(
                         f'"{m.get("subject", "(no subject)")}"' for m in new_msgs[:2]
                     )

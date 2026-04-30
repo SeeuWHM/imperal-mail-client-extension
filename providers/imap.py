@@ -15,6 +15,7 @@ from .helpers import (
 from .imap_connection import _imap_connect_auth, _sync_imap_test, _sync_smtp_test  # noqa: F401
 from .imap_read import (
     _sync_imap_inbox, _sync_imap_fetch_page, _sync_imap_unread_count,
+    _sync_imap_folder_stats,
     _sync_imap_read, _sync_imap_search, _sync_imap_folder,
 )
 from .imap_write import (
@@ -106,6 +107,17 @@ class ImapMailProvider(BaseMailProvider):
                 imap_folder, password=args["password"], access_token=args["access_token"])
         except Exception:
             return 0
+
+    async def get_folder_stats(self, ctx: Context, acc: dict, folder: str = "inbox") -> dict:
+        imap_folder = "INBOX" if folder.lower() == "inbox" else folder
+        acc = await self._ensure_token(ctx, acc)
+        args = self._imap_args(acc)
+        try:
+            return await asyncio.to_thread(
+                _sync_imap_folder_stats, acc.get("email", ""), args["host"], args["port"],
+                imap_folder, password=args["password"], access_token=args["access_token"])
+        except Exception:
+            return {"total": 0, "unread": 0}
 
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")

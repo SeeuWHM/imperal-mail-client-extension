@@ -84,6 +84,14 @@ class GoogleReadMixin:
             return 0
         return resp.json().get("messagesUnread", 0)
 
+    async def get_folder_stats(self, ctx: Context, acc: dict, folder: str = "inbox") -> dict:
+        label_id = _PAGE_FOLDER_LABELS.get(folder.lower(), "INBOX")
+        resp = await _api_get(ctx, f"labels/{label_id}", acc)
+        if resp.status_code != 200:
+            return {"total": 0, "unread": 0}
+        data = resp.json()
+        return {"total": data.get("messagesTotal", 0), "unread": data.get("messagesUnread", 0)}
+
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")
         resp = await _api_get(ctx, f"messages/{message_id}", acc, params={"format": "full"})

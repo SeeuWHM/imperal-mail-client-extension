@@ -109,6 +109,11 @@ def _unread_summary_key(email: str, folder: str = "INBOX") -> str:
     return f"unread:{_slug(email)}:{_slug(folder)}"
 
 
+def _inbox_manifest_key(email: str, folder: str = "INBOX") -> str:
+    """Canonical ctx.cache key for the inbox pagination manifest."""
+    return f"manifest:{_slug(email)}:{_slug(folder)}"
+
+
 # ── Best-effort cache-bust helpers (thin wrappers over ctx.cache.delete) ─
 # Replaces the Redis SCAN-based invalidation from the deleted providers/cache.py.
 # ctx.cache exposes only per-key delete (no SCAN), so we invalidate the

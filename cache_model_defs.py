@@ -14,6 +14,23 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class InboxManifest(BaseModel):
+    """Prefetch manifest: total count + ordered cursor list for true pagination.
+
+    ``cursors[n]`` is the opaque cursor that fetches page n+1.
+    cursors[0] is always "" (first page, no cursor).
+    ``preloaded`` indicates how many pages are currently in ctx.cache.
+    """
+    account_id: str
+    folder: str
+    total: int = 0        # total messages in folder (0 = unknown)
+    unread: int = 0
+    page_size: int = 25
+    cursors: list[str] = Field(default_factory=list)  # cursors[0]="", cursors[1]=cursor for page 2, etc.
+    preloaded: int = 0    # how many pages are pre-cached
+    fetched_at: datetime
+
+
 class InboxPage(BaseModel):
     """A single page of inbox messages returned by provider.fetch_page.
 

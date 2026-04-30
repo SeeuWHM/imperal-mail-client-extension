@@ -92,6 +92,18 @@ class MicrosoftMailProvider(BaseMailProvider):
         except Exception:
             return 0
 
+    async def get_folder_stats(self, ctx: Context, acc: dict, folder: str = "inbox") -> dict:
+        try:
+            if folder.lower() == "starred":
+                return {"total": 0, "unread": await self.get_unread_count(ctx, acc, folder)}
+            ms_folder = _MS_PAGE_FOLDERS.get(folder.lower(), "inbox")
+            resp = await _graph_get(ctx, f"/me/mailFolders/{ms_folder}", acc)
+            resp.raise_for_status()
+            data = resp.json()
+            return {"total": data.get("totalItemCount", 0), "unread": data.get("unreadItemCount", 0)}
+        except Exception:
+            return {"total": 0, "unread": 0}
+
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")
         resp = await _graph_get(ctx, f"/me/messages/{message_id}", acc, params={
