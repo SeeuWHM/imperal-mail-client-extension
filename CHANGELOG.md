@@ -1,5 +1,69 @@
 # Changelog
 
+## [5.2.0] — 2026-04-30
+
+### Fixed
+
+- **inbox_panel stale account after pagination** — Root cause: platform injected `account=old@email` from previous paginated render into every panel call, including account switches. The longer the user paged, the deeper the stale value embedded in platform's param state. Fix: `account` parameter removed from `inbox_panel` signature entirely — absorbed into `**_unused_kwargs`. Active account always resolved from `ctx.store` via `_active_account(ctx, "")` which uses `is_active` flag. Platform cannot inject a stale account through store.
+
+- **Cache race on account switch** — `get_or_fetch` could return stale entry in the brief window between `cache.delete` and the new write. Fix: when `do_switch_account` is set, cache bypassed entirely — `_fetch_page()` called directly.
+
+- **VALIDATION_MISSING_FIELD for `body`** — LLM sends `content` instead of `body` per training. `SendParams.body` and `ReplyParams.body` now use `AliasChoices("body", "content", "message", "text")`. Schema-level fix — no workaround.
+
+- **VALIDATION_MISSING_FIELD for `subject`** — `SendParams.subject` now optional (`default=""`). `impl_send` auto-generates subject from first line of body (up to 60 chars) when omitted.
+
+- **doc_id pollution in store documents** — `_all_accounts()` returns `{"doc_id": d.id, **d.data}` dicts. On subsequent `ctx.store.update`, spreading `{**acc}` included `doc_id` as a document field. Fixed in `handlers_connect.py` and `handlers_panel_actions.py`: strip `doc_id` before update payload.
+
+### Changed
+
+- `inbox_panel` drops `account` parameter — store-based resolution only
+- `folder_counts` uses `asyncio.gather` for all 7 folders in parallel (was sequential)
+- Pagination: `Previous / Page N / Next` UI (developer/transactions pattern) with `page_num` + `prev_cursor` chain
+- Folder tabs + RefreshCw button no longer pass `account=` to `__panel__inbox`
+- `imperal.json` rewritten to SDK v3.x format: single `tool_mail_client_chat` entry point (was 35 manual tool entries); `sdk_version` field removed; `capabilities` corrected to match `app.py`
+
+### Added
+
+- `schemas_params.py` — 20 `@chat.function` Pydantic param models extracted from `schemas.py` (300L rule)
+- `panels_inbox.py` — inbox UI helpers extracted from `panels.py` (300L rule)
+- `imap_read_message.py` — `_sync_imap_read`, `_sync_imap_search`, `_sync_imap_folder`, `_parse_imap_body` extracted from `imap_read.py` (300L rule)
+- `system_prompt.txt` recreated — was deleted in v5.0.0 migration; restored for ChatExtension
+
+---
+
+## [5.1.0] — 2026-04-30
+
+### Fixed
+
+- **Microsoft Starred = Inbox** — `_MS_PAGE_FOLDERS` had no `"starred"` mapping → defaulted to `"inbox"`. And `$orderby` combined with `$filter` on `/me/messages` returns Graph API 400 "InefficientFilter". Fix: `params.pop("$orderby", None)` + `$filter=flag/flagStatus eq 'flagged'` on `/me/messages` endpoint.
+
+- **IMAP starred empty** — IMAP has no "starred" folder; flagged messages live in INBOX with `\Flagged` flag. `_sync_imap_fetch_page` for `"starred"`: selects INBOX, `SEARCH FLAGGED`. `_sync_imap_unread_count`: `SEARCH FLAGGED UNSEEN`.
+
+- **prev/next email arrows did nothing** — `email_list_ids` was built incrementally: first email got `"id1"`, second got `"id1,id2"` — most emails had incomplete lists. Fix: build full `msg_ids` list before the loop, assign `full_ids` to all items with `current_index=i`.
+
+- **Active badge never updated** — `accounts_panel` had `on_event:` refresh that required events from DirectCallWorkflow (which don't publish). Changed to `refresh="interval:30s"` — re-reads `is_active` from store every 30s.
+
+- **`on_end_reached` cursor leaked across accounts** — Platform stored cursor in panel state. On any re-render (folder switch, account switch), platform re-sent `cursor=page2_cursor + account=old`. Fixed by removing `on_end_reached` entirely; replaced with explicit Prev/Next buttons.
+
+- **Google/Microsoft: only one account per provider** — `impl_connect` and `impl_connect_microsoft` returned "already_connected" if any account of that type existed. Removed early return — always generates OAuth URL; supports multiple accounts per provider.
+
+- **`star` action in `impl_mail_action`** — Missing `starred=True` kwarg in action_map. Also added `"unstar"` entry with `starred=False`.
+
+- **`compose_send` Re:/Fwd: double prefix** — Subject prefix check was case-sensitive (`startswith("Re:")` missed `re:`, `RE:`). Changed to `.lower().startswith(...)`.
+
+- **reply-all email exclusion** — Used substring match (`account_email not in addr`) — prone to false positives. Changed to regex-parse `<email>` and exact lowercase comparison.
+
+- **`folder_counts` 6 sequential requests** — Replaced with `asyncio.gather` for parallel execution.
+
+- **`ui.List total_items=0`** — Caused platform to render built-in pagination arrows `← 1/10 →` conflicting with manual Prev/Next buttons. Removed `total_items` parameter.
+
+### Added
+
+- Archive folder added to `FOLDERS` list in `panels_inbox.py` and `FOLDER_KEYS` in `handlers_panel_actions.py`
+- Prev/Next navigation in email viewer (`_action_bar` receives `email_list_ids` + `current_index`)
+
+---
+
 ## [5.0.0] — 2026-04-25
 
 ### Breaking — SDK v2.0.0 (Webbee Single Voice)
