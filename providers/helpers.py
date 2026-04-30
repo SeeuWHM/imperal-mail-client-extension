@@ -114,6 +114,11 @@ def _inbox_manifest_key(email: str, folder: str = "INBOX") -> str:
     return f"manifest:{_slug(email)}:{_slug(folder)}"
 
 
+def _inbox_messages_key(email: str, folder: str = "INBOX") -> str:
+    """Canonical ctx.cache key for the flat InboxMessages list (ui.List pagination)."""
+    return f"msgs:{_slug(email)}:{_slug(folder)}"
+
+
 # ── Best-effort cache-bust helpers (thin wrappers over ctx.cache.delete) ─
 # Replaces the Redis SCAN-based invalidation from the deleted providers/cache.py.
 # ctx.cache exposes only per-key delete (no SCAN), so we invalidate the
@@ -125,6 +130,8 @@ async def _invalidate_first_page(ctx, email: str, folder: str = "INBOX") -> None
         if hasattr(ctx, "cache") and ctx.cache is not None:
             await ctx.cache.delete(_inbox_page_key(email, folder, ""))
             await ctx.cache.delete(_unread_summary_key(email, folder))
+            await ctx.cache.delete(_inbox_messages_key(email, folder))
+            await ctx.cache.delete(_inbox_manifest_key(email, folder))
     except Exception as e:
         log.debug("_invalidate_first_page(%s/%s): %s", email, folder, e)
 

@@ -54,6 +54,16 @@ class UnreadSummary(BaseModel):
     unread_count: int = 0
 
 
+class InboxMessages(BaseModel):
+    """Flat list of up to 150 messages for a folder — powers native ui.List pagination."""
+    account_id: str
+    folder: str
+    messages: list[dict[str, Any]] = Field(default_factory=list)
+    total_in_folder: int = 0   # from get_folder_stats — used for info display
+    unread_in_folder: int = 0  # total unread in folder (not per-page)
+    fetched_at: datetime
+
+
 class AccountList(BaseModel):
     """Cached list of accounts for panels/handlers that don't need fresh data."""
     accounts: list[dict[str, Any]] = Field(default_factory=list)

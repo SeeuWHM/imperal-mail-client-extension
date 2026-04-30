@@ -6,15 +6,12 @@ from datetime import datetime, timezone
 
 from imperal_sdk import ui
 
-import math
-
 from app import ext
 from ctx_helpers import _get_acc
 from providers import get_provider
 from providers.helpers import (
-    _all_accounts, encode_cursor, decode_cursor,
-    _inbox_page_key, _unread_summary_key, _invalidate_first_page,
-    _inbox_manifest_key,
+    _all_accounts, _invalidate_first_page,
+    _inbox_messages_key, _inbox_manifest_key,
 )
 from panels_inbox import (
     FOLDERS,
@@ -25,43 +22,79 @@ from panels_email_viewer import build_email_viewer
 from panels_accounts import build_accounts_panel
 from panels_add_account import build_add_account_panel
 from panels_compose import build_compose_panel
-from cache_model_defs import InboxManifest, InboxPage, UnreadSummary
+from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
+
+INBOX_FLAT_LIMIT = 150   # max messages to load per folder
+INBOX_PAGE_SIZE  = 25    # items shown per page in ui.List
+INBOX_CACHE_TTL  = 90    # seconds
+
+
+async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
+    """Fetch up to INBOX_FLAT_LIMIT messages for a folder in one or two provider calls."""
+    email = acc.get("email", "")
+
+    # Folder stats (total + unread) — single lightweight API call
+    try:
+        stats = await provider.get_folder_stats(ctx, acc, folder)
+        total_in_folder  = stats.get("total", 0)
+        unread_in_folder = stats.get("unread", 0)
+    except Exception:
+        total_in_folder = unread_in_folder = 0
+
+    # Fetch up to INBOX_FLAT_LIMIT messages — single provider call with large limit
+    all_messages: list[dict] = []
+    cursor_data = None
+    while len(all_messages) < INBOX_FLAT_LIMIT:
+        remaining = INBOX_FLAT_LIMIT - len(all_messages)
+        try:
+            messages, next_cursor_data, has_more = await provider.fetch_page(
+                ctx, acc, folder, remaining, cursor_data,
+            )
+        except Exception as e:
+            log.warning("inbox fetch_page failed folder=%s: %s", folder, e)
+            break
+        for m in messages:
+            if "id" in m and "message_id" not in m:
+                m = {**m, "message_id": m["id"]}
+        all_messages.extend(messages)
+        if not has_more or not next_cursor_data or len(messages) < remaining:
+            break
+        cursor_data = next_cursor_data
+
+    return InboxMessages(
+        account_id=email, folder=folder,
+        messages=all_messages,
+        total_in_folder=total_in_folder,
+        unread_in_folder=unread_in_folder,
+        fetched_at=datetime.now(timezone.utc),
+    )
 
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
-    refresh="on_event:archived,deleted,bulk_archived,bulk_deleted,marked_read,marked_unread,mail.action,account.switched,account.connected,account.disconnected",
+    refresh="on_event:archived,deleted,bulk_archived,bulk_deleted,marked_read,"
+            "marked_unread,mail.action,account.switched,account.connected,account.disconnected",
 )
 async def inbox_panel(
     ctx,
     folder: str = "INBOX",
-    limit: int = 25,
-    cursor: str = "",
-    prev_cursor: str = "",
-    page_num: int = 0,
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
-    **_unused_kwargs,  # absorb any stale `account=` the platform injects
+    **_unused_kwargs,
 ):
     accounts = await _all_accounts(ctx)
     if not accounts:
         return ui.Empty(message="No email accounts connected")
 
-    # ── Account switch: update store FIRST, then resolve from store ──────────
-    # Never trust the `account` HTTP param — platform injects stale values
-    # from previous paginated renders. Always resolve from is_active in store.
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
-        cursor = ""
-        prev_cursor = ""
-        page_num = 0
+        folder = "INBOX"
         for _fkey in [f["key"] for f in FOLDERS]:
             await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
-    # Read active account purely from store — immune to platform param injection
     from providers.helpers import _active_account as _resolve_active
     acc = await _resolve_active(ctx, "")
     if not acc:
@@ -70,126 +103,40 @@ async def inbox_panel(
     provider     = get_provider(acc)
     active_email = acc.get("email", "")
 
-    # ── Inline single-message action ──────────────────────────────────────── #
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
 
-    # ── Header ────────────────────────────────────────────────────────────── #
+    # Header
     account_info = ui.Stack([
         ui.Text(active_email[:32], variant="caption"),
         ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
-                   on_click=ui.Call("__panel__inbox", folder=folder, cursor="",
-                                    prev_cursor="", page_num=0)),
+                   on_click=ui.Call("__panel__inbox", folder=folder)),
     ], direction="horizontal", gap=1)
 
     folder_tabs = _build_folder_tabs(folder, active_email)
 
-    # ── Load manifest (best-effort) ───────────────────────────────────────── #
-    manifest: InboxManifest | None = None
-    try:
-        manifest = await ctx.cache.get(_inbox_manifest_key(active_email, folder), InboxManifest)
-    except Exception:
-        pass
+    # Load flat message list (cache-first, inline populate on miss — DB ext pattern)
+    msgs_key = _inbox_messages_key(active_email, folder)
 
-    # Resolve effective cursor from manifest when possible
-    if manifest and folder == "INBOX" and page_num < len(manifest.cursors):
-        effective_cursor = manifest.cursors[page_num]
-    else:
-        effective_cursor = cursor
-
-    # Compute total pages
-    total_pages = 0
-    if manifest and manifest.total > 0 and manifest.page_size > 0:
-        total_pages = math.ceil(manifest.total / manifest.page_size)
-
-    # ── Fetch inbox page ──────────────────────────────────────────────────── #
-    cursor_data = decode_cursor(effective_cursor) if effective_cursor else None
-    clamped     = max(1, min(limit, 100))
-
-    async def _fetch_page() -> InboxPage:
-        messages, next_cursor_data, has_more = await provider.fetch_page(
-            ctx, acc, folder, clamped, cursor_data,
-        )
-        provider_key = acc.get("provider", "oauth")
-        next_cur = encode_cursor(provider_key, next_cursor_data) or ""
-        norm = []
-        for m in messages:
-            if "id" in m and "message_id" not in m:
-                m = {**m, "message_id": m["id"]}
-            norm.append(m)
-        return InboxPage(
-            account_id=active_email,
-            folder=folder,
-            cursor=effective_cursor or "",
-            messages=norm,
-            next_cursor=next_cur,
-            has_more=bool(has_more),
-            fetched_at=datetime.now(timezone.utc),
-        )
+    async def _fetcher() -> InboxMessages:
+        return await _fetch_inbox_messages(ctx, provider, acc, folder)
 
     try:
         if do_switch_account:
-            # Bypass cache entirely after account switch — get_or_fetch might
-            # return a stale entry in the window between delete and new write.
-            page = await _fetch_page()
+            inbox_msgs = await _fetcher()
         else:
-            page = await ctx.cache.get_or_fetch(
-                key=_inbox_page_key(active_email, folder, effective_cursor),
-                model=InboxPage,
-                fetcher=_fetch_page,
-                ttl_seconds=60,
+            inbox_msgs = await ctx.cache.get_or_fetch(
+                msgs_key, InboxMessages, _fetcher, ttl_seconds=INBOX_CACHE_TTL,
             )
-            # Integrity guard: discard if cached for wrong account/folder.
-            if page.account_id != active_email or page.folder != folder:
-                page = await _fetch_page()
+            if inbox_msgs.account_id != active_email or inbox_msgs.folder != folder:
+                inbox_msgs = await _fetcher()
     except Exception as e:
-        log.warning("inbox panel fetch_page failed folder=%s: %s", folder, e)
-        return ui.Stack([
-            account_info, folder_tabs,
-            ui.Error(message=f"Failed to load {folder}: {e}"),
-        ])
-
-    messages    = page.messages
-    next_cursor = page.next_cursor or None
-    has_more    = page.has_more
-
-    # ── Unread count ──────────────────────────────────────────────────────── #
-    # Prefer manifest unread (fresh from skeleton) over separate cache entry
-    if manifest and folder == "INBOX":
-        unread_count = manifest.unread
-    else:
-        async def _fetch_unread() -> UnreadSummary:
-            try:
-                count = await provider.get_unread_count(ctx, acc, folder)
-            except Exception:
-                count = sum(1 for m in messages if m.get("unread"))
-            return UnreadSummary(
-                account_id=active_email, folder=folder, unread_count=int(count or 0))
-
-        try:
-            summary = await ctx.cache.get_or_fetch(
-                key=_unread_summary_key(active_email, folder),
-                model=UnreadSummary,
-                fetcher=_fetch_unread,
-                ttl_seconds=30,
-            )
-            unread_count = summary.unread_count
-        except Exception:
-            unread_count = sum(1 for m in messages if m.get("unread"))
-
-    # Resolve prev_cursor from manifest when possible
-    if manifest and folder == "INBOX" and page_num > 0 and page_num - 1 < len(manifest.cursors):
-        effective_prev_cursor = manifest.cursors[page_num - 1]
-    else:
-        effective_prev_cursor = prev_cursor
+        log.warning("inbox panel load failed folder=%s: %s", folder, e)
+        return ui.Stack([account_info, folder_tabs,
+                         ui.Error(message=f"Failed to load {folder}: {e}")])
 
     email_list = _build_email_list(
-        messages, next_cursor, has_more,
-        folder, active_email, unread_count,
-        total=manifest.total if manifest else 0,
-        current_cursor=effective_cursor,
-        prev_cursor=effective_prev_cursor,
-        page_num=page_num,
-        total_pages=total_pages,
+        inbox_msgs.messages, active_email, folder,
+        unread_count=inbox_msgs.unread_in_folder,
     )
 
     return ui.Stack([account_info, folder_tabs, email_list])
@@ -223,4 +170,5 @@ async def compose_panel(ctx, mode: str = "new", message_id: str = "",
 
 @ext.panel("add_account", slot="right", title="Add Account", icon="UserPlus")
 async def add_account_panel(ctx, step: str = "providers", email: str = "", error: str = ""):
-    return await build_add_account_panel(ctx, step, email, error)
+    from panels_add_account import build_add_account_panel as _build
+    return await _build(ctx, step, email, error)

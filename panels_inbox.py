@@ -21,12 +21,7 @@ FOLDERS = [
 
 
 async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str) -> None:
-    """Execute a single-message action BEFORE the inbox list is fetched.
-
-    Called inline so the result is immediately reflected in the render
-    without depending on event publishing (which only works from the
-    full SessionWorkflow / LLM chat path, not from ui.Call / Fast-RPC).
-    """
+    """Execute a single-message action inline before the inbox list renders."""
     if not action or not message_id:
         return
     email = acc.get("email", "")
@@ -53,27 +48,24 @@ async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str
 async def _switch_active_account(ctx, target_email: str) -> None:
     """Update is_active in the store so _get_acc returns the right account."""
     try:
-        docs = await ctx.store.query(COLLECTION)
-        for d in docs:
-            _data = d.data if hasattr(d, "data") else d
-            _id = d.id if hasattr(d, "id") else d["doc_id"]
-            should_be_active = (_data.get("email") == target_email)
-            if _data.get("is_active") != should_be_active:
-                await ctx.store.update(COLLECTION, _id,
-                                       {**_data, "is_active": should_be_active})
+        page = await ctx.store.query(COLLECTION)
+        for d in page.data:
+            should_be_active = (d.data.get("email") == target_email)
+            if d.data.get("is_active") != should_be_active:
+                await ctx.store.update(COLLECTION, d.id,
+                                       {**d.data, "is_active": should_be_active})
     except Exception as e:
         log.warning("switch_active_account to %s failed: %s", target_email, e)
 
 
 def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
-    """Explicit folder tab buttons — no param_name injection needed."""
+    """Folder tab buttons."""
     buttons = [
         ui.Button(
             f["label"],
             variant="primary" if f["key"] == folder else "ghost",
             size="sm",
-            on_click=ui.Call("__panel__inbox", folder=f["key"],
-                             cursor="", prev_cursor="", page_num=0),
+            on_click=ui.Call("__panel__inbox", folder=f["key"]),
         )
         for f in FOLDERS
     ]
@@ -82,25 +74,28 @@ def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
 
 def _build_email_list(
     messages: list[dict],
-    next_cursor: str | None, has_more: bool,
-    folder: str, active_email: str,
-    unread_count: int = 0, total: int = 0,
-    current_cursor: str = "", prev_cursor: str = "", page_num: int = 0,
-    total_pages: int = 0,
+    active_email: str,
+    folder: str,
+    unread_count: int = 0,
 ) -> ui.UINode:
-    # Build full ID list first so every email gets the complete list for prev/next nav
+    """Build email list using ui.List native pagination (page_size=25).
+
+    Platform handles < 1/N > pagination natively — no manual cursor logic needed.
+    Pattern matches sql-db sidebar (ui.List page_size=50, searchable=True).
+    """
     msg_ids = [msg.get("message_id", msg.get("id", "")) for msg in messages]
     full_ids = ",".join(msg_ids)
 
     items = []
     for i, msg in enumerate(messages):
         mid = msg_ids[i]
+        is_unread = bool(msg.get("unread"))
         items.append(ui.ListItem(
             id=mid,
             title=msg.get("from", "Unknown")[:40],
             subtitle=msg.get("subject", "(no subject)")[:60],
             meta=msg.get("date", "")[:10],
-            badge=ui.Badge("new", color="blue") if msg.get("unread") else None,
+            badge=ui.Badge("new", color="blue") if is_unread else None,
             on_click=ui.Call(
                 "__panel__email_viewer",
                 message_id=mid,
@@ -122,50 +117,15 @@ def _build_email_list(
          "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
     ]
 
-    # Unread label — folder total, not per-page
     info = f"{unread_count} unread" if unread_count > 0 else ""
-
-    email_list = ui.List(
-        items=items,
-        searchable=True,
-        selectable=True,
-        bulk_actions=bulk,
-    )
-
-    # Pagination — < N / N > style
-    # total_pages from manifest when available; fallback: last page known from has_more
-    page_display = page_num + 1
-    if total_pages > 0:
-        total_display: str | int = total_pages
-    elif not has_more:
-        total_display = page_display  # on the last page — we know the max
-    else:
-        total_display = f"{page_display}+"  # more pages exist, exact count unknown
-    nav = [
-        ui.Button(
-            "", icon="ChevronLeft", size="sm", variant="ghost",
-            disabled=page_num == 0,
-            on_click=ui.Call(
-                "__panel__inbox", folder=folder,
-                cursor=prev_cursor, prev_cursor="", page_num=page_num - 1,
-            ) if page_num > 0 else ui.Call(
-                "__panel__inbox", folder=folder, cursor="", page_num=0,
-            ),
-        ),
-        ui.Text(f"{page_display} / {total_display}", variant="caption"),
-        ui.Button(
-            "", icon="ChevronRight", size="sm", variant="ghost",
-            disabled=not has_more and not next_cursor,
-            on_click=ui.Call(
-                "__panel__inbox", folder=folder,
-                cursor=next_cursor or "", prev_cursor=current_cursor,
-                page_num=page_num + 1,
-            ),
-        ),
-    ]
 
     return ui.Stack([
         ui.Text(info, variant="caption") if info else ui.Stack([]),
-        email_list,
-        ui.Stack(nav, direction="horizontal", gap=1),
-    ])
+        ui.List(
+            items=items,
+            page_size=25,
+            searchable=True,
+            selectable=True,
+            bulk_actions=bulk,
+        ),
+    ], gap=1)
