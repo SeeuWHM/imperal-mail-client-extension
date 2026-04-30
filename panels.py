@@ -157,12 +157,27 @@ async def inbox_panel(
         on_submit=ui.Call("__panel__inbox", folder=folder),
     )
 
+    # When search is active — show query badge + clear button
+    search_status = None
+    if q:
+        n = len(display_messages)
+        search_status = ui.Stack([
+            ui.Badge(f'"{q}"', color="blue"),
+            ui.Text(f"{n} result{'s' if n != 1 else ''}", variant="caption"),
+            ui.Button("✕", variant="ghost", size="sm",
+                      on_click=ui.Call("__panel__inbox", folder=folder, search_query="")),
+        ], direction="horizontal", gap=1)
+
     email_list = _build_email_list(
         display_messages, active_email, folder,
         unread_count=unread_display,
     )
 
-    return ui.Stack([header, folder_tabs, search_bar, email_list], gap=1)
+    children = [header, folder_tabs, search_bar]
+    if search_status:
+        children.append(search_status)
+    children.append(email_list)
+    return ui.Stack(children, gap=1)
 
 
 @ext.panel("email_viewer", slot="center", title="Email", icon="Mail")
