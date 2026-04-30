@@ -84,11 +84,13 @@ def _build_email_list(
     has_more: bool, folder: str, active_email: str,
     unread_count: int = 0,
 ) -> ui.UINode:
+    # Build full ID list first so every email gets the complete list for prev/next nav
+    msg_ids = [msg.get("message_id", msg.get("id", "")) for msg in messages]
+    full_ids = ",".join(msg_ids)
+
     items = []
-    msg_ids = []
-    for msg in messages:
-        mid = msg.get("message_id", msg.get("id", ""))
-        msg_ids.append(mid)
+    for i, msg in enumerate(messages):
+        mid = msg_ids[i]
         items.append(ui.ListItem(
             id=mid,
             title=msg.get("from", "Unknown")[:40],
@@ -100,8 +102,8 @@ def _build_email_list(
                 message_id=mid,
                 account=active_email,
                 folder=folder,
-                email_list_ids=",".join(msg_ids),
-                current_index=len(msg_ids) - 1,
+                email_list_ids=full_ids,
+                current_index=i,
             ),
         ))
 
