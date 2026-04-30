@@ -101,7 +101,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> ActionResult:
     })
 
 
-@ext.tool("skeleton_alert_mail_inbox_summary", action_type="read",
+@ext.tool("skeleton_alert_mail_inbox_summary",
           description="Alert check for new unread emails.")
 async def skeleton_alert_mail_inbox_summary(ctx, **kwargs) -> ActionResult:
     return ActionResult.success(data={})
