@@ -122,15 +122,8 @@ def _build_email_list(
          "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
     ]
 
-    # Info line: total messages · unread count · shown count
-    info_parts = []
-    if total > 0:
-        info_parts.append(f"{total} messages")
-    if unread_count > 0:
-        info_parts.append(f"{unread_count} unread")
-    if messages:
-        info_parts.append(f"{len(messages)} shown")
-    info = " · ".join(info_parts)
+    # Unread label — folder total, not per-page
+    info = f"{unread_count} unread" if unread_count > 0 else ""
 
     email_list = ui.List(
         items=items,
@@ -139,9 +132,15 @@ def _build_email_list(
         bulk_actions=bulk,
     )
 
-    # Pagination — < N / N > style with icon-only prev/next buttons
+    # Pagination — < N / N > style
+    # total_pages from manifest when available; fallback: last page known from has_more
     page_display = page_num + 1
-    total_display = total_pages if total_pages > 0 else "?"
+    if total_pages > 0:
+        total_display: str | int = total_pages
+    elif not has_more:
+        total_display = page_display  # on the last page — we know the max
+    else:
+        total_display = f"{page_display}+"  # more pages exist, exact count unknown
     nav = [
         ui.Button(
             "", icon="ChevronLeft", size="sm", variant="ghost",

@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
-    refresh="on_event:mail.received,mail.archived,mail.deleted,mail.mail_action,mail.account_switched,mail.account_connected,mail.account_disconnected",
+    refresh="on_event:archived,deleted,bulk_archived,bulk_deleted,marked_read,marked_unread,mail.action,account.switched,account.connected,account.disconnected",
 )
 async def inbox_panel(
     ctx,
