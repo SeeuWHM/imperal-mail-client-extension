@@ -129,8 +129,8 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
             # `norm`; fetch up to 5 more pages sequentially.
             all_msgs = list(norm)
             cursor_data_pw = next_cursor_data
-            for _ in range(5):
-                if not cursor_data_pw or len(all_msgs) >= 150:
+            for _ in range(11):  # up to 300 messages (200 initial + 11 × 25)
+                if not cursor_data_pw or len(all_msgs) >= 300:
                     break
                 try:
                     more, next_pw, has_pw = await get_provider(acc).fetch_page(
@@ -149,7 +149,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
                 final_cursor = encode_cursor(acc.get("provider", "oauth"), cursor_data_pw) if cursor_data_pw else ""
                 inbox_msgs = InboxMessages(
                     account_id=email, folder="INBOX",
-                    messages=all_msgs[:150],
+                    messages=all_msgs[:300],
                     total_in_folder=total,
                     unread_in_folder=unread,
                     next_cursor=final_cursor,

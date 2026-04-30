@@ -59,7 +59,6 @@ async def _switch_active_account(ctx, target_email: str) -> None:
 
 
 def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
-    """Folder tab buttons."""
     buttons = [
         ui.Button(
             f["label"],
@@ -77,27 +76,23 @@ def _build_email_list(
     active_email: str,
     folder: str,
     unread_count: int = 0,
-    has_more: bool = False,
-    folder_for_more: str = "INBOX",
 ) -> ui.UINode:
-    """Build email list using ui.List native pagination (page_size=25).
+    """Email list with native pagination and search via ui.List(page_size=25, searchable=True).
 
-    Platform handles < 1/N > pagination natively — no manual cursor logic needed.
-    Pattern matches sql-db sidebar (ui.List page_size=50, searchable=True).
+    No extra buttons or inputs — platform handles < 1/N > and search bar natively.
     """
-    msg_ids = [msg.get("message_id", msg.get("id", "")) for msg in messages]
+    msg_ids  = [msg.get("message_id", msg.get("id", "")) for msg in messages]
     full_ids = ",".join(msg_ids)
 
     items = []
     for i, msg in enumerate(messages):
         mid = msg_ids[i]
-        is_unread = bool(msg.get("unread"))
         items.append(ui.ListItem(
             id=mid,
             title=msg.get("from", "Unknown")[:40],
             subtitle=msg.get("subject", "(no subject)")[:60],
             meta=msg.get("date", "")[:10],
-            badge=ui.Badge("new", color="blue") if is_unread else None,
+            badge=ui.Badge("new", color="blue") if msg.get("unread") else None,
             on_click=ui.Call(
                 "__panel__email_viewer",
                 message_id=mid,
@@ -121,19 +116,13 @@ def _build_email_list(
 
     info = f"{unread_count} unread" if unread_count > 0 else ""
 
-    children = []
-    if info:
-        children.append(ui.Text(info, variant="caption"))
-    children.append(ui.List(
-        items=items,
-        page_size=25,
-        searchable=True,
-        selectable=True,
-        bulk_actions=bulk,
-    ))
-    if has_more:
-        children.append(ui.Button(
-            f"Load 75 more", icon="ChevronDown", variant="ghost", size="sm",
-            on_click=ui.Call("__panel__inbox", folder=folder_for_more, load_more=True),
-        ))
-    return ui.Stack(children, gap=1)
+    return ui.Stack([
+        ui.Text(info, variant="caption") if info else ui.Stack([]),
+        ui.List(
+            items=items,
+            page_size=25,
+            searchable=True,
+            selectable=True,
+            bulk_actions=bulk,
+        ),
+    ], gap=1)

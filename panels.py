@@ -11,7 +11,7 @@ from providers import get_provider
 from providers.helpers import (
     _all_accounts, _invalidate_first_page,
     _inbox_messages_key, _refresh_token_if_needed,
-    encode_cursor, decode_cursor,
+    encode_cursor,
 )
 from panels_inbox import (
     FOLDERS,
@@ -26,14 +26,12 @@ from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
 
-INBOX_INLINE_LIMIT = 75   # initial fetch (fast, ~1 API call)
-INBOX_LOAD_MORE    = 75   # each "load more" batch
-INBOX_PAGE_SIZE    = 25   # ui.List page_size
-INBOX_CACHE_TTL    = 90   # seconds
+INBOX_INLINE_LIMIT = 200   # fetch on cold cache — fast with batch IMAP
+INBOX_CACHE_TTL    = 90    # seconds; skeleton overwrites with 300 every 60s
 
 
 async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
-    """Fetch INBOX_INLINE_LIMIT messages. Token refreshed once upfront."""
+    """Fetch up to INBOX_INLINE_LIMIT messages. Token refreshed once upfront."""
     email = acc.get("email", "")
     try:
         acc = await _refresh_token_if_needed(ctx, acc)
@@ -41,22 +39,22 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
         pass
 
     try:
-        stats = await provider.get_folder_stats(ctx, acc, folder)
+        stats            = await provider.get_folder_stats(ctx, acc, folder)
         total_in_folder  = stats.get("total", 0)
         unread_in_folder = stats.get("unread", 0)
     except Exception:
         total_in_folder = unread_in_folder = 0
 
-    all_messages: list[dict] = []
-    next_cursor_encoded = ""
+    messages: list[dict] = []
+    next_cursor_encoded  = ""
     try:
-        messages, next_cursor_data, has_more = await provider.fetch_page(
+        msgs, next_cursor_data, has_more = await provider.fetch_page(
             ctx, acc, folder, INBOX_INLINE_LIMIT, None,
         )
-        for m in messages:
+        for m in msgs:
             if "id" in m and "message_id" not in m:
                 m = {**m, "message_id": m["id"]}
-        all_messages = messages
+        messages = msgs
         if has_more and next_cursor_data:
             next_cursor_encoded = encode_cursor(acc.get("provider", "oauth"), next_cursor_data) or ""
     except Exception as e:
@@ -64,51 +62,12 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
 
     return InboxMessages(
         account_id=email, folder=folder,
-        messages=all_messages,
+        messages=messages,
         total_in_folder=total_in_folder,
         unread_in_folder=unread_in_folder,
         next_cursor=next_cursor_encoded,
         fetched_at=datetime.now(timezone.utc),
     )
-
-
-async def _extend_inbox_messages(ctx, provider, acc, folder, msgs_key) -> InboxMessages:
-    """Load next INBOX_LOAD_MORE messages and append to cached list."""
-    try:
-        acc = await _refresh_token_if_needed(ctx, acc)
-    except Exception:
-        pass
-    email = acc.get("email", "")
-    try:
-        cached = await ctx.cache.get(msgs_key, InboxMessages)
-    except Exception:
-        cached = None
-
-    if not cached or not cached.next_cursor:
-        return cached or await _fetch_inbox_messages(ctx, provider, acc, folder)
-
-    cursor_data = decode_cursor(cached.next_cursor)
-    try:
-        more_msgs, next_cursor_data2, has_more2 = await provider.fetch_page(
-            ctx, acc, folder, INBOX_LOAD_MORE, cursor_data,
-        )
-        for m in more_msgs:
-            if "id" in m and "message_id" not in m:
-                m = {**m, "message_id": m["id"]}
-        next_cur2 = (encode_cursor(acc.get("provider", "oauth"), next_cursor_data2) or "") if has_more2 else ""
-        updated = InboxMessages(
-            account_id=email, folder=folder,
-            messages=cached.messages + more_msgs,
-            total_in_folder=cached.total_in_folder,
-            unread_in_folder=cached.unread_in_folder,
-            next_cursor=next_cur2,
-            fetched_at=datetime.now(timezone.utc),
-        )
-        await ctx.cache.set(msgs_key, updated, ttl_seconds=INBOX_CACHE_TTL)
-        return updated
-    except Exception as e:
-        log.warning("load_more failed: %s", e)
-        return cached
 
 
 @ext.panel(
@@ -122,8 +81,6 @@ async def inbox_panel(
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
-    load_more: bool = False,
-    search_query: str = "",
     **_unused_kwargs,
 ):
     accounts = await _all_accounts(ctx)
@@ -146,53 +103,18 @@ async def inbox_panel(
 
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
 
-    # Header: email address + refresh button
-    account_info = ui.Stack([
+    header = ui.Stack([
         ui.Text(active_email[:32], variant="caption"),
         ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
                    on_click=ui.Call("__panel__inbox", folder=folder)),
     ], direction="horizontal", gap=1)
 
-    # Search input — always visible, server-side search on submit
-    search_input = ui.Input(
-        placeholder="Search all emails…",
-        param_name="search_query",
-        value=search_query,
-        on_submit=ui.Call("__panel__inbox", folder=folder),
-    )
-
-    # ── Search mode ──────────────────────────────────────────────────────── #
-    if search_query:
-        try:
-            acc = await _refresh_token_if_needed(ctx, acc)
-        except Exception:
-            pass
-        try:
-            result  = await provider.search(ctx, acc, query=search_query, max_results=50)
-            results = result.get("results", [])
-            for m in results:
-                if "id" in m and "message_id" not in m:
-                    m["message_id"] = m["id"]
-        except Exception as e:
-            return ui.Stack([account_info, search_input,
-                             ui.Error(message=f"Search failed: {e}")])
-
-        back_btn = ui.Button("← Back to inbox", variant="ghost", size="sm",
-                              on_click=ui.Call("__panel__inbox", folder=folder))
-        info = ui.Text(f'{len(results)} results for "{search_query}"', variant="caption")
-        email_list = _build_email_list(results, active_email, folder,
-                                        unread_count=0, has_more=False)
-        return ui.Stack([account_info, search_input, back_btn, info, email_list], gap=1)
-
-    # ── Normal mode ──────────────────────────────────────────────────────── #
     folder_tabs = _build_folder_tabs(folder, active_email)
-    msgs_key    = _inbox_messages_key(active_email, folder)
 
+    msgs_key = _inbox_messages_key(active_email, folder)
     try:
         if do_switch_account:
             inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
-        elif load_more:
-            inbox_msgs = await _extend_inbox_messages(ctx, provider, acc, folder, msgs_key)
         else:
             inbox_msgs = await ctx.cache.get_or_fetch(
                 msgs_key, InboxMessages,
@@ -203,17 +125,15 @@ async def inbox_panel(
                 inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
     except Exception as e:
         log.warning("inbox panel load failed folder=%s: %s", folder, e)
-        return ui.Stack([account_info, search_input, folder_tabs,
+        return ui.Stack([header, folder_tabs,
                          ui.Error(message=f"Failed to load {folder}: {e}")])
 
     email_list = _build_email_list(
         inbox_msgs.messages, active_email, folder,
         unread_count=inbox_msgs.unread_in_folder,
-        has_more=bool(inbox_msgs.next_cursor),
-        folder_for_more=folder,
     )
 
-    return ui.Stack([account_info, search_input, folder_tabs, email_list], gap=1)
+    return ui.Stack([header, folder_tabs, email_list], gap=1)
 
 
 @ext.panel("email_viewer", slot="center", title="Email", icon="Mail")
