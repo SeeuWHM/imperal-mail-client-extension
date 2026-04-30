@@ -27,5 +27,5 @@
   ],
   "signals": [],
   "schedules": [],
-  "required_scopes": ["store:read", "store:write", "notify:push"]
+  "required_scopes": []
 }

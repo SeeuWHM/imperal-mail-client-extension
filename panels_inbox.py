@@ -53,8 +53,8 @@ async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str
 async def _switch_active_account(ctx, target_email: str) -> None:
     """Update is_active in the store so _get_acc returns the right account."""
     try:
-        page = await ctx.store.query(COLLECTION)
-        for d in page.items:
+        docs = await ctx.store.query(COLLECTION)
+        for d in docs:
             _data = d.data if hasattr(d, "data") else d
             _id = d.id if hasattr(d, "id") else d["doc_id"]
             should_be_active = (_data.get("email") == target_email)

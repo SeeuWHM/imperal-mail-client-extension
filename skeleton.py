@@ -17,8 +17,6 @@ from __future__ import annotations
 import logging
 import time as _time
 
-from imperal_sdk.chat.action_result import ActionResult
-
 from app import ext
 
 from providers import get_provider
@@ -31,14 +29,14 @@ log = logging.getLogger("mail")
 
 @ext.skeleton("mail_inbox_summary", ttl=60, alert=True,
               description="Per-account unread summary for classifier envelope + new-mail alerts.")
-async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> ActionResult:
+async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
     accounts = await _all_accounts(ctx)
     if not accounts:
-        return ActionResult.success(data={
+        return {"response": {
             "accounts_connected": 0,
             "unread_total": 0,
             "per_account": [],
-        })
+        }}
 
     per_account: list[dict] = []
     unread_total = 0
@@ -94,14 +92,14 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> ActionResult:
             })
             unread_total += int(acc.get("unread_count", 0))
 
-    return ActionResult.success(data={
+    return {"response": {
         "accounts_connected": len(accounts),
         "unread_total": unread_total,
         "per_account": per_account,
-    })
+    }}
 
 
 @ext.tool("skeleton_alert_mail_inbox_summary",
           description="Alert check for new unread emails.")
-async def skeleton_alert_mail_inbox_summary(ctx, **kwargs) -> ActionResult:
-    return ActionResult.success(data={})
+async def skeleton_alert_mail_inbox_summary(ctx, **kwargs) -> dict:
+    return {"response": {}}
