@@ -1,6 +1,7 @@
 """IMAP read operations — inbox, fetch page, unread count."""
 from __future__ import annotations
 
+import logging
 import re
 
 from .helpers import IMAP_FOLDER_CANDIDATES
