@@ -121,7 +121,6 @@ def _build_email_list(
         ui.List(
             items=items,
             page_size=25,
-            searchable=True,
             selectable=True,
             bulk_actions=bulk,
         ),
