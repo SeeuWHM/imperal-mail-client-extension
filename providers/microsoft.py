@@ -6,12 +6,12 @@ import logging
 from imperal_sdk import Context
 
 from .base import BaseMailProvider
+from .microsoft_write import MicrosoftWriteMixin
 from .helpers import (
-    MS_GRAPH_BASE,
-    _graph_get, _graph_post, _graph_patch,
+    _graph_get,
     _refresh_token_if_needed,
-    _remove_from_cache, _update_read_in_cache, _save_last_read,
-    _strip_html, _norm_graph_msg, _short_sender,
+    _save_last_read, _update_read_in_cache,
+    _strip_html, _norm_graph_msg,
 )
 
 log = logging.getLogger(__name__)
@@ -21,18 +21,8 @@ _MS_PAGE_FOLDERS: dict = {
     "trash": "deleteditems", "drafts": "drafts", "archive": "archive",
 }
 
-_MS_DEST_MAP: dict = {
-    "inbox": "inbox", "spam": "junkemail", "junk": "junkemail",
-    "trash": "deleteditems", "deleted": "deleteditems",
-    "archive": "archive", "sent": "sentitems", "drafts": "drafts", "draft": "drafts",
-}
 
-
-def _recips(s: str) -> list[dict]:
-    return [{"emailAddress": {"address": a.strip()}} for a in s.split(",") if a.strip()]
-
-
-class MicrosoftMailProvider(BaseMailProvider):
+class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
 
     async def fetch_inbox(self, ctx: Context, acc: dict, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")
@@ -152,86 +142,6 @@ class MicrosoftMailProvider(BaseMailProvider):
         if attachments: result["attachments"] = attachments
         return self.ok(**result)
 
-    async def send(self, ctx: Context, acc: dict, to: str, subject: str, body: str,
-                   cc: str = "", bcc: str = "") -> dict:
-        email_addr = acc.get("email", "")
-        payload: dict = {
-            "message": {
-                "subject": subject, "body": {"contentType": "Text", "content": body},
-                "toRecipients": _recips(to),
-            }
-        }
-        if cc:  payload["message"]["ccRecipients"]  = _recips(cc)
-        if bcc: payload["message"]["bccRecipients"] = _recips(bcc)
-        resp = await _graph_post(ctx, "/me/sendMail", acc, json=payload)
-        if resp.status_code == 202:
-            return self.ok(sent=True, to=to, subject=subject, from_=email_addr)
-        return self.err(f"Send failed {resp.status_code}: {resp.text[:200]}")
-
-    async def reply(self, ctx: Context, acc: dict, message_id: str, body: str,
-                    to: str = "", cc: str = "", bcc: str = "") -> dict:
-        email_addr = acc.get("email", "")
-        payload: dict = {"message": {"body": {"contentType": "Text", "content": body}}}
-        if to:  payload["message"]["toRecipients"]  = _recips(to)
-        if cc:  payload["message"]["ccRecipients"]  = _recips(cc)
-        if bcc: payload["message"]["bccRecipients"] = _recips(bcc)
-        resp = await _graph_post(ctx, f"/me/messages/{message_id}/reply", acc, json=payload)
-        if resp.status_code == 202:
-            return self.ok(sent=True, to=to or "original sender",
-                           bcc=bcc if bcc else None, in_reply_to=message_id, from_=email_addr)
-        return self.err(f"Reply failed {resp.status_code}: {resp.text[:200]}")
-
-    async def forward(self, ctx: Context, acc: dict, message_id: str,
-                      to: str, comment: str = "") -> dict:
-        payload: dict = {"toRecipients": _recips(to)}
-        if comment: payload["comment"] = comment
-        resp = await _graph_post(ctx, f"/me/messages/{message_id}/forward", acc, json=payload)
-        if resp.status_code == 202:
-            return self.ok(forwarded=True, to=to, message_id=message_id)
-        return self.err(f"Forward failed {resp.status_code}: {resp.text[:200]}")
-
-    async def archive(self, ctx: Context, acc: dict, message_id: str) -> dict:
-        email_addr = acc.get("email", "")
-        resp = await _graph_post(ctx, f"/me/messages/{message_id}/move", acc,
-                                 json={"destinationId": "archive"})
-        if resp.status_code == 201:
-            await _remove_from_cache(ctx, email_addr, message_id)
-            return self.ok(archived=True, message_id=message_id, folder="Archive")
-        if resp.status_code not in (404, 400):
-            return self.err(f"Archive failed {resp.status_code}: {resp.text[:200]}")
-        resp2 = await _graph_post(ctx, f"/me/messages/{message_id}/move", acc,
-                                  json={"destinationId": "deleteditems"})
-        if resp2.status_code == 201:
-            await _remove_from_cache(ctx, email_addr, message_id)
-            return self.ok(archived=True, message_id=message_id, folder="Deleted Items",
-                           note="Your Outlook account has no Archive folder. Email moved to Deleted Items instead.")
-        return self.err(f"Could not archive: Archive {resp.status_code}, Deleted Items {resp2.status_code}.")
-
-    async def delete(self, ctx: Context, acc: dict, message_id: str) -> dict:
-        email_addr = acc.get("email", "")
-        resp = await _graph_post(ctx, f"/me/messages/{message_id}/move", acc,
-                                 json={"destinationId": "deleteditems"})
-        if resp.status_code == 201:
-            await _remove_from_cache(ctx, email_addr, message_id)
-            return self.ok(deleted=True, message_id=message_id)
-        return self.err(f"Delete failed {resp.status_code}: {resp.text[:200]}")
-
-    async def mark_read(self, ctx: Context, acc: dict, message_id: str, read: bool = True) -> dict:
-        email_addr = acc.get("email", "")
-        resp = await _graph_patch(ctx, f"/me/messages/{message_id}", acc, json={"isRead": read})
-        if resp.status_code in (200, 204):
-            await _update_read_in_cache(ctx, email_addr, message_id, is_read=read)
-            return self.ok(marked="read" if read else "unread", message_id=message_id)
-        return self.err(f"Mark failed {resp.status_code}")
-
-    async def star(self, ctx: Context, acc: dict, message_id: str, starred: bool = True) -> dict:
-        flag_status = "flagged" if starred else "notFlagged"
-        resp = await _graph_patch(ctx, f"/me/messages/{message_id}", acc,
-                                  json={"flag": {"flagStatus": flag_status}})
-        if resp.status_code in (200, 204):
-            return self.ok(**{"starred" if starred else "unstarred": True, "message_id": message_id})
-        return self.err(f"Star failed {resp.status_code}")
-
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         resp = await _graph_get(ctx, "/me/messages", acc, params={
@@ -281,29 +191,3 @@ class MicrosoftMailProvider(BaseMailProvider):
             })
         return self.ok(thread_id=thread_id, email=email_addr, messages=messages, total=len(messages))
 
-    async def move(self, ctx: Context, acc: dict, message_id: str,
-                   from_folder: str = "INBOX", to_folder: str = "INBOX") -> dict:
-        dest_id = _MS_DEST_MAP.get(to_folder.lower(), to_folder)
-        try:
-            resp = await _graph_post(ctx, f"/me/messages/{message_id}/move", acc,
-                                     json={"destinationId": dest_id})
-            if resp.status_code in (200, 201):
-                return self.ok(moved=True, message_id=message_id,
-                               from_folder=from_folder, to_folder=to_folder)
-            return self.err(f"Outlook move failed ({resp.status_code}): {resp.text[:200]}")
-        except Exception as e:
-            return self.err(f"Outlook move failed: {e}")
-
-    async def purge(self, ctx: Context, acc: dict, message_id: str,
-                    from_folder: str = "DeletedItems") -> dict:
-        try:
-            acc  = await _refresh_token_if_needed(ctx, acc)
-            resp = await ctx.http.delete(
-                f"{MS_GRAPH_BASE}/me/messages/{message_id}",
-                headers={"Authorization": f"Bearer {acc['access_token']}"},
-            )
-            if resp.status_code in (204, 404):
-                return self.ok(purged=True, message_id=message_id)
-            return self.err(f"Outlook permanent delete failed ({resp.status_code}): {resp.text[:200]}")
-        except Exception as e:
-            return self.err(f"Outlook purge failed: {e}")
