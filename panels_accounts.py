@@ -41,16 +41,18 @@ async def build_accounts_panel(ctx, show_add: bool = False,
         is_active = acc.get("is_active", False)
         initial   = email[0].upper() if email else "?"
 
-        # Switch happens in accounts_panel itself (badge updates immediately).
-        # Also call inbox with ALL params explicit so platform can't inject
-        # stale cursor/page_num from a previous paginated render.
+        # ALL params passed explicitly so the platform can't inject stale
+        # cursor/page_num/account from a previous paginated inbox render.
         items.append(ui.ListItem(
             id=email,
             title=email,
             subtitle=PROVIDER_LABELS.get(provider, "Unknown"),
             avatar=ui.Avatar(fallback=initial, size="sm"),
             badge=ui.Badge("Active", color="green") if is_active else None,
-            on_click=ui.Call("__panel__accounts", do_switch=email),
+            on_click=ui.Call("__panel__inbox",
+                             do_switch_account=email,
+                             folder="INBOX",
+                             cursor="", prev_cursor="", page_num=0),
         ))
 
     return ui.Stack([
