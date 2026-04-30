@@ -48,7 +48,7 @@ async def inbox_panel(
     if not accounts:
         return ui.Empty(message="No email accounts connected")
 
-    # ── Inline account switch ─────────────────────────────────────────────── #
+    # ── Inline account switch (fallback — primary path is __panel__accounts) ─ #
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
         account = do_switch_account
@@ -58,7 +58,7 @@ async def inbox_panel(
         for _fkey in [f["key"] for f in FOLDERS]:
             await _invalidate_first_page(ctx, account, _fkey)
 
-    acc, _ = await _get_acc(ctx, account)
+    acc, _ = await _get_acc(ctx, account if account else "")
     if not acc:
         return ui.Empty(message="No email account available")
 
@@ -103,21 +103,20 @@ async def inbox_panel(
         )
 
     try:
-        page = await ctx.cache.get_or_fetch(
-            key=_inbox_page_key(active_email, folder, cursor),
-            model=InboxPage,
-            fetcher=_fetch_page,
-            ttl_seconds=60,
-        )
-        # Integrity guard: if the cached page was stored for a different
-        # account or folder (platform-side key collision or shared namespace),
-        # discard it and fetch fresh so we never show wrong account's messages.
-        if page.account_id != active_email or page.folder != folder:
-            log.warning(
-                "cache integrity mismatch: got %s/%s expected %s/%s — fetching fresh",
-                page.account_id, page.folder, active_email, folder,
-            )
+        if do_switch_account:
+            # Bypass cache entirely after account switch — get_or_fetch might
+            # return a stale entry in the window between delete and new write.
             page = await _fetch_page()
+        else:
+            page = await ctx.cache.get_or_fetch(
+                key=_inbox_page_key(active_email, folder, cursor),
+                model=InboxPage,
+                fetcher=_fetch_page,
+                ttl_seconds=60,
+            )
+            # Integrity guard: discard if cached for wrong account/folder.
+            if page.account_id != active_email or page.folder != folder:
+                page = await _fetch_page()
     except Exception as e:
         log.warning("inbox panel fetch_page failed folder=%s: %s", folder, e)
         return ui.Stack([
@@ -168,8 +167,8 @@ async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
     "accounts", slot="right", title="Accounts", icon="Users",
     refresh="interval:30s",
 )
-async def accounts_panel(ctx, show_add: bool = False):
-    return await build_accounts_panel(ctx, show_add)
+async def accounts_panel(ctx, show_add: bool = False, do_switch: str = ""):
+    return await build_accounts_panel(ctx, show_add, do_switch)
 
 
 @ext.panel("compose", slot="center", title="Compose", icon="PenSquare")
