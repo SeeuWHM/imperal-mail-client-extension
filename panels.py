@@ -12,6 +12,7 @@ from providers import get_provider
 from providers.helpers import (
     _all_accounts, _invalidate_first_page,
     _inbox_messages_key, _inbox_manifest_key,
+    _refresh_token_if_needed,
 )
 from panels_inbox import (
     FOLDERS,
@@ -26,14 +27,26 @@ from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
 
-INBOX_FLAT_LIMIT = 150   # max messages to load per folder
-INBOX_PAGE_SIZE  = 25    # items shown per page in ui.List
-INBOX_CACHE_TTL  = 90    # seconds
+INBOX_INLINE_LIMIT = 75   # items fetched inline on cold cache (3 pages, fast)
+INBOX_PAGE_SIZE    = 25   # items shown per page in ui.List
+INBOX_CACHE_TTL    = 90   # seconds — skeleton over-writes with 150 items every 60s
 
 
 async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
-    """Fetch up to INBOX_FLAT_LIMIT messages for a folder in one or two provider calls."""
+    """Fetch up to INBOX_INLINE_LIMIT messages for a folder.
+
+    Refreshes token once upfront so all downstream provider calls share
+    a valid token without triggering multiple token refresh round trips.
+    Skeleton pre-warms this cache with 150 items every 60s; inline fetch
+    is only needed on the first-ever panel open.
+    """
     email = acc.get("email", "")
+
+    # Refresh token once — avoids per-call refresh in get_folder_stats + fetch_page
+    try:
+        acc = await _refresh_token_if_needed(ctx, acc)
+    except Exception:
+        pass
 
     # Folder stats (total + unread) — single lightweight API call
     try:
@@ -43,25 +56,18 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
     except Exception:
         total_in_folder = unread_in_folder = 0
 
-    # Fetch up to INBOX_FLAT_LIMIT messages — single provider call with large limit
+    # Single provider call — ask for INBOX_INLINE_LIMIT items at once
     all_messages: list[dict] = []
-    cursor_data = None
-    while len(all_messages) < INBOX_FLAT_LIMIT:
-        remaining = INBOX_FLAT_LIMIT - len(all_messages)
-        try:
-            messages, next_cursor_data, has_more = await provider.fetch_page(
-                ctx, acc, folder, remaining, cursor_data,
-            )
-        except Exception as e:
-            log.warning("inbox fetch_page failed folder=%s: %s", folder, e)
-            break
+    try:
+        messages, _, _ = await provider.fetch_page(
+            ctx, acc, folder, INBOX_INLINE_LIMIT, None,
+        )
         for m in messages:
             if "id" in m and "message_id" not in m:
                 m = {**m, "message_id": m["id"]}
-        all_messages.extend(messages)
-        if not has_more or not next_cursor_data or len(messages) < remaining:
-            break
-        cursor_data = next_cursor_data
+        all_messages = messages
+    except Exception as e:
+        log.warning("inbox fetch_page failed folder=%s: %s", folder, e)
 
     return InboxMessages(
         account_id=email, folder=folder,

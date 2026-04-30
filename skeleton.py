@@ -24,9 +24,9 @@ from app import ext
 from providers import get_provider
 from providers.helpers import (
     _all_accounts, _refresh_token_if_needed, COLLECTION, INBOX_FETCH_SIZE,
-    _inbox_page_key, _inbox_manifest_key, encode_cursor,
+    _inbox_page_key, _inbox_manifest_key, _inbox_messages_key, encode_cursor,
 )
-from cache_model_defs import InboxManifest, InboxPage
+from cache_model_defs import InboxManifest, InboxMessages, InboxPage
 
 log = logging.getLogger("mail")
 
@@ -123,6 +123,39 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
                     _inbox_manifest_key(email, "INBOX"), manifest, ttl_seconds=120)
             except Exception as e:
                 log.debug("skeleton: cache manifest failed for %s: %s", email, e)
+
+            # Pre-warm InboxMessages (flat list for ui.List native pagination).
+            # Fetch up to 150 items (6 pages at 25 each). Page 1 is already in
+            # `norm`; fetch up to 5 more pages sequentially.
+            all_msgs = list(norm)
+            cursor_data_pw = next_cursor_data
+            for _ in range(5):
+                if not cursor_data_pw or len(all_msgs) >= 150:
+                    break
+                try:
+                    more, next_pw, has_pw = await get_provider(acc).fetch_page(
+                        ctx, acc, "INBOX", 25, cursor_data_pw)
+                    for m in more:
+                        if "id" in m and "message_id" not in m:
+                            m = {**m, "message_id": m["id"]}
+                    all_msgs.extend(more)
+                    if not has_pw or not next_pw:
+                        break
+                    cursor_data_pw = next_pw
+                except Exception:
+                    break
+            try:
+                inbox_msgs = InboxMessages(
+                    account_id=email, folder="INBOX",
+                    messages=all_msgs[:150],
+                    total_in_folder=total,
+                    unread_in_folder=unread,
+                    fetched_at=datetime.now(timezone.utc),
+                )
+                await ctx.cache.set(_inbox_messages_key(email, "INBOX"),
+                                    inbox_msgs, ttl_seconds=120)
+            except Exception as e:
+                log.debug("skeleton: InboxMessages cache failed for %s: %s", email, e)
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {
