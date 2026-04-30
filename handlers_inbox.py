@@ -151,11 +151,10 @@ async def impl_reply(ctx, body: str, message_id: str = "", to: str = "",
         raise RuntimeError("Reply body is required.")
     mid = message_id
     if not mid:
-        doc = await ctx.store.get("mail_last_read", "latest")
+        uid = str(ctx.user.imperal_id)
+        lr_page = await ctx.store.query("mail_last_read", where={"user_id": uid}, limit=1)
+        doc = lr_page.data[0] if lr_page.data else None
         if doc:
-            stored_uid = doc.get("user_id", "")
-            if stored_uid and stored_uid != ctx.user.imperal_id:
-                raise RuntimeError("auth_mismatch")
             mid = doc.get("message_id", "")
     if not mid:
         raise RuntimeError("No message_id and no recently read email.")

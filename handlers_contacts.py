@@ -121,8 +121,8 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
     added, now = 0, int(_time.time())
     for c in deduped:
         exists = await ctx.store.query(CONTACTS_COLLECTION, where={"email": c["email"]})
-        if exists:
-            d = exists[0]
+        if exists.data:
+            d = exists.data[0]
             updates = {"last_seen": now}
             if c.get("name") and not d.get("name"):
                 updates["name"] = c["name"]
@@ -140,9 +140,9 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
 async def impl_delete_contact(ctx, email: str) -> ContactDeleted:
     email_l = email.lower().strip()
     docs = await ctx.store.query(CONTACTS_COLLECTION, where={"email": email_l})
-    if not docs:
+    if not docs.data:
         raise RuntimeError(f"Contact {email_l} not found.")
-    await ctx.store.delete(CONTACTS_COLLECTION, docs[0].id)
+    await ctx.store.delete(CONTACTS_COLLECTION, docs.data[0].id)
     return ContactDeleted(deleted=True, email=email_l)
 
 

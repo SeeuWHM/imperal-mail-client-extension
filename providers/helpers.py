@@ -143,19 +143,22 @@ async def _update_read_in_cache(ctx, email: str, message_id: str, is_read: bool 
 
 async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
                           message_id_header: str = "", thread_id: str = "") -> None:
-    """Persist the last-read watermark, stamped with user_id for defence-in-depth."""
+    """Persist the last-read watermark per user (upsert by user_id)."""
     try:
-        user_id = ""
-        if ctx and hasattr(ctx, "user") and ctx.user and hasattr(ctx.user, "imperal_id"):
-            user_id = str(ctx.user.imperal_id or "")
-        await ctx.store.set("mail_last_read", "latest", {
+        user_id = str(ctx.user.imperal_id) if ctx.user and ctx.user.imperal_id else ""
+        data = {
             "message_id":        message_id,
             "subject":           subject,
             "sender":            sender,
             "message_id_header": message_id_header,
             "thread_id":         thread_id,
             "user_id":           user_id,
-        })
+        }
+        page = await ctx.store.query("mail_last_read", where={"user_id": user_id}, limit=1)
+        if page.data:
+            await ctx.store.update("mail_last_read", page.data[0].id, data)
+        else:
+            await ctx.store.create("mail_last_read", data)
     except Exception as e:
         log.debug("_save_last_read failed: %s", e)
 
@@ -177,7 +180,7 @@ async def _active_account(ctx: Context, account_id: str = "") -> Optional[dict]:
         return None
     for d in docs:
         if d.get("is_active"): return {"doc_id": d.id, **d.data}
-    return {"doc_id": docs[0].id, **docs[0].data}
+    return {"doc_id": docs.data[0].id, **docs.data[0].data}
 
 
 # ── IMAP provider detection ───────────────────────────────────────────────
