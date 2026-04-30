@@ -36,7 +36,7 @@ async def inbox_panel(
     cursor: str = "",
     folder: str = "INBOX",
     account: str = "",
-    limit: int = 10,
+    limit: int = 25,
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
@@ -125,9 +125,8 @@ async def inbox_panel(
             ui.Error(message=f"Failed to load {folder}: {e}"),
         ])
 
-    messages     = page.messages
-    next_cursor  = page.next_cursor or None
-    has_more     = page.has_more
+    messages = page.messages
+    has_more = page.has_more
 
     # ── Unread count ──────────────────────────────────────────────────────── #
     async def _fetch_unread() -> UnreadSummary:
@@ -148,7 +147,7 @@ async def inbox_panel(
     except Exception:
         unread_count = sum(1 for m in messages if m.get("unread"))
 
-    email_list = _build_email_list(messages, next_cursor, has_more, folder, active_email, unread_count)
+    email_list = _build_email_list(messages, has_more, folder, active_email, unread_count)
 
     return ui.Stack([account_info, folder_tabs, email_list])
 

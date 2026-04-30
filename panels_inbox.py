@@ -79,7 +79,7 @@ def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
 
 
 def _build_email_list(
-    messages: list[dict], next_cursor: str | None,
+    messages: list[dict],
     has_more: bool, folder: str, active_email: str,
     unread_count: int = 0,
 ) -> ui.UINode:
@@ -103,10 +103,6 @@ def _build_email_list(
                 current_index=len(msg_ids) - 1,
             ),
         ))
-
-    on_end = None
-    if has_more and next_cursor:
-        on_end = ui.Call("__panel__inbox", cursor=next_cursor, folder=folder, account=active_email)
 
     bulk = [
         {"label": "Archive", "icon": "Archive",
@@ -132,7 +128,6 @@ def _build_email_list(
     return ui.List(
         items=items,
         searchable=True,
-        on_end_reached=on_end,
         selectable=True,
         bulk_actions=bulk,
         total_items=0,
