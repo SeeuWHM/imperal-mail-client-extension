@@ -72,7 +72,8 @@ def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
             f["label"],
             variant="primary" if f["key"] == folder else "ghost",
             size="sm",
-            on_click=ui.Call("__panel__inbox", folder=f["key"], account=active_email),
+            on_click=ui.Call("__panel__inbox", folder=f["key"], account=active_email,
+                             cursor="", prev_cursor="", page_num=0),
         )
         for f in FOLDERS
     ]
@@ -83,7 +84,8 @@ def _build_email_list(
     messages: list[dict],
     next_cursor: str | None, has_more: bool,
     folder: str, active_email: str,
-    unread_count: int = 0, current_cursor: str = "",
+    unread_count: int = 0,
+    current_cursor: str = "", prev_cursor: str = "", page_num: int = 0,
 ) -> ui.UINode:
     # Build full ID list first so every email gets the complete list for prev/next nav
     msg_ids = [msg.get("message_id", msg.get("id", "")) for msg in messages]
@@ -133,17 +135,24 @@ def _build_email_list(
         extra_info=" · ".join(info_parts),
     )
 
-    # Pagination controls — explicit buttons, no platform state leak
+    # Pagination — exact developer/transactions pattern
     nav = []
-    if current_cursor:
-        nav.append(ui.Button("← Back", icon="ChevronLeft", variant="ghost", size="sm",
+    if page_num > 0:
+        nav.append(ui.Button(
+            "Previous", icon="ChevronLeft", size="sm", variant="ghost",
             on_click=ui.Call("__panel__inbox", folder=folder, account=active_email,
-                             cursor="")))
+                             cursor=prev_cursor, prev_cursor="", page_num=page_num - 1),
+        ))
+    nav.append(ui.Text(f"Page {page_num + 1}", variant="caption"))
     if has_more and next_cursor:
-        nav.append(ui.Button("Next →", icon="ChevronRight", variant="ghost", size="sm",
+        nav.append(ui.Button(
+            "Next", icon="ChevronRight", size="sm", variant="ghost",
             on_click=ui.Call("__panel__inbox", folder=folder, account=active_email,
-                             cursor=next_cursor)))
+                             cursor=next_cursor, prev_cursor=current_cursor,
+                             page_num=page_num + 1),
+        ))
 
-    if nav:
-        return ui.Stack([email_list, ui.Stack(nav, direction="horizontal", gap=1)])
-    return email_list
+    return ui.Stack([
+        email_list,
+        ui.Stack(nav, direction="horizontal", gap=1),
+    ])

@@ -126,8 +126,10 @@ async def impl_get_thread(ctx, thread_id: str, account: str = "") -> ThreadView:
 
 async def impl_send(ctx, to: str, subject: str = "", body: str = "",
                     cc: str = "", bcc: str = "", account: str = "") -> SendResult:
-    if not to or not body:
-        raise RuntimeError("to and body are required.")
+    if not to:
+        raise RuntimeError("Recipient (to) is required.")
+    if not body:
+        raise RuntimeError("Email body is required.")
     if not subject:
         first_line = (body.strip().split('\n')[0] or body.strip())[:60]
         subject = first_line or "(no subject)"

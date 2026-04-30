@@ -1,7 +1,7 @@
 """Pydantic input parameter models for @chat.function registration."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 
 
 class AccountParam(BaseModel):
@@ -44,14 +44,22 @@ class ThreadParams(BaseModel):
 class SendParams(BaseModel):
     to: str = Field(description="Recipient email address")
     subject: str = Field(default="", description="Email subject (auto-generated from body if omitted)")
-    body: str = Field(description="Email body (plain text)")
+    body: str = Field(
+        default="",
+        validation_alias=AliasChoices("body", "content", "message", "text"),
+        description="Email body (plain text)",
+    )
     cc: str = Field(default="", description="CC recipients (comma-separated)")
     bcc: str = Field(default="", description="BCC recipients (comma-separated)")
     account: str = Field(default="", description="Account email or ID")
 
 
 class ReplyParams(BaseModel):
-    body: str = Field(description="Reply body text")
+    body: str = Field(
+        default="",
+        validation_alias=AliasChoices("body", "content", "message", "text"),
+        description="Reply body text",
+    )
     message_id: str = Field(default="", description="Message ID to reply to (omit = last read)")
     to: str = Field(default="", description="Override reply-to address")
     cc: str = Field(default="", description="CC recipients")

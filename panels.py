@@ -36,7 +36,9 @@ async def inbox_panel(
     folder: str = "INBOX",
     account: str = "",
     limit: int = 25,
-    cursor: str = "",          # explicit pagination cursor — passed only via button clicks
+    cursor: str = "",
+    prev_cursor: str = "",
+    page_num: int = 0,
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
@@ -50,7 +52,9 @@ async def inbox_panel(
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
         account = do_switch_account
-        cursor = ""  # always start at page 1 of new account
+        cursor = ""
+        prev_cursor = ""
+        page_num = 0
         for _fkey in [f["key"] for f in FOLDERS]:
             await _invalidate_first_page(ctx, account, _fkey)
 
@@ -145,7 +149,8 @@ async def inbox_panel(
         unread_count = sum(1 for m in messages if m.get("unread"))
 
     email_list = _build_email_list(messages, next_cursor, has_more,
-                                   folder, active_email, unread_count, cursor)
+                                   folder, active_email, unread_count,
+                                   cursor, prev_cursor, page_num)
 
     return ui.Stack([account_info, folder_tabs, email_list])
 

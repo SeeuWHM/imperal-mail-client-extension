@@ -57,8 +57,9 @@ class MicrosoftMailProvider(BaseMailProvider):
             "$select": "id,conversationId,from,subject,bodyPreview,"
                        "receivedDateTime,isRead,flag,hasAttachments",
         }
-        # Starred = flagged messages across all folders (no dedicated mailFolder in Outlook)
+        # Starred = flagged messages — $orderby is incompatible with cross-folder $filter
         if folder.lower() == "starred":
+            params.pop("$orderby", None)
             params["$filter"] = "flag/flagStatus eq 'flagged'"
             endpoint = "/me/messages"
         else:
