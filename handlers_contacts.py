@@ -160,6 +160,7 @@ async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
 
 
 @chat.function("add_contact", action_type="write", event="contact.added",
+               effects=["create:contact"],
                description="Add a contact manually by email address, optionally with a display name.")
 async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
     try:
@@ -170,6 +171,7 @@ async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
 
 
 @chat.function("sync_contacts", action_type="write", event="contacts.synced",
+               effects=["create:contact", "update:contact"],
                description="Import contacts from a connected email — Google People API, Outlook, or header harvest.")
 async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
     try:
@@ -181,6 +183,7 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
 
 
 @chat.function("delete_contact", action_type="destructive", event="contact.deleted",
+               effects=["delete:contact"],
                description="Remove a contact from the address book by email address.")
 async def fn_delete_contact(ctx, params: DeleteContactParams) -> ActionResult:
     try:

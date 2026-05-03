@@ -4,6 +4,10 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, AliasChoices
 
 
+class EmptyParams(BaseModel):
+    """No parameters required — satisfies V17 for parameterless @chat.function handlers."""
+
+
 class AccountParam(BaseModel):
     """Single optional account selector."""
     account: str = Field(default="", description="Account email or ID (omit for active account)")

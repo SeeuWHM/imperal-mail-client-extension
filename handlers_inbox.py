@@ -242,6 +242,7 @@ async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
 
 
 @chat.function("send", action_type="write", event="sent",
+               effects=["create:email"],
                description="Send a new email. Requires to, subject, and body.")
 async def fn_send(ctx, params: SendParams) -> ActionResult:
     try:
@@ -254,6 +255,7 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
 
 
 @chat.function("reply", action_type="write", event="sent",
+               effects=["create:email"],
                description="Reply to an email. Uses last-read message if message_id is omitted.")
 async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
     try:
@@ -266,6 +268,7 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
 
 
 @chat.function("forward", action_type="write", event="sent",
+               effects=["create:email"],
                description="Forward an email to a new recipient with an optional comment.")
 async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
     try:

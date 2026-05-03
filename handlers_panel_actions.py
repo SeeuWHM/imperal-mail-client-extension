@@ -147,6 +147,7 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
 
 
 @chat.function("mail_action", action_type="write", event="mail.action",
+               effects=["update:email"],
                description="Direct mail action from panel — archive, delete, spam, mark_read, mark_unread, star.")
 async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
     try:
@@ -180,6 +181,7 @@ async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
 
 
 @chat.function("add_imap", action_type="write", event="account.connected",
+               effects=["create:account"],
                description="Connect an IMAP account from the add-account panel wizard.")
 async def fn_add_imap(ctx, params: AddImapParams) -> ActionResult:
     try:

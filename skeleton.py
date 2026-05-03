@@ -19,6 +19,8 @@ import logging
 import time as _time
 from datetime import datetime, timezone
 
+from imperal_sdk.chat.action_result import ActionResult
+
 from app import ext
 
 from providers import get_provider
@@ -27,6 +29,7 @@ from providers.helpers import (
     _inbox_page_key, _inbox_manifest_key, _inbox_messages_key, encode_cursor,
 )
 from cache_model_defs import InboxManifest, InboxMessages, InboxPage
+from schemas import InboxSummary, PerAccountUnread
 
 log = logging.getLogger("mail")
 
@@ -35,14 +38,13 @@ log = logging.getLogger("mail")
 
 @ext.skeleton("mail_inbox_summary", ttl=60, alert=True,
               description="Per-account unread summary for classifier envelope + new-mail alerts.")
-async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
+async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
     accounts = await _all_accounts(ctx)
     if not accounts:
-        return {"response": {
-            "accounts_connected": 0,
-            "unread_total": 0,
-            "per_account": [],
-        }}
+        return ActionResult.success(
+            data=InboxSummary(accounts_connected=0, unread_total=0, per_account=[]).model_dump(),
+            summary="0 unread, 0 accounts connected",
+        )
 
     per_account: list[dict] = []
     unread_total = 0
@@ -195,14 +197,17 @@ async def skeleton_refresh_mail_inbox_summary(ctx, **kwargs) -> dict:
             })
             unread_total += int(acc.get("unread_count", 0))
 
-    return {"response": {
-        "accounts_connected": len(accounts),
-        "unread_total": unread_total,
-        "per_account": per_account,
-    }}
+    return ActionResult.success(
+        data=InboxSummary(
+            accounts_connected=len(accounts),
+            unread_total=unread_total,
+            per_account=per_account,
+        ).model_dump(),
+        summary=f"{unread_total} unread across {len(accounts)} account(s)",
+    )
 
 
 @ext.tool("skeleton_alert_mail_inbox_summary",
           description="Alert check for new unread emails.")
-async def skeleton_alert_mail_inbox_summary(ctx, **kwargs) -> dict:
-    return {"response": {}}
+async def skeleton_alert_mail_inbox_summary(ctx) -> ActionResult:
+    return ActionResult.success(data={}, summary="")

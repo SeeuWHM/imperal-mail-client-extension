@@ -31,7 +31,7 @@ from cache_model_defs import UnreadSummary
 from schemas import (
     AccountDisconnected, AccountSwitched, AccountsStatus, ConnectImapResult,
     ConnectOAuthResult, MailAccount,
-    AccountParam, ConnectImapParams,
+    AccountParam, ConnectImapParams, EmptyParams,
 )
 
 log = logging.getLogger("mail")
@@ -52,6 +52,12 @@ def _oauth_state(ctx, provider: str) -> str:
 
 
 async def impl_connect(ctx) -> ConnectOAuthResult:
+    accounts = await _all_accounts(ctx)
+    existing = [a for a in accounts if a.get("provider") == "oauth"]
+    if existing:
+        active = next((a for a in existing if a.get("is_active")), existing[0])
+        return ConnectOAuthResult(already_connected=True, email=active.get("email"),
+                                  total=len(existing))
     if not GMAIL_CLIENT_ID:
         raise RuntimeError("Google OAuth not configured.")
     url = GOOGLE_AUTH_URL + "?" + urlencode({
@@ -63,6 +69,12 @@ async def impl_connect(ctx) -> ConnectOAuthResult:
 
 
 async def impl_connect_microsoft(ctx) -> ConnectOAuthResult:
+    accounts = await _all_accounts(ctx)
+    existing = [a for a in accounts if a.get("provider") == "microsoft"]
+    if existing:
+        active = next((a for a in existing if a.get("is_active")), existing[0])
+        return ConnectOAuthResult(already_connected=True, email=active.get("email"),
+                                  total=len(existing))
     if not MS_CLIENT_ID:
         raise RuntimeError("Microsoft OAuth not configured.")
     url = MS_AUTH_URL + "?" + urlencode({
@@ -171,7 +183,7 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
 
 @chat.function("connect", action_type="read",
                description="Connect a Google/Gmail account via OAuth. Checks if already connected.")
-async def fn_connect(ctx) -> ActionResult:
+async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect(ctx)
         return ActionResult.success(data=r.model_dump(),
@@ -182,7 +194,7 @@ async def fn_connect(ctx) -> ActionResult:
 
 @chat.function("connect_microsoft", action_type="read",
                description="Connect a Microsoft Outlook/Office 365 account via OAuth.")
-async def fn_connect_microsoft(ctx) -> ActionResult:
+async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect_microsoft(ctx)
         return ActionResult.success(data=r.model_dump(),
@@ -193,7 +205,7 @@ async def fn_connect_microsoft(ctx) -> ActionResult:
 
 @chat.function("connect_yahoo", action_type="read",
                description="Connect a Yahoo/AOL account via OAuth.")
-async def fn_connect_yahoo(ctx) -> ActionResult:
+async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect_yahoo(ctx)
         return ActionResult.success(data=r.model_dump(),
@@ -203,6 +215,7 @@ async def fn_connect_yahoo(ctx) -> ActionResult:
 
 
 @chat.function("connect_imap", action_type="write", event="account.connected",
+               effects=["create:account"],
                description="Connect any email account via IMAP/SMTP (iCloud, Zoho, custom domains).")
 async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
     try:
@@ -217,7 +230,7 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
 
 @chat.function("status", action_type="read",
                description="Show all connected email accounts with provider, active flag, and unread count.")
-async def fn_status(ctx) -> ActionResult:
+async def fn_status(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_status(ctx)
         return ActionResult.success(data=r.model_dump(),
@@ -227,6 +240,7 @@ async def fn_status(ctx) -> ActionResult:
 
 
 @chat.function("switch_account", action_type="write", event="account.switched",
+               effects=["update:account"],
                description="Switch the active email account.")
 async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
     try:
@@ -238,6 +252,7 @@ async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
 
 
 @chat.function("disconnect", action_type="destructive", event="account.disconnected",
+               effects=["delete:account"],
                description="Remove a connected email account and purge its credentials.")
 async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
     try:
