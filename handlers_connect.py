@@ -2,15 +2,13 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import json
 import logging
 
 from urllib.parse import urlencode
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
-from ctx_helpers import _get_acc
+from ctx_helpers import _get_acc, _oauth_state
 
 from providers import get_provider  # noqa: F401
 from providers.helpers import (
@@ -35,17 +33,6 @@ from schemas import (
 )
 
 log = logging.getLogger("mail")
-
-
-# ─── Internal ─────────────────────────────────────────────────────────── #
-
-
-def _oauth_state(ctx, provider: str) -> str:
-    return base64.urlsafe_b64encode(
-        json.dumps({"user_id": str(ctx.user.imperal_id),
-                    "tenant_id": getattr(ctx.user, "tenant_id", "default"),
-                    "provider": provider}).encode()
-    ).decode()
 
 
 # ─── impl_* business logic ────────────────────────────────────────────── #
@@ -118,11 +105,9 @@ async def impl_connect_imap(
     })
     accounts = await _all_accounts(ctx)
     for d in accounts:
-        _data = d.data if hasattr(d, "data") else d
-        _id = d.id if hasattr(d, "id") else d["doc_id"]
-        if _data.get("email") != email_addr:
-            clean = {k: v for k, v in _data.items() if k != "doc_id"}
-            await ctx.store.update(COLLECTION, _id, {**clean, "is_active": False})
+        if d.get("email") != email_addr:
+            clean = {k: v for k, v in d.items() if k != "doc_id"}
+            await ctx.store.update(COLLECTION, d["doc_id"], {**clean, "is_active": False})
     return ConnectImapResult(connected=True, email=email_addr, imap_server=imap_h)
 
 

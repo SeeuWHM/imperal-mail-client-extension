@@ -8,7 +8,7 @@ is constructed.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -28,7 +28,7 @@ class InboxManifest(BaseModel):
     page_size: int = 25
     cursors: list[str] = Field(default_factory=list)  # cursors[0]="", cursors[1]=cursor for page 2, etc.
     preloaded: int = 0    # how many pages are pre-cached
-    fetched_at: datetime
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class InboxPage(BaseModel):
@@ -44,7 +44,7 @@ class InboxPage(BaseModel):
     messages: list[dict[str, Any]] = Field(default_factory=list)
     next_cursor: str = ""
     has_more: bool = False
-    fetched_at: datetime
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UnreadSummary(BaseModel):
@@ -62,7 +62,7 @@ class InboxMessages(BaseModel):
     total_in_folder: int = 0    # from get_folder_stats
     unread_in_folder: int = 0   # total unread in folder (not per-page)
     next_cursor: str = ""       # encoded cursor for fetching the next batch
-    fetched_at: datetime
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AccountList(BaseModel):

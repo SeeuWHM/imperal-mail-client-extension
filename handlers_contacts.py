@@ -117,7 +117,11 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
         notes.append(f"Header harvest skipped: {str(e)[:120]}")
 
     seen: set[str] = set()
-    deduped = [c for c in found if not (c["email"] in seen or seen.add(c["email"]))]  # type: ignore[func-returns-value]
+    deduped: list[dict] = []
+    for c in found:
+        if c["email"] not in seen:
+            seen.add(c["email"])
+            deduped.append(c)
     added, now = 0, int(_time.time())
     for c in deduped:
         exists = await ctx.store.query(CONTACTS_COLLECTION, where={"email": c["email"]})

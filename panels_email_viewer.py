@@ -27,7 +27,7 @@ def _attachment_info(attachments: list[dict]) -> list[ui.UINode]:
             size_str = f"{size_kb / 1024:.1f} MB"
         else:
             size_str = f"{size_kb} KB" if size_kb else ""
-        label = f"📎 {filename}" + (f"  ({size_str})" if size_str else "")
+        label = filename + (f"  ({size_str})" if size_str else "")
         nodes.append(ui.Text(label, variant="caption"))
     return nodes
 

@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: str = "",
                             subject: str = "", body: str = "", cc: str = "", bcc: str = "",
-                            account: str = "", attachments: list | None = None) -> ComposeSendResult:
+                            account: str = "") -> ComposeSendResult:
     if not to:
         raise RuntimeError("Recipient (to) is required.")
     acc, provider = await _get_acc(ctx, account)

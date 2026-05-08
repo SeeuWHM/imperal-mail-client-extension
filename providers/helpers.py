@@ -8,9 +8,11 @@ effort inbox page invalidation.
 from __future__ import annotations
 
 import base64
+import hashlib as _hashlib
 import json
 import logging
 import os
+import re as _re
 from typing import Optional
 
 from imperal_sdk import Context
@@ -74,12 +76,6 @@ from .text_utils import (  # noqa: E402, F401
 
 # ── ctx.cache inbox-page key helpers (SDK v1.6.0) ─────────────────────────
 # Keys must satisfy ``[A-Za-z0-9_\-:]+`` length <= 128 (I-CACHE-KEY-SAFETY).
-# We derive a stable short token per (email, folder, cursor) and hash the
-# cursor so arbitrary cursor payloads (base64/URL-safe) stay within the
-# key grammar.
-import hashlib as _hashlib
-import re as _re
-
 _KEY_SAFE = _re.compile(r"[^A-Za-z0-9_\-]")
 
 

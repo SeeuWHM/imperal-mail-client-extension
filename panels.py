@@ -48,10 +48,10 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
         msgs, next_cursor_data, has_more = await provider.fetch_page(
             ctx, acc, folder, INBOX_INLINE_LIMIT, None,
         )
-        for m in msgs:
-            if "id" in m and "message_id" not in m:
-                m = {**m, "message_id": m["id"]}
-        messages = msgs
+        messages = [
+            {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
+            for m in msgs
+        ]
         if has_more and next_cursor_data:
             next_cursor_encoded = encode_cursor(acc.get("provider", "oauth"), next_cursor_data) or ""
     except Exception as e:
