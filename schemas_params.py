@@ -1,7 +1,7 @@
 """Pydantic input parameter models for @chat.function registration."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, AliasChoices
+from pydantic import BaseModel, Field, AliasChoices, field_validator
 
 
 class EmptyParams(BaseModel):
@@ -137,11 +137,19 @@ class AddImapParams(BaseModel):
 
 
 class ComposeSendParams(BaseModel):
-    to: str = Field(description="Recipient email address")
+    to: str = Field(description="Recipient email address(es)")
     subject: str = Field(default="", description="Subject (required for new emails)")
-    body: str = Field(default="", description="Email body")
+    body: str = Field(default="", description="Email body (plain text or HTML)")
     mode: str = Field(default="new", description="Mode: new, reply, forward")
     message_id: str = Field(default="", description="Original message ID (for reply/forward)")
     cc: str = Field(default="", description="CC recipients")
     bcc: str = Field(default="", description="BCC recipients")
     account: str = Field(default="", description="Account email or ID")
+
+    @field_validator("to", "cc", "bcc", mode="before")
+    @classmethod
+    def _coerce_tags_to_csv(cls, v):
+        """TagInput submits a list — coerce to comma-separated string."""
+        if isinstance(v, list):
+            return ", ".join(str(x) for x in v if x)
+        return str(v or "")

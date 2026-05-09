@@ -7,8 +7,14 @@ import re
 from imperal_sdk import ui
 
 from ctx_helpers import _get_acc
+from providers.helpers import CONTACTS_COLLECTION
 
 log = logging.getLogger(__name__)
+
+
+def _parse_tags(value: str) -> list[str]:
+    """Split a comma/semicolon-separated address string into a tag list."""
+    return [v.strip() for v in re.split(r"[,;]", value) if v.strip()]
 
 
 async def build_compose_panel(
@@ -25,8 +31,17 @@ async def build_compose_panel(
         return ui.Empty(message="No email account available")
 
     account_email = acc.get("email", "")
-    to_value      = prefill_to
-    cc_value      = ""
+
+    # Load contacts for TagInput autocomplete
+    suggestions: list[str] = []
+    try:
+        docs = await ctx.store.query(CONTACTS_COLLECTION, limit=200)
+        suggestions = sorted({d.get("email", "") for d in docs if d.get("email")})
+    except Exception:
+        pass
+
+    to_tags      = _parse_tags(prefill_to)
+    cc_tags: list[str] = []
     subject_value = prefill_subject
 
     if mode in ("reply", "forward") and message_id and not prefill_to:
@@ -35,31 +50,34 @@ async def build_compose_panel(
             if original.get("RESULT") != "ERROR":
                 orig_subject = original.get("subject", "")
                 if mode == "reply":
-                    to_value = original.get("from", "")
+                    to_tags = _parse_tags(original.get("from", ""))
                     if reply_all:
-                        orig_cc = original.get("cc", "")
-                        orig_to = original.get("to", "")
-                        all_recipients = []
-                        for addr in (orig_to + "," + orig_cc).split(","):
-                            addr = addr.strip()
-                            if addr:
-                                m = re.match(r'.*<([^>]+)>', addr)
-                                parsed = m.group(1).strip().lower() if m else addr.lower()
-                                if parsed and parsed != account_email.lower():
-                                    all_recipients.append(addr)
-                        cc_value = ", ".join(all_recipients)
+                        recipients = []
+                        for field in ("to", "cc"):
+                            for addr in re.split(r"[,;]", original.get(field, "")):
+                                addr = addr.strip()
+                                if addr:
+                                    m = re.match(r".*<([^>]+)>", addr)
+                                    parsed = (m.group(1).strip() if m else addr).lower()
+                                    if parsed and parsed != account_email.lower():
+                                        recipients.append(addr)
+                        cc_tags = recipients
                     subject_value = (
-                        f"Re: {orig_subject}" if not orig_subject.lower().startswith("re:") else orig_subject
+                        f"Re: {orig_subject}"
+                        if not orig_subject.lower().startswith("re:")
+                        else orig_subject
                     )
                 elif mode == "forward":
                     subject_value = (
-                        f"Fwd: {orig_subject}" if not orig_subject.lower().startswith("fwd:") else orig_subject
+                        f"Fwd: {orig_subject}"
+                        if not orig_subject.lower().startswith("fwd:")
+                        else orig_subject
                     )
         except Exception:
             pass
 
     title = {
-        "reply":   f"Reply to {to_value[:40]}" if to_value else "Reply",
+        "reply":   f"Reply to {to_tags[0][:40]}" if to_tags else "Reply",
         "forward": f"Forward: {subject_value[:40]}" if subject_value else "Forward",
         "new":     "New Email",
     }.get(mode, "Compose")
@@ -69,6 +87,13 @@ async def build_compose_panel(
         if message_id else ui.Call("__panel__inbox")
     )
 
+    _tag = dict(
+        suggestions=suggestions,
+        delimiters=[",", ";"],
+        validate=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        validate_message="Enter a valid email address",
+    )
+
     return ui.Stack([
         ui.Stack([
             ui.Button("Back", icon="ArrowLeft", variant="ghost", size="sm", on_click=back_target),
@@ -76,15 +101,15 @@ async def build_compose_panel(
         ], direction="horizontal", sticky=True),
         ui.Form(
             children=[
-                ui.Input(placeholder="To", value=to_value, param_name="to"),
-                ui.Input(placeholder="CC", value=cc_value, param_name="cc"),
-                ui.Input(placeholder="BCC", param_name="bcc"),
+                ui.TagInput(placeholder="To", values=to_tags, param_name="to", **_tag),
+                ui.TagInput(placeholder="CC", values=cc_tags, param_name="cc", **_tag),
+                ui.TagInput(placeholder="BCC", param_name="bcc", **_tag),
                 ui.Input(placeholder="Subject", value=subject_value, param_name="subject"),
-                ui.TextArea(placeholder="Write your message...", rows=12, param_name="body"),
-                # Attachments are not yet supported — the platform has no SDK mechanism
-                # to serve binary files from extensions (proxy/download endpoint missing).
-                # FileUpload is removed until that SDK gap is closed.
-                ui.Text("📎 Attachments: coming in a future update", variant="caption"),
+                ui.RichEditor(
+                    placeholder="Write your message…",
+                    param_name="body",
+                    toolbar=True,
+                ),
             ],
             action="compose_send",
             submit_label="Send",

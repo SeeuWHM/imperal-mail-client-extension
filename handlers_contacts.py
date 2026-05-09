@@ -6,6 +6,7 @@ import re
 import time as _time
 
 from app import chat
+from imperal_sdk.chat import TaskCancelled
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 
@@ -67,6 +68,7 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
     acc, _ = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
+    await ctx.progress(percent=0, message="Preparing to fetch contacts…")
     acc = await _refresh_token_if_needed(ctx, acc)
     provider, own = acc.get("provider", "oauth"), acc.get("email", "")
     found: list[dict] = []
@@ -105,6 +107,7 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
         except Exception as e:
             notes.append(f"Graph contacts error: {e}")
 
+    await ctx.progress(percent=40, message=f"Found {len(found)} raw contacts, harvesting headers…")
     try:
         inbox = await get_provider(acc).fetch_inbox(ctx, acc, INBOX_FETCH_SIZE)
         for msg in inbox.get("messages", []) or []:
@@ -116,12 +119,14 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
     except Exception as e:
         notes.append(f"Header harvest skipped: {str(e)[:120]}")
 
+    await ctx.progress(percent=65, message=f"Deduplicating {len(found)} contacts…")
     seen: set[str] = set()
     deduped: list[dict] = []
     for c in found:
         if c["email"] not in seen:
             seen.add(c["email"])
             deduped.append(c)
+    await ctx.progress(percent=75, message=f"Saving {len(deduped)} contacts to address book…")
     added, now = 0, int(_time.time())
     for c in deduped:
         exists = await ctx.store.query(CONTACTS_COLLECTION, where={"email": c["email"]})
@@ -138,6 +143,7 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
                                     "account": own, "added_at": now, "last_seen": now})
             added += 1
     total = await ctx.store.count(CONTACTS_COLLECTION)
+    await ctx.progress(percent=100, message=f"Done — {added} added, {int(total)} total.")
     return ContactsSyncResult(found=len(deduped), added=added, total=int(total), notes=notes)
 
 
@@ -182,6 +188,8 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
         r = await impl_sync_contacts(ctx, account=params.account)
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Synced contacts: {r.added} added, {r.total} total.")
+    except TaskCancelled:
+        return ActionResult.error("Sync cancelled.", retryable=True)
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 

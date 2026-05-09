@@ -6,6 +6,7 @@ import logging
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
+from handlers_ui import _email_ui, _inbox_ui, _search_ui
 
 from providers import get_provider
 from providers.helpers import encode_cursor, decode_cursor
@@ -189,8 +190,11 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
     try:
         r = await impl_inbox(ctx, folder=params.folder, cursor=params.cursor,
                              limit=params.limit, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"{len(r.messages)} message(s) in {params.folder}.")
+        return ActionResult.success(
+            data=r.model_dump(),
+            summary=f"{len(r.messages)} message(s) in {params.folder}.",
+            ui=_inbox_ui(r.messages, params.folder),
+        )
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -201,7 +205,11 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_read_email(ctx, message_id=params.message_id, account=params.account)
         subj = r.subject or "(no subject)"
-        return ActionResult.success(data=r.model_dump(), summary=f"Email: {subj}")
+        return ActionResult.success(
+            data=r.model_dump(),
+            summary=f"Email: {subj}",
+            ui=_email_ui(r),
+        )
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -212,8 +220,11 @@ async def fn_search(ctx, params: SearchParams) -> ActionResult:
     try:
         r = await impl_search(ctx, query=params.query, max_results=params.max_results,
                               account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"{r.total} result(s) for '{params.query}'.")
+        return ActionResult.success(
+            data=r.model_dump(),
+            summary=f"{r.total} result(s) for '{params.query}'.",
+            ui=_search_ui(r.results, params.query),
+        )
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 

@@ -11,6 +11,7 @@ if _dir not in sys.path:
 
 _MODULES = (
     "app", "ctx_helpers", "schemas", "schemas_params",
+    "handlers_ui",
     "handlers_connect", "handlers_inbox", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
     "skeleton", "panels", "panels_inbox", "panels_email_viewer", "panels_compose",

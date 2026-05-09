@@ -17,17 +17,16 @@ PROVIDER_LABELS = {
 
 async def build_accounts_panel(ctx, show_add: bool = False,
                                 do_switch: str = "", do_remove: str = "") -> ui.UINode:
-    # Legacy params kept for compat — switching and removal now go through
-    # fn_switch_account / fn_disconnect chat functions via ui.Call which
-    # return refresh_panels=["inbox","accounts"] so both panels update instantly.
     accounts = await _all_accounts(ctx)
 
     if not accounts:
         return ui.Stack([
             ui.Empty(message="No email accounts connected", icon="Mail"),
-            ui.Button("Add Account", icon="Plus", variant="outline",
+            ui.Button("Add Account", icon="Plus", variant="primary",
                       on_click=ui.Call("__panel__add_account")),
-        ])
+        ], gap=2)
+
+    total_unread = sum(int(a.get("unread_count", 0) or 0) for a in accounts)
 
     items = []
     for acc in accounts:
@@ -35,15 +34,19 @@ async def build_accounts_panel(ctx, show_add: bool = False,
         provider  = acc.get("provider", "oauth")
         is_active = acc.get("is_active", False)
         initial   = email[0].upper() if email else "?"
+        unread    = int(acc.get("unread_count", 0) or 0)
 
         items.append(ui.ListItem(
             id=email,
             title=email,
             subtitle=PROVIDER_LABELS.get(provider, "Unknown"),
             avatar=ui.Avatar(fallback=initial, size="sm"),
-            badge=ui.Badge("Active", color="green") if is_active else None,
+            badge=ui.Badge("Active", color="green") if is_active else (
+                ui.Badge(str(unread), color="blue") if unread > 0 else None
+            ),
             on_click=ui.Call("switch_account", account=email),
             actions=[{
+                "label":    "Remove",
                 "icon":     "Trash2",
                 "on_click": ui.Call("disconnect", account=email),
             }],
@@ -51,6 +54,11 @@ async def build_accounts_panel(ctx, show_add: bool = False,
 
     return ui.Stack([
         ui.Header(text="Accounts", level=3),
+        ui.Stats([
+            ui.Stat(label="Unread",   value=total_unread, color="blue" if total_unread else ""),
+            ui.Stat(label="Accounts", value=len(accounts)),
+        ], columns=2),
+        ui.Divider(),
         ui.List(items=items),
         ui.Divider(),
         ui.Button("Add Account", icon="Plus", variant="outline",

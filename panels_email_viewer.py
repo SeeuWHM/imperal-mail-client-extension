@@ -13,12 +13,7 @@ from providers import get_provider
 log = logging.getLogger(__name__)
 
 
-def _attachment_info(attachments: list[dict]) -> list[ui.UINode]:
-    """Render attachment metadata as read-only text items.
-
-    Download endpoints don't exist on the platform (no proxy/serve mechanism
-    for binary extension files — SDK gap). Metadata-only until that lands.
-    """
+def _attachment_items(attachments: list[dict]) -> list[ui.UINode]:
     nodes = []
     for att in attachments:
         filename = att.get("filename", "attachment")
@@ -35,15 +30,7 @@ def _attachment_info(attachments: list[dict]) -> list[ui.UINode]:
 def _action_bar(message_id: str, account_email: str, has_cc: bool,
                 folder: str = "INBOX",
                 email_list_ids: str = "", current_index: int = 0) -> ui.UINode:
-    """Action toolbar for the email viewer.
-
-    Archive / Spam / Delete call __panel__inbox with do_action + do_message_id.
-    This causes inbox_panel to execute the action INLINE before rendering,
-    so the list updates immediately — no dependency on event publishing
-    (which only works from the full SessionWorkflow / LLM chat path,
-    not from ui.Call / Fast-RPC / DirectCallWorkflow).
-    """
-    ids = [i for i in email_list_ids.split(",") if i] if email_list_ids else []
+    ids     = [i for i in email_list_ids.split(",") if i] if email_list_ids else []
     prev_id = ids[current_index - 1] if current_index > 0 and len(ids) > current_index - 1 else None
     next_id = ids[current_index + 1] if len(ids) > current_index + 1 else None
 
@@ -65,27 +52,21 @@ def _action_bar(message_id: str, account_email: str, has_cc: bool,
                    on_click=ui.Call("__panel__compose", mode="reply",
                                     message_id=message_id, account=account_email)))
     if has_cc:
-        buttons.append(ui.Button(
-            "Reply All", icon="Reply", variant="outline", size="sm",
+        buttons.append(ui.Button("Reply All", icon="Reply", variant="outline", size="sm",
             on_click=ui.Call("__panel__compose", mode="reply",
-                             message_id=message_id, account=account_email,
-                             reply_all=True),
-        ))
+                             message_id=message_id, account=account_email, reply_all=True)))
     buttons.extend([
         ui.Button("Forward", icon="Forward", variant="outline", size="sm",
                    on_click=ui.Call("__panel__compose", mode="forward",
                                     message_id=message_id, account=account_email)),
         ui.Button("Archive", icon="Archive", variant="outline", size="sm",
-                   on_click=ui.Call("__panel__inbox",
-                                    folder=folder, account=account_email,
+                   on_click=ui.Call("__panel__inbox", folder=folder, account=account_email,
                                     do_action="archive", do_message_id=message_id)),
         ui.Button("Spam", icon="Ban", variant="outline", size="sm",
-                   on_click=ui.Call("__panel__inbox",
-                                    folder=folder, account=account_email,
+                   on_click=ui.Call("__panel__inbox", folder=folder, account=account_email,
                                     do_action="spam", do_message_id=message_id)),
         ui.Button("Delete", icon="Trash2", variant="danger", size="sm",
-                   on_click=ui.Call("__panel__inbox",
-                                    folder=folder, account=account_email,
+                   on_click=ui.Call("__panel__inbox", folder=folder, account=account_email,
                                     do_action="delete", do_message_id=message_id)),
     ])
     return ui.Stack(buttons, direction="horizontal", wrap=True, sticky=True)
@@ -106,14 +87,12 @@ async def build_email_viewer(
         result = await provider.read_email(ctx, acc, message_id)
     except Exception as e:
         log.warning("read_email failed mid=%s: %s", message_id, e)
-        return ui.Error(message=f"Failed to load email: {e}")
+        return ui.Error(message=f"Failed to load email: {e}",
+                        retry=ui.Call("__panel__email_viewer", message_id=message_id,
+                                      account=account_email, folder=folder))
 
     if result.get("RESULT") == "ERROR":
         return ui.Error(message=result.get("error", "Failed to load email"))
-
-    # read_email already marks as read internally (Google: removeLabelIds UNREAD,
-    # MS: PATCH isRead, IMAP: STORE +FLAGS \Seen). No redundant mark_read needed.
-    # The inbox list will reflect the updated read state on next render (e.g., Back click).
 
     subject     = result.get("subject", "(no subject)")
     from_name   = result.get("from", "Unknown")
@@ -124,37 +103,59 @@ async def build_email_viewer(
     body_type   = result.get("body_type", "html")
     attachments = result.get("attachments", [])
 
-    children: list[ui.UINode] = []
-    children.append(_action_bar(message_id, account_email,
-                                has_cc=bool(cc_field), folder=folder,
-                                email_list_ids=email_list_ids, current_index=current_index))
-    children.append(ui.Header(text=subject, level=3))
+    # ── Tab 0: Message ──────────────────────────────────────────────────
+    meta_items = [{"key": "From", "value": from_name}]
+    if to_field:  meta_items.append({"key": "To",   "value": to_field})
+    if cc_field:  meta_items.append({"key": "CC",   "value": cc_field})
+    if date_str:  meta_items.append({"key": "Date", "value": date_str})
 
-    kv_items = [{"key": "From", "value": from_name}]
-    if to_field:  kv_items.append({"key": "To",   "value": to_field})
-    if cc_field:  kv_items.append({"key": "CC",   "value": cc_field})
-    if date_str:  kv_items.append({"key": "Date", "value": date_str})
-    children.append(ui.KeyValue(items=kv_items, columns=1))
-
+    msg_children: list = [
+        ui.Header(text=subject, level=3),
+        ui.KeyValue(items=meta_items, columns=1),
+    ]
     if attachments:
         n = len(attachments)
-        children.append(ui.Text(f"{n} attachment{'s' if n > 1 else ''}", variant="caption"))
-        children.append(ui.Stack(_attachment_info(attachments), direction="vertical", gap=1))
-
-    children.append(ui.Divider())
-
+        msg_children.append(ui.Stack([
+            ui.Text(f"{n} attachment{'s' if n > 1 else ''}", variant="caption"),
+            ui.Stack(_attachment_items(attachments), direction="vertical", gap=1),
+        ]))
+    msg_children.append(ui.Divider())
     if body:
         if body_type == "html":
-            children.append(ui.Html(content=body, sandbox=True, theme="light"))
+            msg_children.append(ui.Html(content=body, sandbox=True, theme="light"))
         else:
             safe_text = html_escape(body)
-            pre_html  = (
-                f'<pre style="white-space:pre-wrap;word-break:break-word;'
-                f'font-family:-apple-system,BlinkMacSystemFont,sans-serif;'
-                f'font-size:14px;line-height:1.65;margin:0">{safe_text}</pre>'
-            )
-            children.append(ui.Html(content=pre_html, sandbox=True, theme="light"))
+            msg_children.append(ui.Html(
+                content=(
+                    f'<pre style="white-space:pre-wrap;word-break:break-word;'
+                    f'font-family:-apple-system,BlinkMacSystemFont,sans-serif;'
+                    f'font-size:14px;line-height:1.65;margin:0">{safe_text}</pre>'
+                ),
+                sandbox=True, theme="light",
+            ))
     else:
-        children.append(ui.Empty(message="No content", icon="FileText"))
+        msg_children.append(ui.Empty(message="No content", icon="FileText"))
 
-    return ui.Stack(children, className="px-4 pb-4")
+    # ── Tab 1: Headers ─────────────────────────────────────────────────
+    headers_items = [
+        {"key": "Subject", "value": subject},
+        {"key": "From",    "value": from_name},
+        {"key": "To",      "value": to_field  or "—"},
+        {"key": "CC",      "value": cc_field  or "—"},
+        {"key": "Date",    "value": date_str  or "—"},
+        {"key": "Message", "value": message_id},
+        {"key": "Folder",  "value": folder},
+    ]
+
+    return ui.Stack([
+        _action_bar(message_id, account_email,
+                    has_cc=bool(cc_field), folder=folder,
+                    email_list_ids=email_list_ids, current_index=current_index),
+        ui.Tabs(
+            tabs=[
+                {"label": "Message", "content": ui.Stack(msg_children, gap=2)},
+                {"label": "Headers", "content": ui.KeyValue(items=headers_items, columns=1)},
+            ],
+            default_tab=0,
+        ),
+    ], className="px-4 pb-4")
