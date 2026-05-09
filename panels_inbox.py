@@ -77,10 +77,14 @@ def _build_email_list(
     folder: str,
     unread_count: int = 0,
     next_cursor: str = "",
+    total_items: int = 0,
 ) -> ui.UINode:
-    """Email list with native pagination and search via ui.List(page_size=25, searchable=True).
+    """Email list with native pagination and search via ui.List(page_size=25).
 
-    No extra buttons or inputs — platform handles < 1/N > and search bar natively.
+    total_items: real inbox size so the paginator shows the full < 1/N > range.
+    next_cursor: when set, enables on_end_reached — clicking > beyond cached
+    pages fires a panel call that fetches the next batch from API and extends
+    the cached list seamlessly.
     """
     msg_ids  = [msg.get("message_id", msg.get("id", "")) for msg in messages]
     full_ids = ",".join(msg_ids)
@@ -117,14 +121,20 @@ def _build_email_list(
 
     info = f"{unread_count} unread" if unread_count > 0 else ""
 
-    children: list[ui.UINode] = [
+    # on_end_reached fires when user navigates beyond the last loaded page.
+    # total_items tells the paginator the real inbox size so the < > arrows
+    # show the full page range even before all messages are fetched.
+    on_end = (
+        ui.Call("__panel__inbox", folder=folder, load_more_cursor=next_cursor)
+        if next_cursor else None
+    )
+    show_total = total_items if total_items > len(messages) else 0
+
+    return ui.Stack([
         ui.Text(info, variant="caption") if info else ui.Stack([]),
-        ui.List(items=items, page_size=25, selectable=True, bulk_actions=bulk),
-    ]
-    if next_cursor:
-        children.append(
-            ui.Button("Load more", icon="ChevronDown", variant="ghost",
-                      on_click=ui.Call("__panel__inbox", folder=folder,
-                                       load_more_cursor=next_cursor))
-        )
-    return ui.Stack(children, gap=1)
+        ui.List(
+            items=items, page_size=25, selectable=True, bulk_actions=bulk,
+            on_end_reached=on_end,
+            total_items=show_total,
+        ),
+    ], gap=1)

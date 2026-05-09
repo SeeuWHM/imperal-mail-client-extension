@@ -1,6 +1,7 @@
 """Mail Client · Panel handlers (Declarative UI)."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -26,19 +27,17 @@ from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
 
-INBOX_INLINE_LIMIT = 200
+INBOX_INLINE_LIMIT = 300   # 12 pages of 25 from cache before API kicks in
 INBOX_CACHE_TTL    = 90
 
 
 async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
     email = acc.get("email", "")
     try:
-        acc = await _refresh_token_if_needed(ctx, acc)
-    except Exception:
+        acc = await asyncio.wait_for(_refresh_token_if_needed(ctx, acc), timeout=5.0)
+    except (asyncio.TimeoutError, Exception):
         pass
 
-    # Skip folder stats for non-INBOX — IMAP opens a separate connection per call;
-    # stats (total/unread) are only used for INBOX unread badge anyway.
     if folder.upper() == "INBOX":
         try:
             stats            = await provider.get_folder_stats(ctx, acc, folder)
@@ -51,8 +50,9 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
 
     messages, next_cursor_encoded = [], ""
     try:
-        msgs, next_cursor_data, has_more = await provider.fetch_page(
-            ctx, acc, folder, INBOX_INLINE_LIMIT, None,
+        msgs, next_cursor_data, has_more = await asyncio.wait_for(
+            provider.fetch_page(ctx, acc, folder, INBOX_INLINE_LIMIT, None),
+            timeout=10.0,
         )
         messages = [
             {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
@@ -60,6 +60,8 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
         ]
         if has_more and next_cursor_data:
             next_cursor_encoded = encode_cursor(acc.get("provider", "oauth"), next_cursor_data) or ""
+    except asyncio.TimeoutError:
+        log.warning("fetch_page timeout folder=%s account=%s", folder, email)
     except Exception as e:
         log.warning("inbox fetch_page failed folder=%s: %s", folder, e)
 
@@ -91,7 +93,7 @@ async def inbox_panel(
 
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
-        folder, search_query = "INBOX", ""
+        folder, search_query, load_more_cursor = "INBOX", "", ""
         for _fkey in [f["key"] for f in FOLDERS]:
             await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
@@ -105,18 +107,27 @@ async def inbox_panel(
 
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
 
-    # Load more: fetch next page from live API and extend the cache
     msgs_key = _inbox_messages_key(active_email, folder)
+
+    # Load more: fetch the next 25 from API and extend the cached list.
+    # Guard: only run if the cache still belongs to this account/folder so
+    # stale on_end_reached state replays (folder switch, account switch) are
+    # silently ignored instead of loading wrong data.
     if load_more_cursor:
         try:
-            cursor_data = decode_cursor(load_more_cursor)
-            more, next_data, has_more = await provider.fetch_page(ctx, acc, folder, 25, cursor_data)
-            more = [
-                {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
-                for m in more
-            ]
             existing = await ctx.cache.get(msgs_key, InboxMessages)
-            if existing:
+            if (existing
+                    and existing.folder == folder
+                    and existing.account_id == active_email):
+                cursor_data = decode_cursor(load_more_cursor)
+                more, next_data, has_more = await asyncio.wait_for(
+                    provider.fetch_page(ctx, acc, folder, 25, cursor_data),
+                    timeout=10.0,
+                )
+                more = [
+                    {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
+                    for m in more
+                ]
                 new_cursor = (
                     encode_cursor(acc.get("provider", "oauth"), next_data) or ""
                     if has_more and next_data else ""
@@ -130,7 +141,7 @@ async def inbox_panel(
                     fetched_at=datetime.now(timezone.utc),
                 )
                 await ctx.cache.set(msgs_key, extended, ttl_seconds=INBOX_CACHE_TTL)
-        except Exception as e:
+        except (asyncio.TimeoutError, Exception) as e:
             log.warning("load_more failed folder=%s: %s", folder, e)
 
     header = ui.Stack([
@@ -157,7 +168,6 @@ async def inbox_panel(
         return ui.Stack([header, folder_tabs,
                          ui.Error(message=f"Failed to load {folder}: {e}")])
 
-    # Search: combined local filter + server query
     q = search_query.strip()
     if q and len(q) >= 2:
         ql = q.lower()
@@ -179,11 +189,13 @@ async def inbox_panel(
             pass
         display_messages = local + server_extra
         unread_display   = 0
-        show_load_more   = ""
+        show_cursor      = ""
+        show_total       = 0
     else:
         display_messages = inbox_msgs.messages
         unread_display   = inbox_msgs.unread_in_folder
-        show_load_more   = inbox_msgs.next_cursor  # empty string = no button
+        show_cursor      = inbox_msgs.next_cursor
+        show_total       = inbox_msgs.total_in_folder
 
     search_bar = ui.Input(
         placeholder="Search…",
@@ -205,7 +217,8 @@ async def inbox_panel(
     email_list = _build_email_list(
         display_messages, active_email, folder,
         unread_count=unread_display,
-        next_cursor=show_load_more,
+        next_cursor=show_cursor,
+        total_items=show_total,
     )
 
     children = [header, folder_tabs, search_bar]

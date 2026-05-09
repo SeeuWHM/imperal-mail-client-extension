@@ -44,19 +44,15 @@ async def build_accounts_panel(ctx, show_add: bool = False,
         email     = acc.get("email", "?")
         provider  = acc.get("provider", "oauth")
         is_active = acc.get("is_active", False)
-        initial   = email[0].upper() if email else "?"
+        label     = f"{email}  ·  {PROVIDER_LABELS.get(provider, 'Unknown')}"
 
         rows.append(ui.Stack([
-            ui.Avatar(fallback=initial, size="sm"),
-            ui.Stack([
-                ui.Text(email[:32], variant="body"),
-                ui.Text(PROVIDER_LABELS.get(provider, "Unknown"), variant="caption"),
-            ], gap=0),
+            ui.Button(
+                label,
+                variant="primary" if is_active else "ghost",
+                on_click=ui.Call("__panel__accounts", do_switch=email),
+            ),
             ui.Badge("Active", color="green") if is_active else ui.Stack([]),
-            ui.Button("", icon="Mail", variant="ghost", size="sm",
-                      on_click=ui.Call("__panel__inbox",
-                                       do_switch_account=email,
-                                       folder="INBOX")),
             ui.Button("", icon="X", variant="ghost", size="sm",
                       on_click=ui.Call("__panel__accounts", do_remove=email)),
         ], direction="horizontal", gap=2))
