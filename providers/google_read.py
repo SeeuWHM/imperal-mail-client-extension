@@ -56,10 +56,14 @@ class GoogleReadMixin:
         self, ctx: Context, acc: dict, folder: str, limit: int,
         cursor_data: dict | None,
     ) -> tuple[list[dict], dict | None, bool]:
-        label_id = _PAGE_FOLDER_LABELS.get(folder.lower(), "INBOX")
-        params: dict = {"labelIds": label_id, "maxResults": min(limit, 100)}
+        params: dict = {"maxResults": min(limit, 100)}
         if cursor_data and cursor_data.get("token"):
             params["pageToken"] = cursor_data["token"]
+        if folder.lower() == "archive":
+            # Gmail has no Archive label — archived = not in inbox/trash/spam/drafts
+            params["q"] = "-in:inbox -in:trash -in:spam -in:drafts"
+        else:
+            params["labelIds"] = _PAGE_FOLDER_LABELS.get(folder.lower(), "INBOX")
         resp = await _api_get(ctx, "messages", acc, params=params)
         resp.raise_for_status()
         body           = resp.json()
@@ -78,6 +82,8 @@ class GoogleReadMixin:
         return messages, next_cursor, next_page_token is not None
 
     async def get_unread_count(self, ctx: Context, acc: dict, folder: str = "inbox") -> int:
+        if folder.lower() == "archive":
+            return 0  # Gmail archive has no direct label for unread count
         label_id = _PAGE_FOLDER_LABELS.get(folder.lower(), "INBOX")
         resp = await _api_get(ctx, f"labels/{label_id}", acc)
         if resp.status_code != 200:
@@ -85,6 +91,8 @@ class GoogleReadMixin:
         return resp.json().get("messagesUnread", 0)
 
     async def get_folder_stats(self, ctx: Context, acc: dict, folder: str = "inbox") -> dict:
+        if folder.lower() == "archive":
+            return {"total": 0, "unread": 0}  # Gmail archive needs a search for counts
         label_id = _PAGE_FOLDER_LABELS.get(folder.lower(), "INBOX")
         resp = await _api_get(ctx, f"labels/{label_id}", acc)
         if resp.status_code != 200:

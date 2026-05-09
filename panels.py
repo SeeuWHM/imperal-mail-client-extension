@@ -11,7 +11,7 @@ from providers import get_provider
 from providers.helpers import (
     _all_accounts, _invalidate_first_page,
     _inbox_messages_key, _refresh_token_if_needed,
-    encode_cursor,
+    encode_cursor, decode_cursor,
 )
 from panels_inbox import (
     FOLDERS,
@@ -36,11 +36,17 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
         acc = await _refresh_token_if_needed(ctx, acc)
     except Exception:
         pass
-    try:
-        stats            = await provider.get_folder_stats(ctx, acc, folder)
-        total_in_folder  = stats.get("total", 0)
-        unread_in_folder = stats.get("unread", 0)
-    except Exception:
+
+    # Skip folder stats for non-INBOX — IMAP opens a separate connection per call;
+    # stats (total/unread) are only used for INBOX unread badge anyway.
+    if folder.upper() == "INBOX":
+        try:
+            stats            = await provider.get_folder_stats(ctx, acc, folder)
+            total_in_folder  = stats.get("total", 0)
+            unread_in_folder = stats.get("unread", 0)
+        except Exception:
+            total_in_folder = unread_in_folder = 0
+    else:
         total_in_folder = unread_in_folder = 0
 
     messages, next_cursor_encoded = [], ""
@@ -75,6 +81,7 @@ async def inbox_panel(
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
+    load_more_cursor: str = "",
     search_query: str = "",
     **_unused_kwargs,
 ):
@@ -98,6 +105,34 @@ async def inbox_panel(
 
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
 
+    # Load more: fetch next page from live API and extend the cache
+    msgs_key = _inbox_messages_key(active_email, folder)
+    if load_more_cursor:
+        try:
+            cursor_data = decode_cursor(load_more_cursor)
+            more, next_data, has_more = await provider.fetch_page(ctx, acc, folder, 25, cursor_data)
+            more = [
+                {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
+                for m in more
+            ]
+            existing = await ctx.cache.get(msgs_key, InboxMessages)
+            if existing:
+                new_cursor = (
+                    encode_cursor(acc.get("provider", "oauth"), next_data) or ""
+                    if has_more and next_data else ""
+                )
+                extended = InboxMessages(
+                    account_id=active_email, folder=folder,
+                    messages=existing.messages + more,
+                    total_in_folder=existing.total_in_folder,
+                    unread_in_folder=existing.unread_in_folder,
+                    next_cursor=new_cursor,
+                    fetched_at=datetime.now(timezone.utc),
+                )
+                await ctx.cache.set(msgs_key, extended, ttl_seconds=INBOX_CACHE_TTL)
+        except Exception as e:
+            log.warning("load_more failed folder=%s: %s", folder, e)
+
     header = ui.Stack([
         ui.Text(active_email[:32], variant="caption"),
         ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
@@ -106,8 +141,6 @@ async def inbox_panel(
 
     folder_tabs = _build_folder_tabs(folder, active_email)
 
-    # Load cached messages
-    msgs_key = _inbox_messages_key(active_email, folder)
     try:
         if do_switch_account:
             inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
@@ -146,9 +179,11 @@ async def inbox_panel(
             pass
         display_messages = local + server_extra
         unread_display   = 0
+        show_load_more   = ""
     else:
         display_messages = inbox_msgs.messages
         unread_display   = inbox_msgs.unread_in_folder
+        show_load_more   = inbox_msgs.next_cursor  # empty string = no button
 
     search_bar = ui.Input(
         placeholder="Search…",
@@ -157,7 +192,6 @@ async def inbox_panel(
         on_submit=ui.Call("__panel__inbox", folder=folder),
     )
 
-    # When search is active — show query badge + clear button
     search_status = None
     if q:
         n = len(display_messages)
@@ -171,6 +205,7 @@ async def inbox_panel(
     email_list = _build_email_list(
         display_messages, active_email, folder,
         unread_count=unread_display,
+        next_cursor=show_load_more,
     )
 
     children = [header, folder_tabs, search_bar]
@@ -191,10 +226,10 @@ async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
 
 @ext.panel(
     "accounts", slot="right", title="Accounts", icon="Users",
-    refresh="interval:30s",
+    refresh="interval:5s",
 )
-async def accounts_panel(ctx, show_add: bool = False, do_switch: str = ""):
-    return await build_accounts_panel(ctx, show_add, do_switch)
+async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_remove: str = ""):
+    return await build_accounts_panel(ctx, show_add, do_switch, do_remove)
 
 
 @ext.panel("compose", slot="center", title="Compose", icon="PenSquare")

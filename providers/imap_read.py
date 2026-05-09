@@ -163,33 +163,45 @@ def _sync_imap_fetch_page(email_addr: str, host: str, port: int,
     if imap_folder.upper() == "INBOX":
         candidates = ["INBOX"]
     selected = False
+    count    = 0
     for candidate in candidates:
-        r, _ = imap.select(f'"{candidate}"', readonly=True)
+        r, data = imap.select(f'"{candidate}"', readonly=True)
         if r == "OK":
             selected = True
+            count = int(data[0]) if data and data[0] else 0
             break
-    if not selected:
+    if not selected or count == 0:
         imap.logout()
         return [], None, False
 
-    _, uid_data = imap.uid("SEARCH", "ALL")
+    if last_uid is None:
+        # First page: sequence-range FETCH — O(1), no SEARCH ALL on large folders.
+        # UID is requested in the field spec so _parse_fetch_response can extract it.
+        start_seq = max(1, count - limit + 1)
+        _, batch  = imap.fetch(f"{start_seq}:{count}", "(UID FLAGS RFC822.HEADER)")
+        parsed    = _parse_fetch_response(batch, [])
+        parsed.sort(key=lambda x: x[0], reverse=True)
+        messages  = [_msg_dict(u, r, f) for u, r, f in parsed if u > 0]
+        lowest    = parsed[-1][0] if parsed else None
+        has_more  = start_seq > 1
+        imap.logout()
+        return messages, (lowest if has_more and lowest else None), has_more
+
+    # Cursor page: UID range search — bounded, avoids downloading the full UID list.
+    _, uid_data = imap.uid("SEARCH", f"UID 1:{last_uid - 1}")
     all_uids    = uid_data[0].split() if uid_data and uid_data[0] else []
     if not all_uids:
         imap.logout()
         return [], None, False
 
-    uid_ints = sorted([int(u) for u in all_uids], reverse=True)
-    if last_uid is not None:
-        uid_ints = [u for u in uid_ints if u < last_uid]
-
+    uid_ints  = sorted([int(u) for u in all_uids], reverse=True)
     page_uids = uid_ints[:limit]
     if not page_uids:
         imap.logout()
         return [], None, False
 
-    parsed   = _fetch_headers_batch(imap, page_uids)
-    messages = [_msg_dict(u, r, f) for u, r, f in parsed]
-
+    parsed    = _fetch_headers_batch(imap, page_uids)
+    messages  = [_msg_dict(u, r, f) for u, r, f in parsed]
     imap.logout()
     lowest    = page_uids[-1] if page_uids else None
     remaining = [u for u in uid_ints if u < lowest] if lowest else []

@@ -7,6 +7,7 @@ from imperal_sdk import ui
 
 from providers.helpers import _all_accounts, _invalidate_first_page
 from panels_inbox import FOLDERS, _switch_active_account
+from handlers_connect import impl_disconnect
 
 log = logging.getLogger(__name__)
 
@@ -17,9 +18,13 @@ PROVIDER_LABELS = {
 
 
 async def build_accounts_panel(ctx, show_add: bool = False,
-                                do_switch: str = "") -> ui.UINode:
-    # Handle account switch directly here so Active badge updates immediately
-    # (without waiting for interval — switch updates store, then we re-read it)
+                                do_switch: str = "", do_remove: str = "") -> ui.UINode:
+    if do_remove:
+        try:
+            await impl_disconnect(ctx, account=do_remove)
+        except Exception as e:
+            log.warning("remove account %s: %s", do_remove, e)
+
     if do_switch:
         await _switch_active_account(ctx, do_switch)
         for fkey in [f["key"] for f in FOLDERS]:
@@ -34,33 +39,32 @@ async def build_accounts_panel(ctx, show_add: bool = False,
                       on_click=ui.Call("__panel__add_account")),
         ])
 
-    items = []
+    rows = []
     for acc in accounts:
         email     = acc.get("email", "?")
         provider  = acc.get("provider", "oauth")
         is_active = acc.get("is_active", False)
         initial   = email[0].upper() if email else "?"
 
-        # ALL params passed explicitly so the platform can't inject stale
-        # cursor/page_num/account from a previous paginated inbox render.
-        items.append(ui.ListItem(
-            id=email,
-            title=email,
-            subtitle=PROVIDER_LABELS.get(provider, "Unknown"),
-            avatar=ui.Avatar(fallback=initial, size="sm"),
-            badge=ui.Badge("Active", color="green") if is_active else None,
-            on_click=ui.Call("__panel__inbox",
-                             do_switch_account=email,
-                             folder="INBOX",
-                             cursor="", prev_cursor="", page_num=0),
-        ))
+        rows.append(ui.Stack([
+            ui.Avatar(fallback=initial, size="sm"),
+            ui.Stack([
+                ui.Text(email[:32], variant="body"),
+                ui.Text(PROVIDER_LABELS.get(provider, "Unknown"), variant="caption"),
+            ], gap=0),
+            ui.Badge("Active", color="green") if is_active else ui.Stack([]),
+            ui.Button("", icon="Mail", variant="ghost", size="sm",
+                      on_click=ui.Call("__panel__inbox",
+                                       do_switch_account=email,
+                                       folder="INBOX")),
+            ui.Button("", icon="X", variant="ghost", size="sm",
+                      on_click=ui.Call("__panel__accounts", do_remove=email)),
+        ], direction="horizontal", gap=2))
 
     return ui.Stack([
         ui.Header(text="Accounts", level=3),
-        ui.List(items=items),
+        ui.Stack(rows, gap=2),
         ui.Divider(),
         ui.Button("Add Account", icon="Plus", variant="outline",
                   on_click=ui.Call("__panel__add_account")),
-        # After switching in accounts panel, user taps the active account
-        # to open its inbox. Or inbox auto-refreshes on its next event.
     ], gap=2, className="pb-4")
