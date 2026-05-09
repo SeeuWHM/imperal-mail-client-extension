@@ -254,11 +254,19 @@ def _imap_hint(email_addr: str) -> str:
 
 # ── Cursor helpers ────────────────────────────────────────────────────────
 
-def encode_cursor(provider: str, data: dict | None) -> str | None:
+def encode_cursor(provider: str, data: dict | None, account: str = "") -> str | None:
+    """Encode pagination cursor. `account` binds cursor to a specific mailbox —
+    prevents a stale cursor from a switched-away account from being replayed
+    against the new active account (duplicate-emails bug)."""
     if not data:
         return None
-    payload = json.dumps({"p": provider, **data}, separators=(",", ":"))
-    return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    payload = {"p": provider}
+    if account:
+        payload["_a"] = account
+    payload.update(data)
+    return base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
 
 
 def decode_cursor(cursor: str | None) -> dict | None:

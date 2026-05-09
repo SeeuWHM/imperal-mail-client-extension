@@ -40,10 +40,11 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
 
     if folder.upper() == "INBOX":
         try:
-            stats            = await provider.get_folder_stats(ctx, acc, folder)
+            stats = await asyncio.wait_for(
+                provider.get_folder_stats(ctx, acc, folder), timeout=5.0)
             total_in_folder  = stats.get("total", 0)
             unread_in_folder = stats.get("unread", 0)
-        except Exception:
+        except (asyncio.TimeoutError, Exception):
             total_in_folder = unread_in_folder = 0
     else:
         total_in_folder = unread_in_folder = 0
@@ -59,7 +60,11 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
             for m in msgs
         ]
         if has_more and next_cursor_data:
-            next_cursor_encoded = encode_cursor(acc.get("provider", "oauth"), next_cursor_data) or ""
+            # Bind cursor to this account so stale cursors from switched-away
+            # accounts are rejected in the load_more guard (duplicate-emails fix).
+            next_cursor_encoded = encode_cursor(
+                acc.get("provider", "oauth"), next_cursor_data,
+                account=email) or ""
     except asyncio.TimeoutError:
         log.warning("fetch_page timeout folder=%s account=%s", folder, email)
     except Exception as e:
@@ -115,13 +120,20 @@ async def inbox_panel(
     # silently ignored instead of loading wrong data.
     if load_more_cursor:
         try:
-            existing = await ctx.cache.get(msgs_key, InboxMessages)
-            if (existing
+            existing    = await ctx.cache.get(msgs_key, InboxMessages)
+            cursor_data = decode_cursor(load_more_cursor)
+            # Reject cursor if it was issued for a different account (_a field).
+            # Old cursors without _a are also rejected to be safe.
+            cursor_owner = cursor_data.get("_a") if cursor_data else None
+            stale = not cursor_owner or cursor_owner != active_email
+            if (not stale
+                    and existing
                     and existing.folder == folder
                     and existing.account_id == active_email):
-                cursor_data = decode_cursor(load_more_cursor)
+                # Strip _a before passing to provider (unknown field)
+                clean_cursor = {k: v for k, v in cursor_data.items() if k != "_a"}
                 more, next_data, has_more = await asyncio.wait_for(
-                    provider.fetch_page(ctx, acc, folder, 25, cursor_data),
+                    provider.fetch_page(ctx, acc, folder, 25, clean_cursor),
                     timeout=10.0,
                 )
                 more = [
@@ -129,7 +141,9 @@ async def inbox_panel(
                     for m in more
                 ]
                 new_cursor = (
-                    encode_cursor(acc.get("provider", "oauth"), next_data) or ""
+                    encode_cursor(
+                        acc.get("provider", "oauth"), next_data,
+                        account=active_email) or ""
                     if has_more and next_data else ""
                 )
                 extended = InboxMessages(
