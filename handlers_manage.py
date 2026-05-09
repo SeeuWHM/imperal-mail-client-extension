@@ -141,7 +141,7 @@ async def impl_bulk_mark_unread(ctx, message_ids: str, account: str = "") -> Bul
 
 @chat.function("archive", action_type="write", event="archived",
                effects=["update:email"],
-               description="Archive an email — moves it out of inbox without deleting.")
+               description="Archive a single email — removes it from INBOX into the archive folder. Remains searchable and recoverable. Not the same as delete().")
 async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_archive(ctx, message_id=params.message_id, account=params.account)
@@ -152,7 +152,7 @@ async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("delete", action_type="write", event="deleted",
                effects=["update:email"],
-               description="Move an email to Trash. Recoverable until trash is purged.")
+               description="Move a single email to Trash — recoverable until trash is emptied. Use purge() for permanent unrecoverable deletion.")
 async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_delete(ctx, message_id=params.message_id, account=params.account)
@@ -163,7 +163,7 @@ async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("mark_read", action_type="write", event="marked_read",
                effects=["update:email"],
-               description="Mark an email as read.")
+               description="Mark a single email as read (clears the unread indicator). For multiple emails use bulk_mark_read().")
 async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_mark_read(ctx, message_id=params.message_id, account=params.account)
@@ -174,7 +174,7 @@ async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("mark_unread", action_type="write", event="marked_unread",
                effects=["update:email"],
-               description="Mark an email as unread.")
+               description="Mark a single email as unread (restores the unread indicator). For multiple emails use bulk_mark_unread().")
 async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_mark_unread(ctx, message_id=params.message_id, account=params.account)
@@ -185,7 +185,7 @@ async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("star", action_type="write", event="starred",
                effects=["update:email"],
-               description="Star or unstar an email — toggles the starred/important flag.")
+               description="Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle.")
 async def fn_star(ctx, params: StarParams) -> ActionResult:
     try:
         r = await impl_star(ctx, message_id=params.message_id,
@@ -198,7 +198,7 @@ async def fn_star(ctx, params: StarParams) -> ActionResult:
 
 @chat.function("move", action_type="write", event="moved",
                effects=["update:email"],
-               description="Move an email between folders.")
+               description="Move an email from one folder to another — e.g. INBOX→spam, Trash→INBOX (untrash). Requires both from_folder and to_folder.")
 async def fn_move(ctx, params: MoveParams) -> ActionResult:
     try:
         r = await impl_move(ctx, message_id=params.message_id, from_folder=params.from_folder,
@@ -211,7 +211,7 @@ async def fn_move(ctx, params: MoveParams) -> ActionResult:
 
 @chat.function("purge", action_type="destructive", event="purged",
                effects=["delete:email"],
-               description="Permanently delete an email — bypasses Trash, cannot be recovered.")
+               description="Permanently delete an email from a folder (default: Trash) — cannot be recovered. Use delete() to move to Trash first if unsure.")
 async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
     try:
         r = await impl_purge(ctx, message_id=params.message_id,
@@ -224,7 +224,7 @@ async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
 
 @chat.function("bulk_archive", action_type="write", event="bulk_archived",
                effects=["update:email"],
-               description="Archive multiple emails at once. Expects comma-separated message IDs.")
+               description="Archive multiple emails in one operation. Pass message_ids as a comma-separated string.")
 async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_archive(ctx, message_ids=params.message_ids, account=params.account)
@@ -236,7 +236,7 @@ async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
 
 @chat.function("bulk_delete", action_type="write", event="bulk_deleted",
                effects=["update:email"],
-               description="Move multiple emails to Trash. Expects comma-separated message IDs.")
+               description="Move multiple emails to Trash in one operation. Pass message_ids as a comma-separated string.")
 async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_delete(ctx, message_ids=params.message_ids, account=params.account)
@@ -248,7 +248,7 @@ async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
 
 @chat.function("bulk_mark_read", action_type="write", event="bulk_marked_read",
                effects=["update:email"],
-               description="Mark multiple emails as read. Expects comma-separated message IDs.")
+               description="Mark multiple emails as read in one operation. Pass message_ids as a comma-separated string.")
 async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_mark_read(ctx, message_ids=params.message_ids, account=params.account)
@@ -260,7 +260,7 @@ async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
 
 @chat.function("bulk_mark_unread", action_type="write", event="bulk_marked_unread",
                effects=["update:email"],
-               description="Mark multiple emails as unread. Expects comma-separated message IDs.")
+               description="Mark multiple emails as unread in one operation. Pass message_ids as a comma-separated string.")
 async def fn_bulk_mark_unread(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_mark_unread(ctx, message_ids=params.message_ids, account=params.account)

@@ -1,5 +1,43 @@
 # Changelog
 
+## [5.2.1] — 2026-05-09
+
+### Fixed
+
+- **Pre-warm `message_id` normalization (skeleton + panels)** — The `for m in more: m = {**m, ...}` loop rebinds the loop variable but does not update the source list. `all_msgs.extend(more)` therefore extended with unnormalized dicts. Emails on pages 2+ of `InboxMessages` had `id` but no `message_id`, causing viewer opens to fail for Gmail. Fixed with a list comprehension that rewrites `more` before extending. Affected paths: `skeleton.py` pre-warm loop and `panels.py _fetch_inbox_messages`. (`panels_schedule.py` already used the correct `norm2.append(m)` pattern.)
+
+- **`fetched_at` required field crash** — `InboxManifest`, `InboxPage`, and `InboxMessages` declared `fetched_at: datetime` without a default. Any call that constructed these models without explicitly passing the field (e.g. from a stored cache hit) raised `ValidationError`. Changed to `Field(default_factory=lambda: datetime.now(timezone.utc))`.
+
+### Refactored
+
+- **`_oauth_state()` DRY** — Was duplicated verbatim in `handlers_connect.py` and `handlers_panel_actions.py`. Extracted to `ctx_helpers.py` with null-safe `ctx.user` access. Both files now import from there.
+
+- **Store access consistency in `impl_connect_imap` / `impl_add_imap`** — Both functions called `_all_accounts()` (returns `list[dict]` with `doc_id` key) but then accessed results as `d.data` / `d.id` (Document API). Changed to `d.get()` / `d["doc_id"]` to match the actual return type.
+
+- **Dedup loop in `impl_sync_contacts`** — Replaced clever one-liner `[c for c in found if not (c["email"] in seen or seen.add(...))]` with explicit loop for readability.
+
+- **`impl_compose_send`** — Removed unused `attachments: list | None = None` parameter (no platform binary upload support).
+
+- **Import ordering in `providers/helpers.py`** — `hashlib` and `re` moved to the top-level import block.
+
+- **Attachment label** — Removed emoji from filename label in `panels_email_viewer.py`.
+
+- **`skeleton.py` pre-warm** — Fixed `get_provider(acc).fetch_page(...)` → `provider.fetch_page(...)` (provider was already resolved above). Corrected comment: `200 initial` → `20 initial` (matches `INBOX_FETCH_SIZE`).
+
+### Improved
+
+- **All 35 `@chat.function` descriptions rewritten** — Every description now unambiguously identifies its function's purpose, distinguishes it from similar functions, and where applicable cross-references the correct alternative (e.g. `delete()` → "use purge() for permanent deletion"). Key corrections:
+  - `send`: removed false "Requires subject" claim — subject is auto-generated from body
+  - `star`: removed "toggles" — it takes an explicit `starred: bool`, not a toggle
+  - `folder` vs `inbox`: clarified that both are equivalent; prefer `inbox()` universally
+  - `mail_action` / `compose_send` / `get_oauth_url` / `add_imap`: marked as panel UI helpers — LLM should use the named chat functions instead
+  - `mark_read` / `mark_unread`: added cross-reference to `bulk_mark_*` variants
+  - `archive` / `delete` / `purge`: explicit three-way distinction
+
+- **`system_prompt.txt` updated** — Added explicit function-selection rules covering folder routing, send vs reply vs forward, connect provider routing, and panel-only function exclusions.
+
+---
+
 ## [5.2.0] — 2026-04-30
 
 ### Fixed

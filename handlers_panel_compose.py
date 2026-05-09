@@ -48,7 +48,7 @@ async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: st
 
 @chat.function("compose_send", action_type="write", event="sent",
                effects=["create:email"],
-               description="Send email from compose panel — supports reply, forward, and new-message modes.")
+               description="Panel compose form submit — sends from the UI compose panel (mode: new/reply/forward). From LLM chat use send(), reply(), or forward() instead.")
 async def fn_compose_send(ctx, params: ComposeSendParams) -> ActionResult:
     try:
         r = await impl_compose_send(ctx, mode=params.mode, message_id=params.message_id,

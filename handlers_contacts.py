@@ -154,7 +154,7 @@ async def impl_delete_contact(ctx, email: str) -> ContactDeleted:
 
 
 @chat.function("contacts", action_type="read",
-               description="Show email contacts — search-filterable, sorted by name.")
+               description="List address book contacts, optionally filtered by name or email fragment. Results sorted by name.")
 async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
     try:
         r = await impl_contacts(ctx, search=params.search, limit=params.limit)
@@ -165,7 +165,7 @@ async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
 
 @chat.function("add_contact", action_type="write", event="contact.added",
                effects=["create:contact"],
-               description="Add a contact manually by email address, optionally with a display name.")
+               description="Save a new contact to the address book manually. Email is required; display name is optional.")
 async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
     try:
         r = await impl_add_contact(ctx, email=params.email, name=params.name)
@@ -176,7 +176,7 @@ async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
 
 @chat.function("sync_contacts", action_type="write", event="contacts.synced",
                effects=["create:contact", "update:contact"],
-               description="Import contacts from a connected email — Google People API, Outlook, or header harvest.")
+               description="Import contacts from the connected email account — Google People API, Microsoft Graph, or sender/CC header harvest from recent messages.")
 async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_sync_contacts(ctx, account=params.account)
@@ -188,7 +188,7 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
 
 @chat.function("delete_contact", action_type="destructive", event="contact.deleted",
                effects=["delete:contact"],
-               description="Remove a contact from the address book by email address.")
+               description="Remove a contact from the address book by their exact email address.")
 async def fn_delete_contact(ctx, params: DeleteContactParams) -> ActionResult:
     try:
         r = await impl_delete_contact(ctx, email=params.email)

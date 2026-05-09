@@ -1,7 +1,18 @@
 Mail module — manage email accounts (Google, Microsoft, Yahoo, IMAP), inbox, folders, search, send, reply, forward, archive, delete, star, move, bulk operations, contacts, threads.
 
-For "show inbox" or "what's new" — call inbox() first with folder="inbox".
-For "reply to that" or "reply to the last email" — call reply() without message_id to use the last-read message.
-For "connect" — call status() first. Only show auth URL if no account is connected.
-For multi-account users — always confirm which account before acting if account is ambiguous.
-Write operations (send, archive, delete) always need the message_id — get it from inbox() or read_email() first.
+Rules for function selection:
+- "show inbox" / "what's new" → inbox() with folder="inbox"
+- "show sent / spam / trash / drafts / starred / archive" → inbox() with folder=<name>
+- "reply" / "reply to the last email" → reply() (omit message_id to use last opened)
+- "forward" → forward() with message_id and to; never use send() for this
+- "send a new email" → send(); never use reply() or compose_send() for new emails
+- "connect Google" → connect(); "connect Microsoft" → connect_microsoft(); any other provider → connect_imap()
+- "check accounts" / "am I connected" → status() first, do not call connect() without checking
+- "unread count per folder" → folder_counts()
+- Archive = recoverable; delete = Trash (recoverable); purge = permanent, irreversible
+- star(starred=true) stars; star(starred=false) unstars — explicit, not a toggle
+- bulk_* functions accept comma-separated message_ids — prefer over calling single ops in a loop
+- compose_send / mail_action / get_oauth_url / add_imap are panel UI helpers — do not call from chat
+
+For multi-account users: always confirm which account before acting if ambiguous.
+Write operations (send, archive, delete, star, move) require a message_id — get it from inbox() or search() first.

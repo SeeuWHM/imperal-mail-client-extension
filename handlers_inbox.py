@@ -184,7 +184,7 @@ async def impl_forward(ctx, message_id: str, to: str,
 
 
 @chat.function("inbox", action_type="read",
-               description="Show inbox messages with cursor-based pagination. Supports folder keys: inbox/sent/spam/trash/drafts/starred.")
+               description="Fetch a page of messages from the mailbox. Use folder= to browse non-INBOX folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, and read state. Prefer this over folder() for any folder.")
 async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
     try:
         r = await impl_inbox(ctx, folder=params.folder, cursor=params.cursor,
@@ -196,7 +196,7 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
 
 
 @chat.function("read_email", action_type="read",
-               description="Read the full content of an email by message ID — subject, sender, body, attachments.")
+               description="Open a specific email by message_id — returns full body (HTML + plain text), sender, all recipients, date, and attachment list. Also marks the message as read.")
 async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_read_email(ctx, message_id=params.message_id, account=params.account)
@@ -207,7 +207,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
 
 
 @chat.function("search", action_type="read",
-               description="Search emails by sender, subject, keywords, or Gmail search syntax.")
+               description="Full-mailbox search across all folders. Accepts free-text or provider syntax (Gmail: from:, subject:, label:; Outlook and IMAP: free-text). Returns matching message previews.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     try:
         r = await impl_search(ctx, query=params.query, max_results=params.max_results,
@@ -219,7 +219,7 @@ async def fn_search(ctx, params: SearchParams) -> ActionResult:
 
 
 @chat.function("folder", action_type="read",
-               description="Browse a mail folder with cursor-based pagination — sent, spam, trash, starred, drafts, archive.")
+               description="Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive). Functionally identical to inbox() with folder= — prefer inbox() unless explicit folder routing is needed.")
 async def fn_folder(ctx, params: InboxParams) -> ActionResult:
     try:
         r = await impl_folder(ctx, folder=params.folder, cursor=params.cursor,
@@ -231,7 +231,7 @@ async def fn_folder(ctx, params: InboxParams) -> ActionResult:
 
 
 @chat.function("get_thread", action_type="read",
-               description="View a full email thread/conversation by thread ID.")
+               description="Load a complete email conversation by thread_id — all messages in chronological order. Works on Google and Microsoft; IMAP returns a single-message fallback.")
 async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
     try:
         r = await impl_get_thread(ctx, thread_id=params.thread_id, account=params.account)
@@ -243,7 +243,7 @@ async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
 
 @chat.function("send", action_type="write", event="sent",
                effects=["create:email"],
-               description="Send a new email. Requires to, subject, and body.")
+               description="Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Use reply() or forward() when responding to an existing message.")
 async def fn_send(ctx, params: SendParams) -> ActionResult:
     try:
         r = await impl_send(ctx, to=params.to, subject=params.subject, body=params.body,
@@ -256,7 +256,7 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
 
 @chat.function("reply", action_type="write", event="sent",
                effects=["create:email"],
-               description="Reply to an email. Uses last-read message if message_id is omitted.")
+               description="Reply to an email — sends to the original sender. Provide message_id to target a specific email; omit it to reply to the last opened message. Use send() for brand-new emails, not this.")
 async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
     try:
         r = await impl_reply(ctx, body=params.body, message_id=params.message_id,
@@ -269,7 +269,7 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
 
 @chat.function("forward", action_type="write", event="sent",
                effects=["create:email"],
-               description="Forward an email to a new recipient with an optional comment.")
+               description="Forward an existing email to a new address. Requires message_id of the email to forward and a to recipient. Optionally prepend a comment above the forwarded body.")
 async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
     try:
         r = await impl_forward(ctx, message_id=params.message_id, to=params.to,

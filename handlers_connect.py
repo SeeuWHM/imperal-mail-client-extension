@@ -167,7 +167,7 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
 
 
 @chat.function("connect", action_type="read",
-               description="Connect a Google/Gmail account via OAuth. Checks if already connected.")
+               description="Start Google/Gmail OAuth — returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.")
 async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect(ctx)
@@ -178,7 +178,7 @@ async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
 
 
 @chat.function("connect_microsoft", action_type="read",
-               description="Connect a Microsoft Outlook/Office 365 account via OAuth.")
+               description="Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.")
 async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect_microsoft(ctx)
@@ -189,7 +189,7 @@ async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
 
 
 @chat.function("connect_yahoo", action_type="read",
-               description="Connect a Yahoo/AOL account via OAuth.")
+               description="Start Yahoo or AOL OAuth — returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.")
 async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect_yahoo(ctx)
@@ -201,7 +201,7 @@ async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("connect_imap", action_type="write", event="account.connected",
                effects=["create:account"],
-               description="Connect any email account via IMAP/SMTP (iCloud, Zoho, custom domains).")
+               description="Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.")
 async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
     try:
         r = await impl_connect_imap(ctx, email_addr=params.email_addr, password=params.password,
@@ -214,7 +214,7 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
 
 
 @chat.function("status", action_type="read",
-               description="Show all connected email accounts with provider, active flag, and unread count.")
+               description="List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and current unread count for each.")
 async def fn_status(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_status(ctx)
@@ -226,7 +226,7 @@ async def fn_status(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("switch_account", action_type="write", event="account.switched",
                effects=["update:account"],
-               description="Switch the active email account.")
+               description="Change the active email account. All subsequent inbox, send, and manage operations will use this account until switched again.")
 async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_switch_account(ctx, account=params.account)
@@ -238,7 +238,7 @@ async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
 
 @chat.function("disconnect", action_type="destructive", event="account.disconnected",
                effects=["delete:account"],
-               description="Remove a connected email account and purge its credentials.")
+               description="Remove a connected email account and permanently delete its stored credentials and access tokens.")
 async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_disconnect(ctx, account=params.account)
