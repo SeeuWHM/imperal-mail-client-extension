@@ -27,7 +27,7 @@ from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
 
-INBOX_INLINE_LIMIT = 300   # 12 pages of 25 from cache before API kicks in
+INBOX_INLINE_LIMIT = 70    # ~3 pages from cache; skeleton pre-warms more in background
 INBOX_CACHE_TTL    = 90
 
 
