@@ -5,9 +5,7 @@ import logging
 
 from imperal_sdk import ui
 
-from providers.helpers import _all_accounts, _invalidate_first_page
-from panels_inbox import FOLDERS, _switch_active_account
-from handlers_connect import impl_disconnect
+from providers.helpers import _all_accounts
 
 log = logging.getLogger(__name__)
 
@@ -19,17 +17,9 @@ PROVIDER_LABELS = {
 
 async def build_accounts_panel(ctx, show_add: bool = False,
                                 do_switch: str = "", do_remove: str = "") -> ui.UINode:
-    if do_remove:
-        try:
-            await impl_disconnect(ctx, account=do_remove)
-        except Exception as e:
-            log.warning("remove account %s: %s", do_remove, e)
-
-    if do_switch:
-        await _switch_active_account(ctx, do_switch)
-        for fkey in [f["key"] for f in FOLDERS]:
-            await _invalidate_first_page(ctx, do_switch, fkey)
-
+    # Legacy params kept for compat — switching and removal now go through
+    # fn_switch_account / fn_disconnect chat functions via ui.Call which
+    # return refresh_panels=["inbox","accounts"] so both panels update instantly.
     accounts = await _all_accounts(ctx)
 
     if not accounts:
@@ -39,27 +29,29 @@ async def build_accounts_panel(ctx, show_add: bool = False,
                       on_click=ui.Call("__panel__add_account")),
         ])
 
-    rows = []
+    items = []
     for acc in accounts:
         email     = acc.get("email", "?")
         provider  = acc.get("provider", "oauth")
         is_active = acc.get("is_active", False)
-        label     = f"{email}  ·  {PROVIDER_LABELS.get(provider, 'Unknown')}"
+        initial   = email[0].upper() if email else "?"
 
-        rows.append(ui.Stack([
-            ui.Button(
-                label,
-                variant="primary" if is_active else "ghost",
-                on_click=ui.Call("__panel__accounts", do_switch=email),
-            ),
-            ui.Badge("Active", color="green") if is_active else ui.Stack([]),
-            ui.Button("", icon="X", variant="ghost", size="sm",
-                      on_click=ui.Call("__panel__accounts", do_remove=email)),
-        ], direction="horizontal", gap=2))
+        items.append(ui.ListItem(
+            id=email,
+            title=email,
+            subtitle=PROVIDER_LABELS.get(provider, "Unknown"),
+            avatar=ui.Avatar(fallback=initial, size="sm"),
+            badge=ui.Badge("Active", color="green") if is_active else None,
+            on_click=ui.Call("switch_account", account=email),
+            actions=[{
+                "icon":     "Trash2",
+                "on_click": ui.Call("disconnect", account=email),
+            }],
+        ))
 
     return ui.Stack([
         ui.Header(text="Accounts", level=3),
-        ui.Stack(rows, gap=2),
+        ui.List(items=items),
         ui.Divider(),
         ui.Button("Add Account", icon="Plus", variant="outline",
                   on_click=ui.Call("__panel__add_account")),

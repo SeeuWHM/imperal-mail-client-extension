@@ -208,7 +208,8 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
                                     imap_host=params.imap_host, smtp_host=params.smtp_host,
                                     imap_port=params.imap_port, smtp_port=params.smtp_port)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Connected {r.email} via IMAP ({r.imap_server}).")
+                                    summary=f"Connected {r.email} via IMAP ({r.imap_server}).",
+                                    refresh_panels=["accounts", "inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)
 
@@ -231,7 +232,8 @@ async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_switch_account(ctx, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Switched to {r.active_account}.")
+                                    summary=f"Switched to {r.active_account}.",
+                                    refresh_panels=["inbox", "accounts"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)
 
@@ -243,6 +245,7 @@ async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_disconnect(ctx, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Disconnected {r.email}. {r.remaining} account(s) remaining.")
+                                    summary=f"Disconnected {r.email}. {r.remaining} account(s) remaining.",
+                                    refresh_panels=["accounts", "inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)

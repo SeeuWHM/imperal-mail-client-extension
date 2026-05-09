@@ -239,7 +239,7 @@ async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
 
 @ext.panel(
     "accounts", slot="right", title="Accounts", icon="Users",
-    refresh="interval:5s",
+    refresh="on_event:account.switched,account.connected,account.disconnected",
 )
 async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_remove: str = ""):
     return await build_accounts_panel(ctx, show_add, do_switch, do_remove)
