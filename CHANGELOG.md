@@ -1,5 +1,76 @@
 # Changelog
 
+## [5.3.1-patch] — 2026-05-10
+
+### Fixed
+- **`refresh_panels=["inbox"]` missing from all chat-path write handlers** — `archive`, `delete`, `mark_read`, `mark_unread`, `star`, `move`, `purge`, `bulk_archive`, `bulk_delete`, `bulk_mark_read`, `bulk_mark_unread` (`handlers_manage.py`) and `send`, `reply`, `forward` (`handlers_inbox.py`) had no `refresh_panels`. Inbox appeared stale after every write action until next skeleton tick (60s TTL). Added `refresh_panels=["inbox"]` to all 13 handlers.
+
+---
+
+## [5.3.1] — 2026-05-09
+
+### Fixed
+- **Duplicate emails on load_more (cross-account cursor replay)** — `encode_cursor()` now accepts optional `account=""` param — cursor payload carries `_a` field binding it to the originating mailbox. `load_more` guard checks `_a == active_email` before appending; cursors from the wrong account or without `_a` are silently skipped. `clean_cursor()` strips `_a` before passing to provider (providers are unaware of this field).
+- **Outlook hang** — Microsoft Graph occasionally returns cursors that loop on the same page; guard added to detect and break the loop.
+
+---
+
+## [5.3.0] — 2026-05-09
+
+### Added
+
+**Compose panel:**
+- `ui.TagInput` for To/CC/BCC — autocomplete from `mail_contacts` store (up to 200 suggestions), email validation, comma/semicolon delimiters; `ComposeSendParams` coerces tag lists to CSV string for the existing `impl_send`/`impl_reply` signature
+- `ui.RichEditor` for body — TipTap WYSIWYG with `toolbar=True`, replaces plain `ui.TextArea`
+
+**Email viewer:**
+- `ui.Tabs` — "Message" + "Headers" tabs; action bar stays sticky above tabs (outside tab container)
+- Headers tab: `ui.KeyValue` with full metadata (from, to, cc, date, folder, message_id)
+- `ui.Error` with retry action on load failure
+
+**Inbox list:**
+- `ui.ListItem(expandable=True)` — click to expand shows snippet + 4 inline action buttons (Reply, Archive, Delete, Mark Read) without opening the viewer; saves a round trip for quick actions
+
+---
+
+## [INBOX_INLINE_LIMIT] — 2026-05-09
+
+### Changed
+- **`INBOX_INLINE_LIMIT` 300 → 70** (`panels.py`) — panel cold-fetch was timing out on large mailboxes. 70 ≈ 3 pages at 25 msg/page; skeleton pre-warms up to 300 in background. Hot-cache path is unaffected.
+
+---
+
+## [5.2.4] — 2026-05-09
+
+### Fixed
+- **`interval:Ns` silently dropped by SDK** — `interval:30s` on `accounts_panel` never worked (SDK discards unrecognised refresh values). Removed. Account switching now driven by `refresh_panels` on ActionResult (works from both LLM `SessionWorkflow` and panel `DirectCallWorkflow`).
+- **Account switch / disconnect / connect not updating panels** — `fn_switch_account`, `fn_disconnect`, `fn_connect_imap` now return `refresh_panels=["inbox","accounts"]` so both panels re-render immediately regardless of call path.
+
+### Changed
+- `accounts_panel` refresh: `interval:30s` removed; panel re-renders only when triggered by `refresh_panels` from a write action
+
+---
+
+## [5.2.3] — 2026-05-09
+
+### Changed
+- **`INBOX_INLINE_LIMIT` 200 → 300** — extend cold-fetch to match skeleton pre-warm depth (subsequently reverted to 70 to avoid timeouts)
+- **`on_end_reached` pagination** — `_build_email_list` passes `total_items` from `InboxManifest` to `ui.List` so the native paginator shows real `< 1/N >` range even before all messages are fetched; `on_end_reached` fires `load_more` when user navigates past last loaded page via native arrows
+- **`load_more` guard** — checks `InboxMessages.folder` and `InboxMessages.account_id` match current context before appending; stale replays after folder/account switch are silently ignored
+
+---
+
+## [5.2.2] — 2026-05-09
+
+### Added
+- **Remove/disconnect button per account** in accounts panel — `ui.Stack` layout replaces `ui.List`; `do_remove` param handles disconnect + cache invalidation inline in the panel
+- **"Load more" button** in inbox list — `load_more_cursor` param on `inbox_panel` fetches next page live from API (no cache), appends to `InboxMessages` cache, re-renders with extended list; `_build_email_list` gains `next_cursor` param to show/hide the button
+
+### Changed
+- Accounts panel badge update: `interval:5s` (was `interval:30s`)
+
+---
+
 ## [5.2.1] — 2026-05-09
 
 ### Fixed
