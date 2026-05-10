@@ -260,7 +260,8 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
         r = await impl_send(ctx, to=params.to, subject=params.subject, body=params.body,
                             cc=params.cc, bcc=params.bcc, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Email sent to {params.to}.")
+                                    summary=f"Email sent to {params.to}.",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)
 
@@ -273,7 +274,8 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
         r = await impl_reply(ctx, body=params.body, message_id=params.message_id,
                              to=params.to, cc=params.cc, bcc=params.bcc, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Reply sent to {r.to}.")
+                                    summary=f"Reply sent to {r.to}.",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)
 
@@ -286,6 +288,7 @@ async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
         r = await impl_forward(ctx, message_id=params.message_id, to=params.to,
                                comment=params.comment, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Forwarded to {params.to}.")
+                                    summary=f"Forwarded to {params.to}.",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)

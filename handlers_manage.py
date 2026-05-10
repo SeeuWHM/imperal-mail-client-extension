@@ -145,7 +145,7 @@ async def impl_bulk_mark_unread(ctx, message_ids: str, account: str = "") -> Bul
 async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_archive(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(data=r.model_dump(), summary=f"Archived {params.message_id}.")
+        return ActionResult.success(data=r.model_dump(), summary=f"Archived {params.message_id}.", refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -156,7 +156,7 @@ async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
 async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_delete(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(data=r.model_dump(), summary=f"Moved {params.message_id} to Trash.")
+        return ActionResult.success(data=r.model_dump(), summary=f"Moved {params.message_id} to Trash.", refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -167,7 +167,7 @@ async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
 async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_mark_read(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(data=r.model_dump(), summary=f"Marked {params.message_id} as read.")
+        return ActionResult.success(data=r.model_dump(), summary=f"Marked {params.message_id} as read.", refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -178,7 +178,7 @@ async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
 async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_mark_unread(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(data=r.model_dump(), summary=f"Marked {params.message_id} as unread.")
+        return ActionResult.success(data=r.model_dump(), summary=f"Marked {params.message_id} as unread.", refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -191,7 +191,7 @@ async def fn_star(ctx, params: StarParams) -> ActionResult:
         r = await impl_star(ctx, message_id=params.message_id,
                             starred=params.starred, account=params.account)
         action = "Starred" if params.starred else "Unstarred"
-        return ActionResult.success(data=r.model_dump(), summary=f"{action} {params.message_id}.")
+        return ActionResult.success(data=r.model_dump(), summary=f"{action} {params.message_id}.", refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -204,7 +204,8 @@ async def fn_move(ctx, params: MoveParams) -> ActionResult:
         r = await impl_move(ctx, message_id=params.message_id, from_folder=params.from_folder,
                             to_folder=params.to_folder, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Moved {params.message_id} to {params.to_folder}.")
+                                    summary=f"Moved {params.message_id} to {params.to_folder}.",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -217,7 +218,8 @@ async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
         r = await impl_purge(ctx, message_id=params.message_id,
                              from_folder=params.from_folder, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Permanently deleted {params.message_id}.")
+                                    summary=f"Permanently deleted {params.message_id}.",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)
 
@@ -229,7 +231,8 @@ async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_archive(ctx, message_ids=params.message_ids, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Archived {r.succeeded} email(s).")
+                                    summary=f"Archived {r.succeeded} email(s).",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -241,7 +244,8 @@ async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_delete(ctx, message_ids=params.message_ids, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Deleted {r.succeeded} email(s).")
+                                    summary=f"Deleted {r.succeeded} email(s).",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -253,7 +257,8 @@ async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_mark_read(ctx, message_ids=params.message_ids, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Marked {r.succeeded} email(s) as read.")
+                                    summary=f"Marked {r.succeeded} email(s) as read.",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
 
@@ -265,6 +270,7 @@ async def fn_bulk_mark_unread(ctx, params: BulkParams) -> ActionResult:
     try:
         r = await impl_bulk_mark_unread(ctx, message_ids=params.message_ids, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Marked {r.succeeded} email(s) as unread.")
+                                    summary=f"Marked {r.succeeded} email(s) as unread.",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=True)
