@@ -2,13 +2,13 @@
 
 Per I-SKELETON-LLM-ONLY: the skeleton carries scalar fields for the classifier
 envelope only — no message lists, no full inbox blobs. Panel rendering reads
-from ``ctx.cache`` via ``inbox_page`` / ``unread_summary`` models.
+from ``ctx.cache`` via ``InboxMessages`` / ``UnreadSummary`` models.
 
 The refresh tool continues to fetch the latest inbox so it can:
 1. Surface ``unread_total`` + per-account ``unread_count`` for the classifier.
 2. Diff against ``last_message_ids`` stored per-account (ctx.store) to fire
    ``ctx.notify(...)`` for genuinely new messages.
-3. Cache page 1 + InboxManifest for true pagination in the inbox panel.
+3. Pre-warm InboxMessages (flat list) so the panel renders instantly.
 
 It does NOT call ``ctx.skeleton.update(...)`` — the kernel persists the
 returned dict via the ``skeleton_save_section`` activity.
@@ -26,9 +26,9 @@ from app import ext
 from providers import get_provider
 from providers.helpers import (
     _all_accounts, _refresh_token_if_needed, COLLECTION, INBOX_FETCH_SIZE,
-    _inbox_page_key, _inbox_manifest_key, _inbox_messages_key, encode_cursor,
+    _inbox_messages_key, encode_cursor,
 )
-from cache_model_defs import InboxManifest, InboxMessages, InboxPage
+from cache_model_defs import InboxMessages
 from schemas import InboxSummary, PerAccountUnread
 
 log = logging.getLogger("mail")
@@ -93,38 +93,6 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                 if "id" in m and "message_id" not in m:
                     m = {**m, "message_id": m["id"]}
                 norm.append(m)
-
-            # Build page 1 cache entry
-            provider_key = acc.get("provider", "oauth")
-            next_cur = encode_cursor(provider_key, next_cursor_data) or ""
-            page1 = InboxPage(
-                account_id=email, folder="INBOX", cursor="",
-                messages=norm, next_cursor=next_cur,
-                has_more=bool(has_more),
-                fetched_at=datetime.now(timezone.utc),
-            )
-            try:
-                await ctx.cache.set(_inbox_page_key(email, "INBOX", ""), page1, ttl_seconds=120)
-            except Exception as e:
-                log.debug("skeleton: cache page1 failed for %s: %s", email, e)
-
-            # Build and cache manifest
-            cursors = [""]  # page 1 always has cursor ""
-            if next_cur and has_more:
-                cursors.append(next_cur)  # cursor for page 2 is known
-            manifest = InboxManifest(
-                account_id=email, folder="INBOX",
-                total=total, unread=unread,
-                page_size=INBOX_FETCH_SIZE,
-                cursors=cursors,
-                preloaded=1,
-                fetched_at=datetime.now(timezone.utc),
-            )
-            try:
-                await ctx.cache.set(
-                    _inbox_manifest_key(email, "INBOX"), manifest, ttl_seconds=120)
-            except Exception as e:
-                log.debug("skeleton: cache manifest failed for %s: %s", email, e)
 
             # Pre-warm InboxMessages (flat list for ui.List native pagination).
             # Fetch up to 150 items (6 pages at 25 each). Page 1 is already in

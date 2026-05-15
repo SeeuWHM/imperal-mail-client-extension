@@ -80,7 +80,7 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
     refresh="on_event:archived,deleted,bulk_archived,bulk_deleted,marked_read,"
-            "marked_unread,mail.action,account.switched,account.connected,account.disconnected",
+            "marked_unread,sent,mail.action,account.switched,account.connected,account.disconnected",
 )
 async def inbox_panel(
     ctx,
@@ -162,7 +162,7 @@ async def inbox_panel(
         ui.Text(active_email[:32], variant="caption"),
         ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
                    on_click=ui.Call("__panel__inbox", folder=folder)),
-    ], direction="horizontal", gap=1)
+    ], direction="h", gap=1)
 
     folder_tabs = _build_folder_tabs(folder, active_email)
 
@@ -226,7 +226,7 @@ async def inbox_panel(
             ui.Text(f"{n} result{'s' if n != 1 else ''}", variant="caption"),
             ui.Button("✕", variant="ghost", size="sm",
                       on_click=ui.Call("__panel__inbox", folder=folder, search_query="")),
-        ], direction="horizontal", gap=1)
+        ], direction="h", gap=1)
 
     email_list = _build_email_list(
         display_messages, active_email, folder,
@@ -242,7 +242,7 @@ async def inbox_panel(
     return ui.Stack(children, gap=1)
 
 
-@ext.panel("email_viewer", slot="center", title="Email", icon="Mail")
+@ext.panel("email_viewer", slot="center", title="Email", icon="Mail", center_overlay=True)
 async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
                               folder: str = "INBOX"):

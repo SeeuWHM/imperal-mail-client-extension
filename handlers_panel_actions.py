@@ -138,7 +138,8 @@ async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
         r = await impl_mail_action(ctx, action=params.action, message_id=params.message_id,
                                    message_ids=params.message_ids, account=params.account)
         return ActionResult.success(data=r.model_dump(),
-                                    summary=f"{params.action}: {r.count} message(s).")
+                                    summary=f"{params.action}: {r.count} message(s).",
+                                    refresh_panels=["inbox"])
     except RuntimeError as e:
         return ActionResult.error(str(e), retryable=False)
 

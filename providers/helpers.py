@@ -85,29 +85,8 @@ def _slug(s: str, max_len: int = 24) -> str:
     return safe or "none"
 
 
-def _inbox_page_key(email: str, folder: str, cursor: str = "") -> str:
-    """Canonical ctx.cache key for an inbox page.
-
-    Shape: ``inbox:<email-slug>:<folder-slug>:<cursor-hash>``. Stays within
-    the 128-char bound and only uses alphanumerics + ``_-:`` per
-    I-CACHE-KEY-SAFETY.
-    """
-    email_slug  = _slug(email)
-    folder_slug = _slug(folder)
-    if cursor:
-        cur = _hashlib.md5(cursor.encode()).hexdigest()[:10]
-    else:
-        cur = "first"
-    return f"inbox:{email_slug}:{folder_slug}:{cur}"
-
-
 def _unread_summary_key(email: str, folder: str = "INBOX") -> str:
     return f"unread:{_slug(email)}:{_slug(folder)}"
-
-
-def _inbox_manifest_key(email: str, folder: str = "INBOX") -> str:
-    """Canonical ctx.cache key for the inbox pagination manifest."""
-    return f"manifest:{_slug(email)}:{_slug(folder)}"
 
 
 def _inbox_messages_key(email: str, folder: str = "INBOX") -> str:
@@ -124,10 +103,8 @@ def _inbox_messages_key(email: str, folder: str = "INBOX") -> str:
 async def _invalidate_first_page(ctx, email: str, folder: str = "INBOX") -> None:
     try:
         if hasattr(ctx, "cache") and ctx.cache is not None:
-            await ctx.cache.delete(_inbox_page_key(email, folder, ""))
             await ctx.cache.delete(_unread_summary_key(email, folder))
             await ctx.cache.delete(_inbox_messages_key(email, folder))
-            await ctx.cache.delete(_inbox_manifest_key(email, folder))
     except Exception as e:
         log.debug("_invalidate_first_page(%s/%s): %s", email, folder, e)
 

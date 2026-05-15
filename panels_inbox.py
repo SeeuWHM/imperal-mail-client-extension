@@ -68,7 +68,7 @@ def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
         )
         for f in FOLDERS
     ]
-    return ui.Stack(buttons, direction="horizontal", wrap=True, gap=1)
+    return ui.Stack(buttons, direction="h", wrap=True, gap=1)
 
 
 def _build_email_list(
@@ -92,23 +92,22 @@ def _build_email_list(
     items = []
     for i, msg in enumerate(messages):
         mid     = msg_ids[i]
-        snippet = (msg.get("snippet") or msg.get("preview") or "")[:120]
         starred = msg.get("starred", False)
 
-        quick_actions = ui.Stack([
-            ui.Button("", icon="Reply", size="sm", variant="ghost",
-                      on_click=ui.Call("__panel__compose", mode="reply",
-                                       message_id=mid, account=active_email)),
-            ui.Button("", icon="Archive", size="sm", variant="ghost",
-                      on_click=ui.Call("__panel__inbox", folder=folder,
-                                       do_action="archive", do_message_id=mid)),
-            ui.Button("", icon="Trash2", size="sm", variant="ghost",
-                      on_click=ui.Call("__panel__inbox", folder=folder,
-                                       do_action="delete", do_message_id=mid)),
-            ui.Button("", icon="MailOpen", size="sm", variant="ghost",
-                      on_click=ui.Call("__panel__inbox", folder=folder,
-                                       do_action="mark_read", do_message_id=mid)),
-        ], direction="horizontal", gap=1)
+        item_actions = [
+            {"label": "Reply",   "icon": "Reply",
+             "on_click": ui.Call("__panel__compose", mode="reply",
+                                 message_id=mid, account=active_email)},
+            {"label": "Archive", "icon": "Archive",
+             "on_click": ui.Call("__panel__inbox", folder=folder,
+                                 do_action="archive", do_message_id=mid)},
+            {"label": "Delete",  "icon": "Trash2",
+             "on_click": ui.Call("__panel__inbox", folder=folder,
+                                 do_action="delete", do_message_id=mid)},
+            {"label": "Read",    "icon": "MailOpen",
+             "on_click": ui.Call("__panel__inbox", folder=folder,
+                                 do_action="mark_read", do_message_id=mid)},
+        ]
 
         items.append(ui.ListItem(
             id=mid,
@@ -125,11 +124,7 @@ def _build_email_list(
                 email_list_ids=full_ids,
                 current_index=i,
             ),
-            expandable=True,
-            expanded_content=ui.Stack([
-                ui.Text(snippet or "(no preview)", variant="caption"),
-                quick_actions,
-            ], gap=1),
+            actions=item_actions,
         ))
 
     bulk = [

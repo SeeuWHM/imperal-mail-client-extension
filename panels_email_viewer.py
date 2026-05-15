@@ -69,7 +69,7 @@ def _action_bar(message_id: str, account_email: str, has_cc: bool,
                    on_click=ui.Call("__panel__inbox", folder=folder, account=account_email,
                                     do_action="delete", do_message_id=message_id)),
     ])
-    return ui.Stack(buttons, direction="horizontal", wrap=True, sticky=True)
+    return ui.Stack(buttons, direction="h", wrap=True, sticky=True)
 
 
 async def build_email_viewer(
@@ -117,7 +117,7 @@ async def build_email_viewer(
         n = len(attachments)
         msg_children.append(ui.Stack([
             ui.Text(f"{n} attachment{'s' if n > 1 else ''}", variant="caption"),
-            ui.Stack(_attachment_items(attachments), direction="vertical", gap=1),
+            ui.Stack(_attachment_items(attachments), direction="v", gap=1),
         ]))
     msg_children.append(ui.Divider())
     if body:

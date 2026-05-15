@@ -60,7 +60,7 @@ async def build_compose_panel(
                                     m = re.match(r".*<([^>]+)>", addr)
                                     parsed = (m.group(1).strip() if m else addr).lower()
                                     if parsed and parsed != account_email.lower():
-                                        recipients.append(addr)
+                                        recipients.append(parsed)
                         cc_tags = recipients
                     subject_value = (
                         f"Re: {orig_subject}"
@@ -98,7 +98,7 @@ async def build_compose_panel(
         ui.Stack([
             ui.Button("Back", icon="ArrowLeft", variant="ghost", size="sm", on_click=back_target),
             ui.Text(title, variant="body"),
-        ], direction="horizontal", sticky=True),
+        ], direction="h", sticky=True),
         ui.Form(
             children=[
                 ui.TagInput(placeholder="To", values=to_tags, param_name="to", **_tag),
