@@ -263,7 +263,7 @@ async def inbox_panel(
     return ui.Stack(children, gap=1)
 
 
-@ext.panel("email_viewer", slot="center", title="Email", icon="Mail", center_overlay=True)
+@ext.panel("email_viewer", slot="overlay", title="Email", icon="Mail", center_overlay=True)
 async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
                               folder: str = "INBOX"):
@@ -280,7 +280,7 @@ async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_re
     return await build_accounts_panel(ctx, show_add, do_switch, do_remove)
 
 
-@ext.panel("compose", slot="center", title="Compose", icon="PenSquare",
+@ext.panel("compose", slot="overlay", title="Compose", icon="PenSquare",
            center_overlay=True, refresh="on_event:account.switched")
 async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                          account: str = "", prefill_to: str = "",
