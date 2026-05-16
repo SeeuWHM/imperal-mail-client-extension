@@ -225,7 +225,8 @@ def _build_email_list(
         item_actions = [
             {"label": "Reply",    "icon": "Reply",
              "on_click": ui.Call("__panel__compose", mode="reply",
-                                 message_id=mid, account=active_email)},
+                                 message_id=mid, account=active_email,
+                                 compose_active=True)},
             {"label": star_label, "icon": star_icon,
              "on_click": ui.Call("__panel__inbox", folder=folder,
                                  do_action=star_act, do_message_id=mid)},

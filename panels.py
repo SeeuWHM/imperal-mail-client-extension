@@ -284,7 +284,10 @@ async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_re
            center_overlay=True, refresh="on_event:account.switched")
 async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                          account: str = "", prefill_to: str = "",
-                         prefill_subject: str = "", reply_all: str = ""):
+                         prefill_subject: str = "", reply_all: str = "",
+                         compose_active: str = ""):
+    if str(compose_active).lower() not in ("true", "1", "yes"):
+        return None
     reply_all_bool = str(reply_all).lower() in ("true", "1", "yes")
     return await build_compose_panel(ctx, mode, message_id, account,
                                       prefill_to, prefill_subject, reply_all_bool)
