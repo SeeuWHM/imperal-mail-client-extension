@@ -9,7 +9,7 @@ from ctx_helpers import _get_acc
 from handlers_ui import _email_ui, _inbox_ui, _search_ui
 
 from providers import get_provider
-from providers.helpers import encode_cursor, decode_cursor
+from providers.helpers import encode_cursor, decode_cursor, _all_accounts
 
 from schemas import (
     EmailBody, InboxPageResult, SearchResult, SendResult, ThreadView,
@@ -67,14 +67,45 @@ async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
 
 
 async def impl_search(ctx, query: str, max_results: int = 10, account: str = "") -> SearchResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
+    if account:
+        # Explicit account requested — single-account path
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        result = await provider.search(ctx, acc, query=query, max_results=max_results)
+        if result.get("RESULT") == "ERROR":
+            raise RuntimeError(result.get("error", "Unknown provider error"))
+        results = result.get("results", []) or []
+        return SearchResult(query=query, results=results,
+                            total=int(result.get("total", len(results)) or 0))
+
+    # No specific account → search ALL connected accounts and merge
+    accounts = await _all_accounts(ctx)
+    if not accounts:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = await provider.search(ctx, acc, query=query, max_results=max_results)
-    if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", "Unknown provider error"))
-    results = result.get("results", []) or []
-    return SearchResult(query=query, results=results, total=int(result.get("total", len(results)) or 0))
+
+    all_results: list[dict] = []
+    seen_ids: set[str] = set()
+    for acc in accounts:
+        try:
+            provider = get_provider(acc)
+            result = await provider.search(ctx, acc, query=query, max_results=max_results)
+            for msg in result.get("results", []) or []:
+                mid = msg.get("message_id") or msg.get("id") or ""
+                key = f"{acc.get('email','')}/{mid}" if mid else ""
+                if key and key in seen_ids:
+                    continue
+                if key:
+                    seen_ids.add(key)
+                if "message_id" not in msg and mid:
+                    msg = {**msg, "message_id": mid}
+                msg["_account"] = acc.get("email", "")
+                all_results.append(msg)
+        except Exception as e:
+            log.warning("search failed for %s: %s", acc.get("email", "?"), e)
+
+    return SearchResult(query=query, results=all_results[:max_results],
+                        total=len(all_results))
 
 
 async def impl_folder(ctx, folder: str, cursor: str = "",
