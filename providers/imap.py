@@ -133,7 +133,7 @@ class ImapMailProvider(BaseMailProvider):
         body = data.get("body", "")
         if len(body) > 4000: data["body"] = body[:4000]; data["truncated"] = True
         await _save_last_read(ctx, message_id, data.get("subject", ""), data.get("from", ""),
-                              data.get("message_id_header", ""), "")
+                              data.get("message_id_header", ""), "", account=email_addr)
         await _update_read_in_cache(ctx, email_addr, message_id, is_read=True)
         return self.ok(**data, message_id=message_id)
 

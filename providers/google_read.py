@@ -122,7 +122,7 @@ class GoogleReadMixin:
             await _update_read_in_cache(ctx, email_addr, message_id, is_read=True)
         except Exception:
             pass
-        await _save_last_read(ctx, message_id, subject, sender, mid_h, msg.get("threadId", ""))
+        await _save_last_read(ctx, message_id, subject, sender, mid_h, msg.get("threadId", ""), account=email_addr)
 
         def _walk_attachments(payload):
             atts = []

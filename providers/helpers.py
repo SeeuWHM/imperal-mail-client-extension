@@ -127,7 +127,8 @@ async def _update_read_in_cache(ctx, email: str, message_id: str, is_read: bool 
 
 
 async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
-                          message_id_header: str = "", thread_id: str = "") -> None:
+                          message_id_header: str = "", thread_id: str = "",
+                          account: str = "") -> None:
     """Persist the last-read watermark per user (upsert by user_id)."""
     try:
         user_id = str(ctx.user.imperal_id) if ctx.user and ctx.user.imperal_id else ""
@@ -138,6 +139,7 @@ async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
             "message_id_header": message_id_header,
             "thread_id":         thread_id,
             "user_id":           user_id,
+            "account":           account,
         }
         page = await ctx.store.query("mail_last_read", where={"user_id": user_id}, limit=1)
         if page.data:

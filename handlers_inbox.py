@@ -56,14 +56,34 @@ async def impl_inbox(ctx, folder: str = "inbox", cursor: str = "",
 
 
 async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        result = await provider.read_email(ctx, acc, message_id)
+        if result.get("RESULT") == "ERROR":
+            raise RuntimeError(result.get("error", "Unknown provider error"))
+        data = {k: v for k, v in result.items() if k != "RESULT"}
+        return EmailBody.model_validate(data)
+
+    # No account specified — try all connected accounts, return first hit.
+    # _save_last_read (with account=) is called inside each provider's read_email.
+    accounts = await _all_accounts(ctx)
+    if not accounts:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = await provider.read_email(ctx, acc, message_id)
-    if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", "Unknown provider error"))
-    data = {k: v for k, v in result.items() if k != "RESULT"}
-    return EmailBody.model_validate(data)
+    last_err = "Email not found in any connected account."
+    for acc in accounts:
+        try:
+            provider = get_provider(acc)
+            result = await provider.read_email(ctx, acc, message_id)
+            if result.get("RESULT") == "ERROR":
+                last_err = result.get("error", last_err)
+                continue
+            data = {k: v for k, v in result.items() if k != "RESULT"}
+            return EmailBody.model_validate(data)
+        except Exception as e:
+            log.warning("read_email failed for %s: %s", acc.get("email", "?"), e)
+    raise RuntimeError(last_err)
 
 
 async def impl_search(ctx, query: str, max_results: int = 10, account: str = "") -> SearchResult:
@@ -188,6 +208,8 @@ async def impl_reply(ctx, body: str, message_id: str = "", to: str = "",
         doc = lr_page.data[0] if lr_page.data else None
         if doc:
             mid = doc.get("message_id", "")
+            if not account and doc.get("account"):
+                account = doc.get("account", "")
     if not mid:
         raise RuntimeError("No message_id and no recently read email.")
     acc, provider = await _get_acc(ctx, account)

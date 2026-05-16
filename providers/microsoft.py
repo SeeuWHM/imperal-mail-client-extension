@@ -127,7 +127,8 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
             pass
 
         await _save_last_read(ctx, message_id, msg.get("subject", ""),
-                              from_data.get("address", ""), "", msg.get("conversationId", ""))
+                              from_data.get("address", ""), "", msg.get("conversationId", ""),
+                              account=email_addr)
 
         result: dict = {
             "message_id": message_id,
