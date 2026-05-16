@@ -224,14 +224,33 @@ async def impl_reply(ctx, body: str, message_id: str = "", to: str = "",
 
 async def impl_forward(ctx, message_id: str, to: str,
                        comment: str = "", account: str = "") -> SendResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        result = await provider.forward(ctx, acc, message_id=message_id, to=to, comment=comment)
+        if result.get("RESULT") == "ERROR":
+            raise RuntimeError(result.get("error", "Forward failed"))
+        return SendResult(sent=True, to=to,
+                          message_id=result.get("message_id") or result.get("id"))
+
+    # No account specified — try all accounts until the message is found
+    accounts = await _all_accounts(ctx)
+    if not accounts:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = await provider.forward(ctx, acc, message_id=message_id, to=to, comment=comment)
-    if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", "Forward failed"))
-    return SendResult(sent=True, to=to,
-                      message_id=result.get("message_id") or result.get("id"))
+    last_err = "Message not found in any connected account."
+    for acc in accounts:
+        try:
+            provider = get_provider(acc)
+            result = await provider.forward(ctx, acc, message_id=message_id, to=to, comment=comment)
+            if result.get("RESULT") == "ERROR":
+                last_err = result.get("error", last_err)
+                continue
+            return SendResult(sent=True, to=to,
+                              message_id=result.get("message_id") or result.get("id"))
+        except Exception as e:
+            log.warning("forward failed for %s: %s", acc.get("email", "?"), e)
+    raise RuntimeError(last_err)
 
 
 # ─── @chat.function wrappers ──────────────────────────────────────────── #

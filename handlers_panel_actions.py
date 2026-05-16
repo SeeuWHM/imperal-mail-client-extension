@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc, _oauth_state
+from providers import get_provider
 from providers.helpers import _invalidate_first_page
 from providers.helpers import (
     _all_accounts, COLLECTION,
@@ -66,18 +67,29 @@ FOLDER_KEYS = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
 
 
 async def impl_folder_counts(ctx, account: str = "") -> FolderCountsResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
+    if account:
+        acc, prov = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("No email account connected.")
+        accs = [(acc, prov)]
+    else:
+        all_accs = await _all_accounts(ctx)
+        if not all_accs:
+            raise RuntimeError("No email account connected.")
+        accs = [(a, get_provider(a)) for a in all_accs]
 
-    async def _get_count(folder: str) -> int:
+    async def _count(acc, prov, folder: str) -> int:
         try:
-            return int(await provider.get_unread_count(ctx, acc, folder))
+            return int(await prov.get_unread_count(ctx, acc, folder))
         except Exception:
             return 0
 
-    results = await asyncio.gather(*[_get_count(f) for f in FOLDER_KEYS])
-    return FolderCountsResult(counts=dict(zip(FOLDER_KEYS, results)))
+    totals = {f: 0 for f in FOLDER_KEYS}
+    for acc, prov in accs:
+        results = await asyncio.gather(*[_count(acc, prov, f) for f in FOLDER_KEYS])
+        for folder, n in zip(FOLDER_KEYS, results):
+            totals[folder] += n
+    return FolderCountsResult(counts=totals)
 
 
 async def impl_get_oauth_url(ctx, provider: str) -> OAuthUrlResult:

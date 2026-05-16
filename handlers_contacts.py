@@ -65,59 +65,76 @@ async def impl_add_contact(ctx, email: str, name: str = "") -> ContactAdded:
 
 
 async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
-    acc, _ = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
-    await ctx.progress(percent=0, message="Preparing to fetch contacts…")
-    acc = await _refresh_token_if_needed(ctx, acc)
-    provider, own = acc.get("provider", "oauth"), acc.get("email", "")
+    if account:
+        acc_single, _ = await _get_acc(ctx, account)
+        if not acc_single:
+            raise RuntimeError("No email account connected. Connect one first.")
+        target_accs = [acc_single]
+    else:
+        from providers.helpers import _all_accounts
+        target_accs = await _all_accounts(ctx)
+        if not target_accs:
+            raise RuntimeError("No email account connected. Connect one first.")
+
+    await ctx.progress(percent=0, message=f"Preparing to sync {len(target_accs)} account(s)…")
+
+    # All own emails — never add self as a contact regardless of which account found them
+    own_emails = {a.get("email", "").lower() for a in target_accs if a.get("email")}
+
     found: list[dict] = []
     notes: list[str] = []
 
-    if provider == "oauth":
+    for acc_raw in target_accs:
         try:
-            resp = await ctx.http.get(
-                f"{PEOPLE_API}/people/me/connections?personFields=names,emailAddresses&pageSize=1000",
-                headers={"Authorization": f"Bearer {acc['access_token']}"},
-            )
-            if resp.status_code == 200:
-                for p in resp.json().get("connections", []):
-                    nm = p.get("names", [])
-                    pname = nm[0].get("displayName", "") if nm else ""
-                    for em in p.get("emailAddresses", []):
-                        val = em.get("value", "").lower()
-                        if val and val != own:
-                            found.append({"email": val, "name": pname, "source": "google"})
-            elif resp.status_code == 403:
-                notes.append("Google Contacts scope not granted — reconnect.")
-        except Exception as e:
-            notes.append(f"People API error: {e}")
-    elif provider == "microsoft":
-        try:
-            resp = await _graph_get(ctx, "/me/contacts?$select=displayName,emailAddresses&$top=500", acc)
-            if resp.status_code == 200:
-                for c in resp.json().get("value", []):
-                    pname = c.get("displayName", "")
-                    for em in c.get("emailAddresses", []):
-                        val = em.get("address", "").lower()
-                        if val and val != own:
-                            found.append({"email": val, "name": pname, "source": "outlook"})
-            elif resp.status_code == 403:
-                notes.append("Outlook Contacts scope not granted — reconnect.")
-        except Exception as e:
-            notes.append(f"Graph contacts error: {e}")
+            acc = await _refresh_token_if_needed(ctx, acc_raw)
+        except Exception:
+            acc = acc_raw
+        prov_type = acc.get("provider", "oauth")
+        own = acc.get("email", "")
 
-    await ctx.progress(percent=40, message=f"Found {len(found)} raw contacts, harvesting headers…")
-    try:
-        inbox = await get_provider(acc).fetch_inbox(ctx, acc, INBOX_FETCH_SIZE)
-        for msg in inbox.get("messages", []) or []:
-            for field in ("from", "to", "cc"):
-                for part in (msg.get(field) or "").split(","):
-                    pname, pemail = _parse_email_addr(part)
-                    if pemail and pemail != own:
-                        found.append({"email": pemail, "name": pname, "source": "extracted"})
-    except Exception as e:
-        notes.append(f"Header harvest skipped: {str(e)[:120]}")
+        if prov_type == "oauth":
+            try:
+                resp = await ctx.http.get(
+                    f"{PEOPLE_API}/people/me/connections?personFields=names,emailAddresses&pageSize=1000",
+                    headers={"Authorization": f"Bearer {acc['access_token']}"},
+                )
+                if resp.status_code == 200:
+                    for p in resp.json().get("connections", []):
+                        nm = p.get("names", [])
+                        pname = nm[0].get("displayName", "") if nm else ""
+                        for em in p.get("emailAddresses", []):
+                            val = em.get("value", "").lower()
+                            if val and val not in own_emails:
+                                found.append({"email": val, "name": pname, "source": "google", "account": own})
+                elif resp.status_code == 403:
+                    notes.append(f"Google Contacts scope not granted for {own} — reconnect.")
+            except Exception as e:
+                notes.append(f"People API error ({own}): {e}")
+        elif prov_type == "microsoft":
+            try:
+                resp = await _graph_get(ctx, "/me/contacts?$select=displayName,emailAddresses&$top=500", acc)
+                if resp.status_code == 200:
+                    for c in resp.json().get("value", []):
+                        pname = c.get("displayName", "")
+                        for em in c.get("emailAddresses", []):
+                            val = em.get("address", "").lower()
+                            if val and val not in own_emails:
+                                found.append({"email": val, "name": pname, "source": "outlook", "account": own})
+                elif resp.status_code == 403:
+                    notes.append(f"Outlook Contacts scope not granted for {own} — reconnect.")
+            except Exception as e:
+                notes.append(f"Graph contacts error ({own}): {e}")
+
+        try:
+            inbox = await get_provider(acc).fetch_inbox(ctx, acc, INBOX_FETCH_SIZE)
+            for msg in inbox.get("messages", []) or []:
+                for field in ("from", "to", "cc"):
+                    for part in (msg.get(field) or "").split(","):
+                        pname, pemail = _parse_email_addr(part)
+                        if pemail and pemail not in own_emails:
+                            found.append({"email": pemail, "name": pname, "source": "extracted", "account": own})
+        except Exception as e:
+            notes.append(f"Header harvest skipped ({own}): {str(e)[:80]}")
 
     await ctx.progress(percent=65, message=f"Deduplicating {len(found)} contacts…")
     seen: set[str] = set()
@@ -140,7 +157,8 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
             await ctx.store.create(CONTACTS_COLLECTION,
                                    {"email": c["email"], "name": c.get("name", ""),
                                     "source": c.get("source", "extracted"),
-                                    "account": own, "added_at": now, "last_seen": now})
+                                    "account": c.get("account", ""),
+                                    "added_at": now, "last_seen": now})
             added += 1
     total = await ctx.store.count(CONTACTS_COLLECTION)
     await ctx.progress(percent=100, message=f"Done — {added} added, {int(total)} total.")
