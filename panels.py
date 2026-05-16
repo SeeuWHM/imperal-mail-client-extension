@@ -268,7 +268,7 @@ async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
                               folder: str = "INBOX"):
     if not message_id:
-        return ui.Empty(message="Select an email to read", icon="Mail")
+        return None
     return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index, folder)
 
 
