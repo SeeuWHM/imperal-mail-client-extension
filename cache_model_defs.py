@@ -8,26 +8,11 @@ is constructed.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-
-class InboxPage(BaseModel):
-    """A single page of inbox messages returned by provider.fetch_page.
-
-    ``messages`` is kept as ``list[dict]`` — MessagePreview shape is provider-
-    specific (Gmail/Graph/IMAP normalised), migration to a typed shape can
-    happen in a later SDK bump.
-    """
-    account_id: str
-    folder: str
-    cursor: str = ""
-    messages: list[dict[str, Any]] = Field(default_factory=list)
-    next_cursor: str = ""
-    has_more: bool = False
-    fetched_at: datetime
 
 
 class UnreadSummary(BaseModel):
@@ -35,6 +20,17 @@ class UnreadSummary(BaseModel):
     account_id: str
     folder: str = "INBOX"
     unread_count: int = 0
+
+
+class InboxMessages(BaseModel):
+    """Flat list of messages for a folder — powers native ui.List pagination."""
+    account_id: str
+    folder: str
+    messages: list[dict[str, Any]] = Field(default_factory=list)
+    total_in_folder: int = 0    # from get_folder_stats
+    unread_in_folder: int = 0   # total unread in folder (not per-page)
+    next_cursor: str = ""       # encoded cursor for fetching the next batch
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AccountList(BaseModel):

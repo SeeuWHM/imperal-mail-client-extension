@@ -1,17 +1,4 @@
-"""Pydantic output schemas for mail extension tools (SDK v2.0.0).
-
-Every ``@ext.tool`` must bind to one of these models via ``output_schema``.
-Webbee Narrator grounds its prose against the schema, so fields here are
-literally what the Routing LLM + user-facing narration can reference.
-
-Fields are derived from the actual runtime dicts returned by the legacy
-``ActionResult.success(data=...)`` calls in handlers_*.py (pre-v2). All
-fields are permissive (``Optional`` / default) because provider payloads
-vary across Gmail / Microsoft Graph / IMAP, and Narrator still renders
-gracefully when a field is absent.
-
-Per CLAUDE.md rule 6 (<300 lines), schemas are grouped tightly.
-"""
+"""Pydantic schemas for mail extension — response models."""
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -133,8 +120,8 @@ class EmailBody(BaseModel):
     to: Optional[str] = None
     cc: Optional[str] = None
     date: Optional[str] = None
-    body_text: Optional[str] = None
-    body_html: Optional[str] = None
+    body: Optional[str] = None
+    body_type: Optional[str] = None
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     unread: Optional[bool] = None
     starred: Optional[bool] = None
@@ -294,3 +281,7 @@ class SkeletonAlertMessage(BaseModel):
     """skeleton_alert_mail_inbox_summary — proactive new-mail narration."""
 
     message: str = ""
+
+
+# Re-export param models so handler imports (from schemas import FooParams) keep working.
+from schemas_params import *  # noqa: F401, F403

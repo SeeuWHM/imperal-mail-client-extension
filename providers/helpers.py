@@ -8,9 +8,11 @@ effort inbox page invalidation.
 from __future__ import annotations
 
 import base64
+import hashlib as _hashlib
 import json
 import logging
 import os
+import re as _re
 from typing import Optional
 
 from imperal_sdk import Context
@@ -74,12 +76,6 @@ from .text_utils import (  # noqa: E402, F401
 
 # ── ctx.cache inbox-page key helpers (SDK v1.6.0) ─────────────────────────
 # Keys must satisfy ``[A-Za-z0-9_\-:]+`` length <= 128 (I-CACHE-KEY-SAFETY).
-# We derive a stable short token per (email, folder, cursor) and hash the
-# cursor so arbitrary cursor payloads (base64/URL-safe) stay within the
-# key grammar.
-import hashlib as _hashlib
-import re as _re
-
 _KEY_SAFE = _re.compile(r"[^A-Za-z0-9_\-]")
 
 
@@ -89,24 +85,13 @@ def _slug(s: str, max_len: int = 24) -> str:
     return safe or "none"
 
 
-def _inbox_page_key(email: str, folder: str, cursor: str = "") -> str:
-    """Canonical ctx.cache key for an inbox page.
-
-    Shape: ``inbox:<email-slug>:<folder-slug>:<cursor-hash>``. Stays within
-    the 128-char bound and only uses alphanumerics + ``_-:`` per
-    I-CACHE-KEY-SAFETY.
-    """
-    email_slug  = _slug(email)
-    folder_slug = _slug(folder)
-    if cursor:
-        cur = _hashlib.md5(cursor.encode()).hexdigest()[:10]
-    else:
-        cur = "first"
-    return f"inbox:{email_slug}:{folder_slug}:{cur}"
-
-
 def _unread_summary_key(email: str, folder: str = "INBOX") -> str:
     return f"unread:{_slug(email)}:{_slug(folder)}"
+
+
+def _inbox_messages_key(email: str, folder: str = "INBOX") -> str:
+    """Canonical ctx.cache key for the flat InboxMessages list (ui.List pagination)."""
+    return f"msgs:{_slug(email)}:{_slug(folder)}"
 
 
 # ── Best-effort cache-bust helpers (thin wrappers over ctx.cache.delete) ─
@@ -118,8 +103,8 @@ def _unread_summary_key(email: str, folder: str = "INBOX") -> str:
 async def _invalidate_first_page(ctx, email: str, folder: str = "INBOX") -> None:
     try:
         if hasattr(ctx, "cache") and ctx.cache is not None:
-            await ctx.cache.delete(_inbox_page_key(email, folder, ""))
             await ctx.cache.delete(_unread_summary_key(email, folder))
+            await ctx.cache.delete(_inbox_messages_key(email, folder))
     except Exception as e:
         log.debug("_invalidate_first_page(%s/%s): %s", email, folder, e)
 
@@ -142,20 +127,25 @@ async def _update_read_in_cache(ctx, email: str, message_id: str, is_read: bool 
 
 
 async def _save_last_read(ctx, message_id: str, subject: str, sender: str,
-                          message_id_header: str = "", thread_id: str = "") -> None:
-    """Persist the last-read watermark, stamped with user_id for defence-in-depth."""
+                          message_id_header: str = "", thread_id: str = "",
+                          account: str = "") -> None:
+    """Persist the last-read watermark per user (upsert by user_id)."""
     try:
-        user_id = ""
-        if ctx and hasattr(ctx, "user") and ctx.user and hasattr(ctx.user, "id"):
-            user_id = str(ctx.user.id or "")
-        await ctx.store.set("mail_last_read", "latest", {
+        user_id = str(ctx.user.imperal_id) if ctx.user and ctx.user.imperal_id else ""
+        data = {
             "message_id":        message_id,
             "subject":           subject,
             "sender":            sender,
             "message_id_header": message_id_header,
             "thread_id":         thread_id,
             "user_id":           user_id,
-        })
+            "account":           account,
+        }
+        page = await ctx.store.query("mail_last_read", where={"user_id": user_id}, limit=1)
+        if page.data:
+            await ctx.store.update("mail_last_read", page.data[0].id, data)
+        else:
+            await ctx.store.create("mail_last_read", data)
     except Exception as e:
         log.debug("_save_last_read failed: %s", e)
 
@@ -169,15 +159,15 @@ async def _all_accounts(ctx: Context) -> list[dict]:
 
 async def _active_account(ctx: Context, account_id: str = "") -> Optional[dict]:
     docs = await ctx.store.query(COLLECTION)
-    if not docs: return None
+    if not docs.data: return None
     if account_id:
-        for d in docs:
-            if d.id == account_id or d.get("email") == account_id:
+        for d in docs.data:
+            if d.id == account_id or d.data.get("email") == account_id:
                 return {"doc_id": d.id, **d.data}
         return None
-    for d in docs:
-        if d.get("is_active"): return {"doc_id": d.id, **d.data}
-    return {"doc_id": docs[0].id, **docs[0].data}
+    for d in docs.data:
+        if d.data.get("is_active"): return {"doc_id": d.id, **d.data}
+    return {"doc_id": docs.data[0].id, **docs.data[0].data}
 
 
 # ── IMAP provider detection ───────────────────────────────────────────────
@@ -243,11 +233,19 @@ def _imap_hint(email_addr: str) -> str:
 
 # ── Cursor helpers ────────────────────────────────────────────────────────
 
-def encode_cursor(provider: str, data: dict | None) -> str | None:
+def encode_cursor(provider: str, data: dict | None, account: str = "") -> str | None:
+    """Encode pagination cursor. `account` binds cursor to a specific mailbox —
+    prevents a stale cursor from a switched-away account from being replayed
+    against the new active account (duplicate-emails bug)."""
     if not data:
         return None
-    payload = json.dumps({"p": provider, **data}, separators=(",", ":"))
-    return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    payload = {"p": provider}
+    if account:
+        payload["_a"] = account
+    payload.update(data)
+    return base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
 
 
 def decode_cursor(cursor: str | None) -> dict | None:

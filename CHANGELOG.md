@@ -1,5 +1,178 @@
 # Changelog
 
+## [5.3.1-patch] — 2026-05-10
+
+### Fixed
+- **`refresh_panels=["inbox"]` missing from all chat-path write handlers** — `archive`, `delete`, `mark_read`, `mark_unread`, `star`, `move`, `purge`, `bulk_archive`, `bulk_delete`, `bulk_mark_read`, `bulk_mark_unread` (`handlers_manage.py`) and `send`, `reply`, `forward` (`handlers_inbox.py`) had no `refresh_panels`. Inbox appeared stale after every write action until next skeleton tick (60s TTL). Added `refresh_panels=["inbox"]` to all 13 handlers.
+
+---
+
+## [5.3.1] — 2026-05-09
+
+### Fixed
+- **Duplicate emails on load_more (cross-account cursor replay)** — `encode_cursor()` now accepts optional `account=""` param — cursor payload carries `_a` field binding it to the originating mailbox. `load_more` guard checks `_a == active_email` before appending; cursors from the wrong account or without `_a` are silently skipped. `clean_cursor()` strips `_a` before passing to provider (providers are unaware of this field).
+- **Outlook hang** — Microsoft Graph occasionally returns cursors that loop on the same page; guard added to detect and break the loop.
+
+---
+
+## [5.3.0] — 2026-05-09
+
+### Added
+
+**Compose panel:**
+- `ui.TagInput` for To/CC/BCC — autocomplete from `mail_contacts` store (up to 200 suggestions), email validation, comma/semicolon delimiters; `ComposeSendParams` coerces tag lists to CSV string for the existing `impl_send`/`impl_reply` signature
+- `ui.RichEditor` for body — TipTap WYSIWYG with `toolbar=True`, replaces plain `ui.TextArea`
+
+**Email viewer:**
+- `ui.Tabs` — "Message" + "Headers" tabs; action bar stays sticky above tabs (outside tab container)
+- Headers tab: `ui.KeyValue` with full metadata (from, to, cc, date, folder, message_id)
+- `ui.Error` with retry action on load failure
+
+**Inbox list:**
+- `ui.ListItem(expandable=True)` — click to expand shows snippet + 4 inline action buttons (Reply, Archive, Delete, Mark Read) without opening the viewer; saves a round trip for quick actions
+
+---
+
+## [INBOX_INLINE_LIMIT] — 2026-05-09
+
+### Changed
+- **`INBOX_INLINE_LIMIT` 300 → 70** (`panels.py`) — panel cold-fetch was timing out on large mailboxes. 70 ≈ 3 pages at 25 msg/page; skeleton pre-warms up to 300 in background. Hot-cache path is unaffected.
+
+---
+
+## [5.2.4] — 2026-05-09
+
+### Fixed
+- **`interval:Ns` silently dropped by SDK** — `interval:30s` on `accounts_panel` never worked (SDK discards unrecognised refresh values). Removed. Account switching now driven by `refresh_panels` on ActionResult (works from both LLM `SessionWorkflow` and panel `DirectCallWorkflow`).
+- **Account switch / disconnect / connect not updating panels** — `fn_switch_account`, `fn_disconnect`, `fn_connect_imap` now return `refresh_panels=["inbox","accounts"]` so both panels re-render immediately regardless of call path.
+
+### Changed
+- `accounts_panel` refresh: `interval:30s` removed; panel re-renders only when triggered by `refresh_panels` from a write action
+
+---
+
+## [5.2.3] — 2026-05-09
+
+### Changed
+- **`INBOX_INLINE_LIMIT` 200 → 300** — extend cold-fetch to match skeleton pre-warm depth (subsequently reverted to 70 to avoid timeouts)
+- **`on_end_reached` pagination** — `_build_email_list` passes `total_items` from `InboxManifest` to `ui.List` so the native paginator shows real `< 1/N >` range even before all messages are fetched; `on_end_reached` fires `load_more` when user navigates past last loaded page via native arrows
+- **`load_more` guard** — checks `InboxMessages.folder` and `InboxMessages.account_id` match current context before appending; stale replays after folder/account switch are silently ignored
+
+---
+
+## [5.2.2] — 2026-05-09
+
+### Added
+- **Remove/disconnect button per account** in accounts panel — `ui.Stack` layout replaces `ui.List`; `do_remove` param handles disconnect + cache invalidation inline in the panel
+- **"Load more" button** in inbox list — `load_more_cursor` param on `inbox_panel` fetches next page live from API (no cache), appends to `InboxMessages` cache, re-renders with extended list; `_build_email_list` gains `next_cursor` param to show/hide the button
+
+### Changed
+- Accounts panel badge update: `interval:5s` (was `interval:30s`)
+
+---
+
+## [5.2.1] — 2026-05-09
+
+### Fixed
+
+- **Pre-warm `message_id` normalization (skeleton + panels)** — The `for m in more: m = {**m, ...}` loop rebinds the loop variable but does not update the source list. `all_msgs.extend(more)` therefore extended with unnormalized dicts. Emails on pages 2+ of `InboxMessages` had `id` but no `message_id`, causing viewer opens to fail for Gmail. Fixed with a list comprehension that rewrites `more` before extending. Affected paths: `skeleton.py` pre-warm loop and `panels.py _fetch_inbox_messages`. (`panels_schedule.py` already used the correct `norm2.append(m)` pattern.)
+
+- **`fetched_at` required field crash** — `InboxManifest`, `InboxPage`, and `InboxMessages` declared `fetched_at: datetime` without a default. Any call that constructed these models without explicitly passing the field (e.g. from a stored cache hit) raised `ValidationError`. Changed to `Field(default_factory=lambda: datetime.now(timezone.utc))`.
+
+### Refactored
+
+- **`_oauth_state()` DRY** — Was duplicated verbatim in `handlers_connect.py` and `handlers_panel_actions.py`. Extracted to `ctx_helpers.py` with null-safe `ctx.user` access. Both files now import from there.
+
+- **Store access consistency in `impl_connect_imap` / `impl_add_imap`** — Both functions called `_all_accounts()` (returns `list[dict]` with `doc_id` key) but then accessed results as `d.data` / `d.id` (Document API). Changed to `d.get()` / `d["doc_id"]` to match the actual return type.
+
+- **Dedup loop in `impl_sync_contacts`** — Replaced clever one-liner `[c for c in found if not (c["email"] in seen or seen.add(...))]` with explicit loop for readability.
+
+- **`impl_compose_send`** — Removed unused `attachments: list | None = None` parameter (no platform binary upload support).
+
+- **Import ordering in `providers/helpers.py`** — `hashlib` and `re` moved to the top-level import block.
+
+- **Attachment label** — Removed emoji from filename label in `panels_email_viewer.py`.
+
+- **`skeleton.py` pre-warm** — Fixed `get_provider(acc).fetch_page(...)` → `provider.fetch_page(...)` (provider was already resolved above). Corrected comment: `200 initial` → `20 initial` (matches `INBOX_FETCH_SIZE`).
+
+### Improved
+
+- **All 35 `@chat.function` descriptions rewritten** — Every description now unambiguously identifies its function's purpose, distinguishes it from similar functions, and where applicable cross-references the correct alternative (e.g. `delete()` → "use purge() for permanent deletion"). Key corrections:
+  - `send`: removed false "Requires subject" claim — subject is auto-generated from body
+  - `star`: removed "toggles" — it takes an explicit `starred: bool`, not a toggle
+  - `folder` vs `inbox`: clarified that both are equivalent; prefer `inbox()` universally
+  - `mail_action` / `compose_send` / `get_oauth_url` / `add_imap`: marked as panel UI helpers — LLM should use the named chat functions instead
+  - `mark_read` / `mark_unread`: added cross-reference to `bulk_mark_*` variants
+  - `archive` / `delete` / `purge`: explicit three-way distinction
+
+- **`system_prompt.txt` updated** — Added explicit function-selection rules covering folder routing, send vs reply vs forward, connect provider routing, and panel-only function exclusions.
+
+---
+
+## [5.2.0] — 2026-04-30
+
+### Fixed
+
+- **inbox_panel stale account after pagination** — Root cause: platform injected `account=old@email` from previous paginated render into every panel call, including account switches. The longer the user paged, the deeper the stale value embedded in platform's param state. Fix: `account` parameter removed from `inbox_panel` signature entirely — absorbed into `**_unused_kwargs`. Active account always resolved from `ctx.store` via `_active_account(ctx, "")` which uses `is_active` flag. Platform cannot inject a stale account through store.
+
+- **Cache race on account switch** — `get_or_fetch` could return stale entry in the brief window between `cache.delete` and the new write. Fix: when `do_switch_account` is set, cache bypassed entirely — `_fetch_page()` called directly.
+
+- **VALIDATION_MISSING_FIELD for `body`** — LLM sends `content` instead of `body` per training. `SendParams.body` and `ReplyParams.body` now use `AliasChoices("body", "content", "message", "text")`. Schema-level fix — no workaround.
+
+- **VALIDATION_MISSING_FIELD for `subject`** — `SendParams.subject` now optional (`default=""`). `impl_send` auto-generates subject from first line of body (up to 60 chars) when omitted.
+
+- **doc_id pollution in store documents** — `_all_accounts()` returns `{"doc_id": d.id, **d.data}` dicts. On subsequent `ctx.store.update`, spreading `{**acc}` included `doc_id` as a document field. Fixed in `handlers_connect.py` and `handlers_panel_actions.py`: strip `doc_id` before update payload.
+
+### Changed
+
+- `inbox_panel` drops `account` parameter — store-based resolution only
+- `folder_counts` uses `asyncio.gather` for all 7 folders in parallel (was sequential)
+- Pagination: `Previous / Page N / Next` UI (developer/transactions pattern) with `page_num` + `prev_cursor` chain
+- Folder tabs + RefreshCw button no longer pass `account=` to `__panel__inbox`
+- `imperal.json` rewritten to SDK v3.x format: single `tool_mail_client_chat` entry point (was 35 manual tool entries); `sdk_version` field removed; `capabilities` corrected to match `app.py`
+
+### Added
+
+- `schemas_params.py` — 20 `@chat.function` Pydantic param models extracted from `schemas.py` (300L rule)
+- `panels_inbox.py` — inbox UI helpers extracted from `panels.py` (300L rule)
+- `imap_read_message.py` — `_sync_imap_read`, `_sync_imap_search`, `_sync_imap_folder`, `_parse_imap_body` extracted from `imap_read.py` (300L rule)
+- `system_prompt.txt` recreated — was deleted in v5.0.0 migration; restored for ChatExtension
+
+---
+
+## [5.1.0] — 2026-04-30
+
+### Fixed
+
+- **Microsoft Starred = Inbox** — `_MS_PAGE_FOLDERS` had no `"starred"` mapping → defaulted to `"inbox"`. And `$orderby` combined with `$filter` on `/me/messages` returns Graph API 400 "InefficientFilter". Fix: `params.pop("$orderby", None)` + `$filter=flag/flagStatus eq 'flagged'` on `/me/messages` endpoint.
+
+- **IMAP starred empty** — IMAP has no "starred" folder; flagged messages live in INBOX with `\Flagged` flag. `_sync_imap_fetch_page` for `"starred"`: selects INBOX, `SEARCH FLAGGED`. `_sync_imap_unread_count`: `SEARCH FLAGGED UNSEEN`.
+
+- **prev/next email arrows did nothing** — `email_list_ids` was built incrementally: first email got `"id1"`, second got `"id1,id2"` — most emails had incomplete lists. Fix: build full `msg_ids` list before the loop, assign `full_ids` to all items with `current_index=i`.
+
+- **Active badge never updated** — `accounts_panel` had `on_event:` refresh that required events from DirectCallWorkflow (which don't publish). Changed to `refresh="interval:30s"` — re-reads `is_active` from store every 30s.
+
+- **`on_end_reached` cursor leaked across accounts** — Platform stored cursor in panel state. On any re-render (folder switch, account switch), platform re-sent `cursor=page2_cursor + account=old`. Fixed by removing `on_end_reached` entirely; replaced with explicit Prev/Next buttons.
+
+- **Google/Microsoft: only one account per provider** — `impl_connect` and `impl_connect_microsoft` returned "already_connected" if any account of that type existed. Removed early return — always generates OAuth URL; supports multiple accounts per provider.
+
+- **`star` action in `impl_mail_action`** — Missing `starred=True` kwarg in action_map. Also added `"unstar"` entry with `starred=False`.
+
+- **`compose_send` Re:/Fwd: double prefix** — Subject prefix check was case-sensitive (`startswith("Re:")` missed `re:`, `RE:`). Changed to `.lower().startswith(...)`.
+
+- **reply-all email exclusion** — Used substring match (`account_email not in addr`) — prone to false positives. Changed to regex-parse `<email>` and exact lowercase comparison.
+
+- **`folder_counts` 6 sequential requests** — Replaced with `asyncio.gather` for parallel execution.
+
+- **`ui.List total_items=0`** — Caused platform to render built-in pagination arrows `← 1/10 →` conflicting with manual Prev/Next buttons. Removed `total_items` parameter.
+
+### Added
+
+- Archive folder added to `FOLDERS` list in `panels_inbox.py` and `FOLDER_KEYS` in `handlers_panel_actions.py`
+- Prev/Next navigation in email viewer (`_action_bar` receives `email_list_ids` + `current_index`)
+
+---
+
 ## [5.0.0] — 2026-04-25
 
 ### Breaking — SDK v2.0.0 (Webbee Single Voice)

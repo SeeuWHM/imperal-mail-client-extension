@@ -1,380 +1,22 @@
 {
+  "manifest_schema_version": 3,
+  "sdk_version": "5.0.0",
   "app_id": "mail",
-  "version": "5.0.0",
-  "sdk_version": "2.0.0",
-  "capabilities": [],
+  "version": "5.3.3",
+  "name": "Mail Client",
+  "description": "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. Inbox, send, reply, forward, search, archive, manage emails, contacts.",
+  "icon": "mail.svg",
+  "actions_explicit": true,
+  "system": false,
+  "capabilities": [
+    "store:read",
+    "store:write",
+    "notify:push"
+  ],
   "tools": [
     {
-      "name": "connect",
-      "description": "Connect a Google / Gmail account via OAuth. Returns the authorisation URL or confirms an existing connection.",
-      "scopes": [],
-      "output_schema_ref": "mail.ConnectOAuthResult",
-      "parameters": {}
-    },
-    {
-      "name": "connect_microsoft",
-      "description": "Connect a Microsoft Outlook / Office 365 account via OAuth. Returns the authorisation URL or confirms an existing connection.",
-      "scopes": [],
-      "output_schema_ref": "mail.ConnectOAuthResult",
-      "parameters": {}
-    },
-    {
-      "name": "connect_yahoo",
-      "description": "Connect a Yahoo / AOL account via OAuth. Returns the authorisation URL or confirms an existing connection.",
-      "scopes": [],
-      "output_schema_ref": "mail.ConnectOAuthResult",
-      "parameters": {}
-    },
-    {
-      "name": "connect_imap",
-      "description": "Connect any email account via IMAP/SMTP — iCloud, Zoho, custom domains. Auto-detects server settings when possible.",
-      "scopes": [],
-      "output_schema_ref": "mail.ConnectImapResult",
-      "parameters": {
-        "email_addr": { "type": "string", "required": true },
-        "password":   { "type": "string", "required": true },
-        "imap_host":  { "type": "string", "required": false },
-        "smtp_host":  { "type": "string", "required": false },
-        "imap_port":  { "type": "integer", "required": false },
-        "smtp_port":  { "type": "integer", "required": false }
-      }
-    },
-    {
-      "name": "status",
-      "description": "Show all connected email accounts with provider type, active flag, and unread count for each.",
-      "scopes": [],
-      "output_schema_ref": "mail.AccountsStatus",
-      "parameters": {}
-    },
-    {
-      "name": "switch_account",
-      "description": "Switch the active email account used by subsequent inbox / read / send operations.",
-      "scopes": [],
-      "output_schema_ref": "mail.AccountSwitched",
-      "parameters": {
-        "account": { "type": "string", "required": true }
-      }
-    },
-    {
-      "name": "disconnect",
-      "description": "Remove a connected email account. Purges stored credentials and cached inbox pages.",
-      "scopes": [],
-      "output_schema_ref": "mail.AccountDisconnected",
-      "parameters": {
-        "account": { "type": "string", "required": true }
-      }
-    },
-    {
-      "name": "inbox",
-      "description": "Show inbox messages with cursor-based pagination. Supports folder keys inbox / sent / spam / trash / drafts / starred.",
-      "scopes": [],
-      "output_schema_ref": "mail.InboxPageResult",
-      "parameters": {
-        "folder":  { "type": "string", "required": false },
-        "cursor":  { "type": "string", "required": false },
-        "limit":   { "type": "integer", "required": false },
-        "account": { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "read_email",
-      "description": "Read the full content of an email message by its ID — subject, sender, body (text + html), attachments.",
-      "scopes": [],
-      "output_schema_ref": "mail.EmailBody",
-      "parameters": {
-        "message_id": { "type": "string", "required": true },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "search",
-      "description": "Search emails by sender, subject, keywords, or any provider-supported query — Gmail search syntax is honoured.",
-      "scopes": [],
-      "output_schema_ref": "mail.SearchResult",
-      "parameters": {
-        "query":       { "type": "string", "required": true },
-        "max_results": { "type": "integer", "required": false },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "folder",
-      "description": "Browse a mail folder with cursor-based pagination — sent, spam, trash, starred, drafts, all, archive, unread.",
-      "scopes": [],
-      "output_schema_ref": "mail.InboxPageResult",
-      "parameters": {
-        "folder":  { "type": "string", "required": true },
-        "cursor":  { "type": "string", "required": false },
-        "limit":   { "type": "integer", "required": false },
-        "account": { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "get_thread",
-      "description": "View a full email thread / conversation by thread ID — returns all messages in reply chronology.",
-      "scopes": [],
-      "output_schema_ref": "mail.ThreadView",
-      "parameters": {
-        "thread_id": { "type": "string", "required": true },
-        "account":   { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "send",
-      "description": "Send a new email. Requires to, subject, and body; cc / bcc optional. Uses the active account unless specified.",
-      "scopes": [],
-      "output_schema_ref": "mail.SendResult",
-      "parameters": {
-        "to":      { "type": "string", "required": true },
-        "subject": { "type": "string", "required": true },
-        "body":    { "type": "string", "required": true },
-        "cc":      { "type": "string", "required": false },
-        "bcc":     { "type": "string", "required": false },
-        "account": { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "reply",
-      "description": "Reply to an email. Uses the message_id you read last if not specified; body required. Adds In-Reply-To headers.",
-      "scopes": [],
-      "output_schema_ref": "mail.SendResult",
-      "parameters": {
-        "body":       { "type": "string", "required": true },
-        "message_id": { "type": "string", "required": false },
-        "to":         { "type": "string", "required": false },
-        "cc":         { "type": "string", "required": false },
-        "bcc":        { "type": "string", "required": false },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "forward",
-      "description": "Forward an email to a new recipient with an optional comment prepended to the forwarded message body.",
-      "scopes": [],
-      "output_schema_ref": "mail.SendResult",
-      "parameters": {
-        "message_id": { "type": "string", "required": true },
-        "to":         { "type": "string", "required": true },
-        "comment":    { "type": "string", "required": false },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "archive",
-      "description": "Archive an email — moves it out of the inbox without deleting.",
-      "scopes": [],
-      "output_schema_ref": "mail.OperationResult",
-      "parameters": {
-        "message_id": { "type": "string", "required": true },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "delete",
-      "description": "Move an email to Trash. Recoverable until trash is purged.",
-      "scopes": [],
-      "output_schema_ref": "mail.OperationResult",
-      "parameters": {
-        "message_id": { "type": "string", "required": true },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "mark_read",
-      "description": "Mark an email as read — clears the unread flag.",
-      "scopes": [],
-      "output_schema_ref": "mail.OperationResult",
-      "parameters": {
-        "message_id": { "type": "string", "required": true },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "mark_unread",
-      "description": "Mark an email as unread — restores the unread flag.",
-      "scopes": [],
-      "output_schema_ref": "mail.OperationResult",
-      "parameters": {
-        "message_id": { "type": "string", "required": true },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "star",
-      "description": "Star or unstar an email — toggles the starred / important flag.",
-      "scopes": [],
-      "output_schema_ref": "mail.OperationResult",
-      "parameters": {
-        "message_id": { "type": "string", "required": true },
-        "starred":    { "type": "boolean", "required": false },
-        "account":    { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "move",
-      "description": "Move an email between folders — INBOX, Junk, Trash, Archive, or any provider-supported label/folder name.",
-      "scopes": [],
-      "output_schema_ref": "mail.OperationResult",
-      "parameters": {
-        "message_id":  { "type": "string", "required": true },
-        "from_folder": { "type": "string", "required": true },
-        "to_folder":   { "type": "string", "required": true },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "purge",
-      "description": "Permanently delete an email — bypasses Trash, cannot be recovered by the provider.",
-      "scopes": [],
-      "output_schema_ref": "mail.OperationResult",
-      "parameters": {
-        "message_id":  { "type": "string", "required": true },
-        "from_folder": { "type": "string", "required": false },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "bulk_archive",
-      "description": "Archive multiple emails at once. Expects a comma-separated list of message IDs.",
-      "scopes": [],
-      "output_schema_ref": "mail.BulkOperationResult",
-      "parameters": {
-        "message_ids": { "type": "string", "required": true },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "bulk_delete",
-      "description": "Delete (move to Trash) multiple emails at once. Expects a comma-separated list of message IDs.",
-      "scopes": [],
-      "output_schema_ref": "mail.BulkOperationResult",
-      "parameters": {
-        "message_ids": { "type": "string", "required": true },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "bulk_mark_read",
-      "description": "Mark multiple emails as read in one batch. Expects a comma-separated list of message IDs.",
-      "scopes": [],
-      "output_schema_ref": "mail.BulkOperationResult",
-      "parameters": {
-        "message_ids": { "type": "string", "required": true },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "bulk_mark_unread",
-      "description": "Mark multiple emails as unread in one batch. Expects a comma-separated list of message IDs.",
-      "scopes": [],
-      "output_schema_ref": "mail.BulkOperationResult",
-      "parameters": {
-        "message_ids": { "type": "string", "required": true },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "contacts",
-      "description": "Show email contacts — search-filterable, sorted by name.",
-      "scopes": [],
-      "output_schema_ref": "mail.ContactsList",
-      "parameters": {
-        "search": { "type": "string", "required": false },
-        "limit":  { "type": "integer", "required": false }
-      }
-    },
-    {
-      "name": "add_contact",
-      "description": "Add a contact manually by email address, optionally with a display name.",
-      "scopes": [],
-      "output_schema_ref": "mail.ContactAdded",
-      "parameters": {
-        "email": { "type": "string", "required": true },
-        "name":  { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "sync_contacts",
-      "description": "Import contacts from a connected email — Google People API, Outlook address book, or recent email header harvest.",
-      "scopes": [],
-      "output_schema_ref": "mail.ContactsSyncResult",
-      "parameters": {
-        "account": { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "delete_contact",
-      "description": "Remove a contact from the address book by email address.",
-      "scopes": [],
-      "output_schema_ref": "mail.ContactDeleted",
-      "parameters": {
-        "email": { "type": "string", "required": true }
-      }
-    },
-    {
-      "name": "mail_action",
-      "description": "Direct mail action from the UI panel — archive, delete, spam, mark_read, mark_unread, star. Accepts one or many IDs.",
-      "scopes": [],
-      "output_schema_ref": "mail.MailActionResult",
-      "parameters": {
-        "action":      { "type": "string", "required": true },
-        "message_id":  { "type": "string", "required": false },
-        "message_ids": { "type": "array",  "required": false },
-        "account":     { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "folder_counts",
-      "description": "Get unread counts per folder — INBOX, sent, drafts, spam, trash, starred — for UI sidebar badge rendering.",
-      "scopes": [],
-      "output_schema_ref": "mail.FolderCountsResult",
-      "parameters": {
-        "account": { "type": "string", "required": false }
-      }
-    },
-    {
-      "name": "get_oauth_url",
-      "description": "Get an OAuth authorisation URL for the given provider (google or microsoft) — used by the add-account panel.",
-      "scopes": [],
-      "output_schema_ref": "mail.OAuthUrlResult",
-      "parameters": {
-        "provider": { "type": "string", "required": true }
-      }
-    },
-    {
-      "name": "add_imap",
-      "description": "Connect an IMAP email account from the add-account panel wizard — tests credentials, persists encrypted password.",
-      "scopes": [],
-      "output_schema_ref": "mail.ConnectImapResult",
-      "parameters": {
-        "email":     { "type": "string", "required": true },
-        "password":  { "type": "string", "required": true },
-        "imap_host": { "type": "string", "required": false },
-        "smtp_host": { "type": "string", "required": false },
-        "imap_port": { "type": "integer", "required": false },
-        "smtp_port": { "type": "integer", "required": false }
-      }
-    },
-    {
-      "name": "compose_send",
-      "description": "Send an email from the compose panel — supports reply, forward, and new-message modes.",
-      "scopes": [],
-      "output_schema_ref": "mail.ComposeSendResult",
-      "parameters": {
-        "mode":        { "type": "string", "required": false },
-        "message_id":  { "type": "string", "required": false },
-        "to":          { "type": "string", "required": false },
-        "subject":     { "type": "string", "required": false },
-        "body":        { "type": "string", "required": false },
-        "cc":          { "type": "string", "required": false },
-        "bcc":         { "type": "string", "required": false },
-        "account":     { "type": "string", "required": false },
-        "attachments": { "type": "array",  "required": false }
-      }
-    },
-    {
       "name": "skeleton_refresh_mail_inbox_summary",
-      "description": "Background per-account unread summary for classifier envelope.",
+      "description": "Per-account unread summary for classifier envelope + new-mail alerts.",
       "scopes": [],
       "parameters": {}
     },
@@ -383,9 +25,1373 @@
       "description": "Alert check for new unread emails.",
       "scopes": [],
       "parameters": {}
+    },
+    {
+      "name": "connect",
+      "description": "Start Google/Gmail OAuth — returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "connect_microsoft",
+      "description": "Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "connect_yahoo",
+      "description": "Start Yahoo or AOL OAuth — returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "connect_imap",
+      "description": "Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:account"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "email_addr": {
+            "description": "Email address",
+            "title": "Email Addr",
+            "type": "string"
+          },
+          "password": {
+            "description": "IMAP password or app password",
+            "title": "Password",
+            "type": "string"
+          },
+          "imap_host": {
+            "default": "",
+            "description": "IMAP host (auto-detected if empty)",
+            "title": "Imap Host",
+            "type": "string"
+          },
+          "smtp_host": {
+            "default": "",
+            "description": "SMTP host (auto-detected if empty)",
+            "title": "Smtp Host",
+            "type": "string"
+          },
+          "imap_port": {
+            "default": 0,
+            "description": "IMAP port (auto-detected if 0)",
+            "title": "Imap Port",
+            "type": "integer"
+          },
+          "smtp_port": {
+            "default": 0,
+            "description": "SMTP port (auto-detected if 0)",
+            "title": "Smtp Port",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email_addr",
+          "password"
+        ],
+        "title": "ConnectImapParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "account.connected",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "status",
+      "description": "List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and current unread count for each.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "switch_account",
+      "description": "Change the active email account. All subsequent inbox, send, and manage operations will use this account until switched again.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:account"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Single optional account selector.",
+        "properties": {
+          "account": {
+            "default": "",
+            "description": "Account email or ID (omit for active account)",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "AccountParam",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "account.switched",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "disconnect",
+      "description": "Remove a connected email account and permanently delete its stored credentials and access tokens.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:account"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Single optional account selector.",
+        "properties": {
+          "account": {
+            "default": "",
+            "description": "Account email or ID (omit for active account)",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "AccountParam",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "account.disconnected",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "inbox",
+      "description": "Fetch a page of messages from the mailbox. Use folder= to browse non-INBOX folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, and read state. Prefer this over folder() for any folder.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "folder": {
+            "default": "inbox",
+            "description": "Folder: inbox/sent/spam/trash/drafts/starred",
+            "title": "Folder",
+            "type": "string"
+          },
+          "cursor": {
+            "default": "",
+            "description": "Pagination cursor from previous page",
+            "title": "Cursor",
+            "type": "string"
+          },
+          "limit": {
+            "default": 20,
+            "description": "Messages per page (1-100)",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "InboxParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "read_email",
+      "description": "Open a specific email by message_id — returns full body (HTML + plain text), sender, all recipients, date, and attachment list. Also marks the message as read.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Email message ID",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "MessageIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "search",
+      "description": "Full-mailbox search across all folders. Accepts free-text or provider syntax (Gmail: from:, subject:, label:; Outlook and IMAP: free-text). Returns matching message previews.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "query": {
+            "description": "Search query — Gmail syntax supported",
+            "title": "Query",
+            "type": "string"
+          },
+          "max_results": {
+            "default": 10,
+            "description": "Max results to return",
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "SearchParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "folder",
+      "description": "Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive). Functionally identical to inbox() with folder= — prefer inbox() unless explicit folder routing is needed.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "folder": {
+            "default": "inbox",
+            "description": "Folder: inbox/sent/spam/trash/drafts/starred",
+            "title": "Folder",
+            "type": "string"
+          },
+          "cursor": {
+            "default": "",
+            "description": "Pagination cursor from previous page",
+            "title": "Cursor",
+            "type": "string"
+          },
+          "limit": {
+            "default": 20,
+            "description": "Messages per page (1-100)",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "InboxParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "get_thread",
+      "description": "Load a complete email conversation by thread_id — all messages in chronological order. Works on Google and Microsoft; IMAP returns a single-message fallback.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "thread_id": {
+            "description": "Thread ID",
+            "title": "Thread Id",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread_id"
+        ],
+        "title": "ThreadParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "send",
+      "description": "Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Use reply() or forward() when responding to an existing message.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "to": {
+            "description": "Recipient email address",
+            "title": "To",
+            "type": "string"
+          },
+          "subject": {
+            "default": "",
+            "description": "Email subject (auto-generated from body if omitted)",
+            "title": "Subject",
+            "type": "string"
+          },
+          "body": {
+            "default": "",
+            "description": "Email body (plain text)",
+            "title": "Body",
+            "type": "string"
+          },
+          "cc": {
+            "default": "",
+            "description": "CC recipients (comma-separated)",
+            "title": "Cc",
+            "type": "string"
+          },
+          "bcc": {
+            "default": "",
+            "description": "BCC recipients (comma-separated)",
+            "title": "Bcc",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to"
+        ],
+        "title": "SendParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "sent",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "reply",
+      "description": "Reply to an email — sends to the original sender. Provide message_id to target a specific email; omit it to reply to the last opened message. Use send() for brand-new emails, not this.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "body": {
+            "default": "",
+            "description": "Reply body text",
+            "title": "Body",
+            "type": "string"
+          },
+          "message_id": {
+            "default": "",
+            "description": "Message ID to reply to (omit = last read)",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "to": {
+            "default": "",
+            "description": "Override reply-to address",
+            "title": "To",
+            "type": "string"
+          },
+          "cc": {
+            "default": "",
+            "description": "CC recipients",
+            "title": "Cc",
+            "type": "string"
+          },
+          "bcc": {
+            "default": "",
+            "description": "BCC recipients",
+            "title": "Bcc",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "ReplyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "sent",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "forward",
+      "description": "Forward an existing email to a new address. Requires message_id of the email to forward and a to recipient. Optionally prepend a comment above the forwarded body.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Message ID to forward",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "to": {
+            "description": "Forward recipient email",
+            "title": "To",
+            "type": "string"
+          },
+          "comment": {
+            "default": "",
+            "description": "Optional comment prepended to the forwarded body",
+            "title": "Comment",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id",
+          "to"
+        ],
+        "title": "ForwardParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "sent",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "archive",
+      "description": "Archive a single email — removes it from INBOX into the archive folder. Remains searchable and recoverable. Not the same as delete().",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Email message ID",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "MessageIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "archived",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "delete",
+      "description": "Move a single email to Trash — recoverable until trash is emptied. Use purge() for permanent unrecoverable deletion.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Email message ID",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "MessageIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "deleted",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "mark_read",
+      "description": "Mark a single email as read (clears the unread indicator). For multiple emails use bulk_mark_read().",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Email message ID",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "MessageIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "marked_read",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "mark_unread",
+      "description": "Mark a single email as unread (restores the unread indicator). For multiple emails use bulk_mark_unread().",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Email message ID",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "MessageIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "marked_unread",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "star",
+      "description": "Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Message ID",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "starred": {
+            "default": true,
+            "description": "True to star, False to unstar",
+            "title": "Starred",
+            "type": "boolean"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "StarParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "starred",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "move",
+      "description": "Move an email from one folder to another — e.g. INBOX→spam, Trash→INBOX (untrash). Requires both from_folder and to_folder.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Message ID to move",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "from_folder": {
+            "description": "Source folder",
+            "title": "From Folder",
+            "type": "string"
+          },
+          "to_folder": {
+            "description": "Destination folder",
+            "title": "To Folder",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id",
+          "from_folder",
+          "to_folder"
+        ],
+        "title": "MoveParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "moved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "purge",
+      "description": "Permanently delete an email from a folder (default: Trash) — cannot be recovered. Use delete() to move to Trash first if unsure.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Message ID to permanently delete",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "from_folder": {
+            "default": "Trash",
+            "description": "Folder to purge from",
+            "title": "From Folder",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "PurgeParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "purged",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "bulk_archive",
+      "description": "Archive multiple emails in one operation. Pass message_ids as a comma-separated string.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_ids": {
+            "description": "Comma-separated list of message IDs",
+            "title": "Message Ids",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "title": "BulkParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "bulk_archived",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "bulk_delete",
+      "description": "Move multiple emails to Trash in one operation. Pass message_ids as a comma-separated string.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_ids": {
+            "description": "Comma-separated list of message IDs",
+            "title": "Message Ids",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "title": "BulkParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "bulk_deleted",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "bulk_mark_read",
+      "description": "Mark multiple emails as read in one operation. Pass message_ids as a comma-separated string.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_ids": {
+            "description": "Comma-separated list of message IDs",
+            "title": "Message Ids",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "title": "BulkParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "bulk_marked_read",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "bulk_mark_unread",
+      "description": "Mark multiple emails as unread in one operation. Pass message_ids as a comma-separated string.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_ids": {
+            "description": "Comma-separated list of message IDs",
+            "title": "Message Ids",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "title": "BulkParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "bulk_marked_unread",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "contacts",
+      "description": "List address book contacts, optionally filtered by name or email fragment. Results sorted by name.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "search": {
+            "default": "",
+            "description": "Filter by name or email",
+            "title": "Search",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Max contacts to return",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ContactsParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "add_contact",
+      "description": "Save a new contact to the address book manually. Email is required; display name is optional.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:contact"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "email": {
+            "description": "Contact email address",
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "Display name (optional)",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "AddContactParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "contact.added",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "sync_contacts",
+      "description": "Import contacts from the connected email account — Google People API, Microsoft Graph, or sender/CC header harvest from recent messages.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:contact",
+        "update:contact"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Single optional account selector.",
+        "properties": {
+          "account": {
+            "default": "",
+            "description": "Account email or ID (omit for active account)",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "AccountParam",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "contacts.synced",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "delete_contact",
+      "description": "Remove a contact from the address book by their exact email address.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:contact"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "email": {
+            "description": "Contact email address to remove",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "DeleteContactParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "contact.deleted",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "compose_send",
+      "description": "Panel compose form submit — sends from the UI compose panel (mode: new/reply/forward). From LLM chat use send(), reply(), or forward() instead.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "to": {
+            "default": "",
+            "description": "Recipient email address(es)",
+            "title": "To",
+            "type": "string"
+          },
+          "subject": {
+            "default": "",
+            "description": "Subject (required for new emails)",
+            "title": "Subject",
+            "type": "string"
+          },
+          "body": {
+            "default": "",
+            "description": "Email body (plain text or HTML)",
+            "title": "Body",
+            "type": "string"
+          },
+          "mode": {
+            "default": "new",
+            "description": "Mode: new, reply, forward",
+            "title": "Mode",
+            "type": "string"
+          },
+          "message_id": {
+            "default": "",
+            "description": "Original message ID (for reply/forward)",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "cc": {
+            "default": "",
+            "description": "CC recipients",
+            "title": "Cc",
+            "type": "string"
+          },
+          "bcc": {
+            "default": "",
+            "description": "BCC recipients",
+            "title": "Bcc",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "ComposeSendParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "sent",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "mail_action",
+      "description": "Panel UI action dispatcher — called by inbox row buttons, not LLM chat. From chat use archive(), delete(), mark_read(), star() etc. individually.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "action": {
+            "description": "Action: archive, delete, spam, mark_read, mark_unread, star",
+            "title": "Action",
+            "type": "string"
+          },
+          "message_id": {
+            "default": "",
+            "description": "Single message ID",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "message_ids": {
+            "description": "Multiple message IDs",
+            "items": {
+              "type": "string"
+            },
+            "title": "Message Ids",
+            "type": "array"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "MailActionParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "mail.action",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "folder_counts",
+      "description": "Get current unread message count for all 7 folders simultaneously — INBOX, sent, drafts, spam, trash, starred, archive.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Single optional account selector.",
+        "properties": {
+          "account": {
+            "default": "",
+            "description": "Account email or ID (omit for active account)",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "title": "AccountParam",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "get_oauth_url",
+      "description": "Panel add-account wizard helper — returns OAuth URL for Google or Microsoft. From LLM chat use connect() or connect_microsoft() instead.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "provider": {
+            "description": "OAuth provider: google or microsoft",
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "title": "OAuthParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "add_imap",
+      "description": "Panel add-account wizard helper — connects an IMAP account from the UI form. From LLM chat use connect_imap() instead.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:account"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "email": {
+            "description": "Email address",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "description": "IMAP password or app password",
+            "title": "Password",
+            "type": "string"
+          },
+          "imap_host": {
+            "default": "",
+            "description": "IMAP host (auto-detected if empty)",
+            "title": "Imap Host",
+            "type": "string"
+          },
+          "smtp_host": {
+            "default": "",
+            "description": "SMTP host (auto-detected if empty)",
+            "title": "Smtp Host",
+            "type": "string"
+          },
+          "imap_port": {
+            "default": 993,
+            "description": "IMAP port",
+            "title": "Imap Port",
+            "type": "integer"
+          },
+          "smtp_port": {
+            "default": 587,
+            "description": "SMTP port",
+            "title": "Smtp Port",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "AddImapParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "account.connected",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
     }
   ],
   "signals": [],
   "schedules": [],
-  "required_scopes": []
+  "required_scopes": [],
+  "icon_size_bytes": 1015,
+  "events": {
+    "subscribes": [
+      {
+        "type": "email.received",
+        "handler": "on_email_received"
+      }
+    ],
+    "emits": []
+  },
+  "lifecycle": {
+    "on_install": true,
+    "health_check": {
+      "interval_sec": 60
+    }
+  },
+  "lifecycle_hooks": {
+    "on_install": {
+      "signature": "(ctx)"
+    }
+  }
 }

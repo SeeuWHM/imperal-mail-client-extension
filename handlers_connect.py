@@ -1,16 +1,16 @@
-"""Mail Client · Connect & account handlers (SDK v2.0.0)."""
+"""Mail Client · Connect & account handlers."""
 from __future__ import annotations
 
 import asyncio
-import base64
-import json
 import logging
 
 from urllib.parse import urlencode
 
-from ctx_helpers import _get_acc
+from app import chat
+from imperal_sdk.chat.action_result import ActionResult
+from ctx_helpers import _get_acc, _oauth_state
 
-from providers import get_provider  # noqa: F401  — used by sync_contacts path
+from providers import get_provider  # noqa: F401
 from providers.helpers import (
     _all_accounts,
     COLLECTION,
@@ -21,41 +21,30 @@ from providers.helpers import (
     _invalidate_first_page,
     _unread_summary_key,
 )
+
+_ALL_FOLDER_KEYS = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
 from providers.imap import _sync_imap_test
 from cache_model_defs import UnreadSummary
 
 from schemas import (
     AccountDisconnected, AccountSwitched, AccountsStatus, ConnectImapResult,
     ConnectOAuthResult, MailAccount,
+    AccountParam, ConnectImapParams, EmptyParams,
 )
 
 log = logging.getLogger("mail")
 
 
-# ─── Internal ─────────────────────────────────────────────────────────── #
-
-
-def _oauth_state(ctx, provider: str) -> str:
-    return base64.urlsafe_b64encode(
-        json.dumps({"user_id": str(ctx.user.id),
-                    "tenant_id": getattr(ctx.user, "tenant_id", "default"),
-                    "provider": provider}).encode()
-    ).decode()
-
-
-# ─── Connect Handlers ─────────────────────────────────────────────────── #
+# ─── impl_* business logic ────────────────────────────────────────────── #
 
 
 async def impl_connect(ctx) -> ConnectOAuthResult:
     accounts = await _all_accounts(ctx)
-    oauth = [a for a in accounts if a.get("provider", "oauth") == "oauth"]
-    if oauth:
-        active = next((a for a in oauth if a.get("is_active")), oauth[0])
-        return ConnectOAuthResult(
-            already_connected=True,
-            email=active.get("email"),
-            total=len(accounts),
-        )
+    existing = [a for a in accounts if a.get("provider") == "oauth"]
+    if existing:
+        active = next((a for a in existing if a.get("is_active")), existing[0])
+        return ConnectOAuthResult(already_connected=True, email=active.get("email"),
+                                  total=len(existing))
     if not GMAIL_CLIENT_ID:
         raise RuntimeError("Google OAuth not configured.")
     url = GOOGLE_AUTH_URL + "?" + urlencode({
@@ -63,31 +52,23 @@ async def impl_connect(ctx) -> ConnectOAuthResult:
         "response_type": "code", "scope": GMAIL_SCOPE,
         "access_type": "offline", "prompt": "consent", "state": _oauth_state(ctx, "oauth"),
     })
-    return ConnectOAuthResult(
-        auth_url=url,
-        instruction="Open link to authorise Google.",
-    )
+    return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Google.")
 
 
 async def impl_connect_microsoft(ctx) -> ConnectOAuthResult:
     accounts = await _all_accounts(ctx)
-    ms = [a for a in accounts if a.get("provider") == "microsoft"]
-    if ms:
-        active = next((a for a in ms if a.get("is_active")), ms[0])
-        return ConnectOAuthResult(
-            already_connected=True,
-            email=active.get("email"),
-        )
+    existing = [a for a in accounts if a.get("provider") == "microsoft"]
+    if existing:
+        active = next((a for a in existing if a.get("is_active")), existing[0])
+        return ConnectOAuthResult(already_connected=True, email=active.get("email"),
+                                  total=len(existing))
     if not MS_CLIENT_ID:
         raise RuntimeError("Microsoft OAuth not configured.")
     url = MS_AUTH_URL + "?" + urlencode({
         "client_id": MS_CLIENT_ID, "response_type": "code", "redirect_uri": MS_REDIRECT_URI,
         "scope": MS_SCOPE, "response_mode": "query", "state": _oauth_state(ctx, "microsoft"),
     })
-    return ConnectOAuthResult(
-        auth_url=url,
-        instruction="Open link to authorise Microsoft.",
-    )
+    return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Microsoft.")
 
 
 async def impl_connect_yahoo(ctx) -> ConnectOAuthResult:
@@ -95,20 +76,14 @@ async def impl_connect_yahoo(ctx) -> ConnectOAuthResult:
     yahoo = [a for a in accounts if a.get("provider") == "yahoo"]
     if yahoo:
         active = next((a for a in yahoo if a.get("is_active")), yahoo[0])
-        return ConnectOAuthResult(
-            already_connected=True,
-            email=active.get("email"),
-        )
+        return ConnectOAuthResult(already_connected=True, email=active.get("email"))
     if not YAHOO_CLIENT_ID:
         raise RuntimeError("Yahoo OAuth not configured.")
     url = YAHOO_AUTH_URL + "?" + urlencode({
         "client_id": YAHOO_CLIENT_ID, "redirect_uri": YAHOO_REDIRECT_URI,
         "response_type": "code", "scope": YAHOO_SCOPE, "state": _oauth_state(ctx, "yahoo"),
     })
-    return ConnectOAuthResult(
-        auth_url=url,
-        instruction="Open link to authorise Yahoo/AOL.",
-    )
+    return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Yahoo/AOL.")
 
 
 async def impl_connect_imap(
@@ -123,8 +98,6 @@ async def impl_connect_imap(
     ok, err = await asyncio.to_thread(_sync_imap_test, email_addr, password, imap_h, imap_p)
     if not ok:
         raise RuntimeError(f"IMAP failed: {err}")
-    # Create the new account FIRST, then deactivate others.
-    # If create fails, the user still has their existing active account.
     await ctx.store.create(COLLECTION, {
         "email": email_addr, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p, "smtp_host": smtp_h, "smtp_port": smtp_p,
@@ -132,42 +105,26 @@ async def impl_connect_imap(
     })
     accounts = await _all_accounts(ctx)
     for d in accounts:
-        _data = d.data if hasattr(d, "data") else d
-        _id = d.id if hasattr(d, "id") else d["doc_id"]
-        if _data.get("email") != email_addr:
-            await ctx.store.update(COLLECTION, _id, {**_data, "is_active": False})
-    return ConnectImapResult(
-        connected=True,
-        email=email_addr,
-        imap_server=imap_h,
-    )
-
-
-# ─── Account Handlers ─────────────────────────────────────────────────── #
+        if d.get("email") != email_addr:
+            clean = {k: v for k, v in d.items() if k != "doc_id"}
+            await ctx.store.update(COLLECTION, d["doc_id"], {**clean, "is_active": False})
+    return ConnectImapResult(connected=True, email=email_addr, imap_server=imap_h)
 
 
 async def impl_status(ctx) -> AccountsStatus:
     accounts = await _all_accounts(ctx)
     if not accounts:
         return AccountsStatus(connected=False, accounts=[], total=0)
-
-    labels = {"oauth": "Google", "microsoft": "Microsoft",
-              "yahoo": "Yahoo / AOL", "imap": "IMAP"}
+    labels = {"oauth": "Google", "microsoft": "Microsoft", "yahoo": "Yahoo / AOL", "imap": "IMAP"}
     result: list[MailAccount] = []
     for a in accounts:
         email = a.get("email", "?")
         unread = 0
-        # Prefer ctx.cache-backed summary; fall back to store-persisted unread_count
-        # (skeleton_refresh writes that field every ttl=60s).
         try:
             summary = await ctx.cache.get(_unread_summary_key(email, "INBOX"), UnreadSummary)
-            if summary:
-                unread = summary.unread_count
-            else:
-                unread = int(a.get("unread_count", 0) or 0)
+            unread = summary.unread_count if summary else int(a.get("unread_count", 0) or 0)
         except Exception:
             unread = int(a.get("unread_count", 0) or 0)
-
         result.append(MailAccount(
             email=email,
             provider=labels.get(a.get("provider", "oauth"), "Unknown"),
@@ -188,7 +145,11 @@ async def impl_switch_account(ctx, account: str) -> AccountSwitched:
         new_active = d.id == target.id
         if d.get("is_active") != new_active:
             await ctx.store.update(COLLECTION, d.id, {**d.data, "is_active": new_active})
-    return AccountSwitched(switched=True, active_account=target.get("email"))
+    target_email = target.get("email", "")
+    if target_email:
+        for fkey in _ALL_FOLDER_KEYS:
+            await _invalidate_first_page(ctx, target_email, fkey)
+    return AccountSwitched(switched=True, active_account=target_email)
 
 
 async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
@@ -199,8 +160,92 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
     email = target.get("email", "")
     await ctx.store.delete(COLLECTION, target.id)
     await _invalidate_first_page(ctx, email, "INBOX")
-    return AccountDisconnected(
-        disconnected=True,
-        email=email,
-        remaining=len(docs) - 1,
-    )
+    return AccountDisconnected(disconnected=True, email=email, remaining=len(docs) - 1)
+
+
+# ─── @chat.function wrappers ──────────────────────────────────────────── #
+
+
+@chat.function("connect", action_type="read",
+               description="Start Google/Gmail OAuth — returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.")
+async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
+    try:
+        r = await impl_connect(ctx)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary="Already connected." if r.already_connected else "OAuth URL ready.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("connect_microsoft", action_type="read",
+               description="Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.")
+async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
+    try:
+        r = await impl_connect_microsoft(ctx)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary="Already connected." if r.already_connected else "OAuth URL ready.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("connect_yahoo", action_type="read",
+               description="Start Yahoo or AOL OAuth — returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.")
+async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
+    try:
+        r = await impl_connect_yahoo(ctx)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary="Already connected." if r.already_connected else "OAuth URL ready.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("connect_imap", action_type="write", event="account.connected",
+               effects=["create:account"],
+               description="Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.")
+async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
+    try:
+        r = await impl_connect_imap(ctx, email_addr=params.email_addr, password=params.password,
+                                    imap_host=params.imap_host, smtp_host=params.smtp_host,
+                                    imap_port=params.imap_port, smtp_port=params.smtp_port)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Connected {r.email} via IMAP ({r.imap_server}).",
+                                    refresh_panels=["accounts", "inbox"])
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("status", action_type="read",
+               description="List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and current unread count for each.")
+async def fn_status(ctx, params: EmptyParams) -> ActionResult:
+    try:
+        r = await impl_status(ctx)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"{r.total} account(s) connected." if r.connected else "No accounts connected.")
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("switch_account", action_type="write", event="account.switched",
+               effects=["update:account"],
+               description="Change the active email account. All subsequent inbox, send, and manage operations will use this account until switched again.")
+async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
+    try:
+        r = await impl_switch_account(ctx, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Switched to {r.active_account}.",
+                                    refresh_panels=["inbox", "accounts"])
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("disconnect", action_type="destructive", event="account.disconnected",
+               effects=["delete:account"],
+               description="Remove a connected email account and permanently delete its stored credentials and access tokens.")
+async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
+    try:
+        r = await impl_disconnect(ctx, account=params.account)
+        return ActionResult.success(data=r.model_dump(),
+                                    summary=f"Disconnected {r.email}. {r.remaining} account(s) remaining.",
+                                    refresh_panels=["accounts", "inbox"])
+    except RuntimeError as e:
+        return ActionResult.error(str(e), retryable=False)

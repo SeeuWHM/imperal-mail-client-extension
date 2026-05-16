@@ -15,6 +15,7 @@ from .helpers import (
 from .imap_connection import _imap_connect_auth, _sync_imap_test, _sync_smtp_test  # noqa: F401
 from .imap_read import (
     _sync_imap_inbox, _sync_imap_fetch_page, _sync_imap_unread_count,
+    _sync_imap_folder_stats,
     _sync_imap_read, _sync_imap_search, _sync_imap_folder,
 )
 from .imap_write import (
@@ -107,6 +108,17 @@ class ImapMailProvider(BaseMailProvider):
         except Exception:
             return 0
 
+    async def get_folder_stats(self, ctx: Context, acc: dict, folder: str = "inbox") -> dict:
+        imap_folder = "INBOX" if folder.lower() == "inbox" else folder
+        acc = await self._ensure_token(ctx, acc)
+        args = self._imap_args(acc)
+        try:
+            return await asyncio.to_thread(
+                _sync_imap_folder_stats, acc.get("email", ""), args["host"], args["port"],
+                imap_folder, password=args["password"], access_token=args["access_token"])
+        except Exception:
+            return {"total": 0, "unread": 0}
+
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
@@ -121,7 +133,7 @@ class ImapMailProvider(BaseMailProvider):
         body = data.get("body", "")
         if len(body) > 4000: data["body"] = body[:4000]; data["truncated"] = True
         await _save_last_read(ctx, message_id, data.get("subject", ""), data.get("from", ""),
-                              data.get("message_id_header", ""), "")
+                              data.get("message_id_header", ""), "", account=email_addr)
         await _update_read_in_cache(ctx, email_addr, message_id, is_read=True)
         return self.ok(**data, message_id=message_id)
 

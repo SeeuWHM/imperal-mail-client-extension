@@ -1,288 +1,287 @@
 """Mail Client · Panel handlers (Declarative UI)."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
 from imperal_sdk import ui
 
 from app import ext
-from ctx_helpers import _get_acc
 from providers import get_provider
 from providers.helpers import (
-    _all_accounts, encode_cursor, decode_cursor, COLLECTION,
-    _inbox_page_key, _unread_summary_key, _invalidate_first_page,
+    _all_accounts, _invalidate_first_page,
+    _inbox_messages_key, _refresh_token_if_needed,
+    encode_cursor, decode_cursor,
+)
+from panels_inbox import (
+    FOLDERS,
+    _execute_panel_action, _switch_active_account,
+    _build_folder_tabs, _build_email_list,
 )
 from panels_email_viewer import build_email_viewer
 from panels_accounts import build_accounts_panel
 from panels_add_account import build_add_account_panel
 from panels_compose import build_compose_panel
-from cache_models import InboxPage, UnreadSummary
+from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
 
-FOLDERS = [
-    {"key": "INBOX",   "label": "Inbox"},
-    {"key": "sent",    "label": "Sent"},
-    {"key": "drafts",  "label": "Drafts"},
-    {"key": "spam",    "label": "Spam"},
-    {"key": "trash",   "label": "Trash"},
-    {"key": "starred", "label": "Starred"},
-]
+INBOX_INLINE_LIMIT = 25    # one page; additional pages load on demand via on_end_reached
+INBOX_CACHE_TTL    = 90
 
 
-async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str) -> None:
-    """Execute a single-message action BEFORE the inbox list is fetched.
-
-    Called inline so the result is immediately reflected in the render
-    without depending on event publishing (which only works from the
-    full SessionWorkflow / LLM chat path, not from ui.Call / Fast-RPC).
-    """
-    if not action or not message_id:
-        return
+async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
     email = acc.get("email", "")
     try:
-        if action == "archive":
-            await provider.archive(ctx, acc, message_id)
-        elif action == "delete":
-            await provider.delete(ctx, acc, message_id)
-        elif action == "spam":
-            await provider.move(ctx, acc, message_id, "INBOX", "spam")
-        elif action == "mark_read":
-            await provider.mark_read(ctx, acc, message_id, read=True)
-        elif action == "mark_unread":
-            await provider.mark_read(ctx, acc, message_id, read=False)
-        elif action == "star":
-            await provider.star(ctx, acc, message_id, starred=True)
-        elif action == "unstar":
-            await provider.star(ctx, acc, message_id, starred=False)
-        await _invalidate_first_page(ctx, email, "INBOX")
-    except Exception as e:
-        log.warning("panel action=%s message=%s failed: %s", action, message_id[:16], e)
+        acc = await asyncio.wait_for(_refresh_token_if_needed(ctx, acc), timeout=5.0)
+    except (asyncio.TimeoutError, Exception):
+        pass
 
-
-async def _switch_active_account(ctx, target_email: str) -> None:
-    """Update is_active in the store so _get_acc returns the right account."""
     try:
-        docs = await ctx.store.query(COLLECTION)
-        for d in docs:
-            _data = d.data if hasattr(d, "data") else d
-            _id = d.id if hasattr(d, "id") else d["doc_id"]
-            should_be_active = (_data.get("email") == target_email)
-            if _data.get("is_active") != should_be_active:
-                await ctx.store.update(COLLECTION, _id,
-                                       {**_data, "is_active": should_be_active})
-    except Exception as e:
-        log.warning("switch_active_account to %s failed: %s", target_email, e)
+        stats = await asyncio.wait_for(
+            provider.get_folder_stats(ctx, acc, folder), timeout=5.0)
+        total_in_folder  = stats.get("total", 0)
+        unread_in_folder = stats.get("unread", 0)
+    except (asyncio.TimeoutError, Exception):
+        total_in_folder = unread_in_folder = 0
 
-
-def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
-    """Explicit folder tab buttons — no param_name injection needed.
-
-    Each button has the folder value hardcoded in the Call, so the correct
-    folder is always passed regardless of SDK Select injection behavior.
-    """
-    buttons = [
-        ui.Button(
-            f["label"],
-            variant="primary" if f["key"] == folder else "ghost",
-            size="sm",
-            on_click=ui.Call("__panel__inbox", folder=f["key"], account=active_email),
+    messages, next_cursor_encoded = [], ""
+    try:
+        msgs, next_cursor_data, has_more = await asyncio.wait_for(
+            provider.fetch_page(ctx, acc, folder, INBOX_INLINE_LIMIT, None),
+            timeout=10.0,
         )
-        for f in FOLDERS
-    ]
-    return ui.Stack(buttons, direction="horizontal", wrap=True, gap=1)
+        messages = [
+            {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
+            for m in msgs
+        ]
+        if has_more and next_cursor_data:
+            # Bind cursor to this account so stale cursors from switched-away
+            # accounts are rejected in the load_more guard (duplicate-emails fix).
+            next_cursor_encoded = encode_cursor(
+                acc.get("provider", "oauth"), next_cursor_data,
+                account=email) or ""
+    except asyncio.TimeoutError:
+        log.warning("fetch_page timeout folder=%s account=%s", folder, email)
+    except Exception as e:
+        log.warning("inbox fetch_page failed folder=%s: %s", folder, e)
 
-
-def _build_email_list(
-    messages: list[dict], next_cursor: str | None,
-    has_more: bool, folder: str, active_email: str,
-    unread_count: int = 0,
-) -> ui.UINode:
-    items = []
-    msg_ids = []
-    for msg in messages:
-        mid = msg.get("message_id", msg.get("id", ""))
-        msg_ids.append(mid)
-        items.append(ui.ListItem(
-            id=mid,
-            title=msg.get("from", "Unknown")[:40],
-            subtitle=msg.get("subject", "(no subject)")[:60],
-            meta=msg.get("date", "")[:10],
-            badge=ui.Badge("new", color="blue") if msg.get("unread") else None,
-            on_click=ui.Call(
-                "__panel__email_viewer",
-                message_id=mid,
-                account=active_email,
-                folder=folder,
-                email_list_ids=",".join(msg_ids),
-                current_index=len(msg_ids) - 1,
-            ),
-        ))
-
-    on_end = None
-    if has_more and next_cursor:
-        on_end = ui.Call("__panel__inbox", cursor=next_cursor, folder=folder, account=active_email)
-
-    # Bulk actions — SDK injects selected IDs as `message_ids` list into fn_mail_action.
-    bulk = [
-        {"label": "Archive", "icon": "Archive",
-         "action": ui.Call("mail_action", action="archive", account=active_email)},
-        {"label": "Delete",  "icon": "Trash2",
-         "action": ui.Call("mail_action", action="delete",  account=active_email)},
-        {"label": "Read",    "icon": "MailOpen",
-         "action": ui.Call("mail_action", action="mark_read",   account=active_email)},
-        {"label": "Unread",  "icon": "Mail",
-         "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
-    ]
-
-    return ui.List(
-        items=items,
-        searchable=True,
-        on_end_reached=on_end,
-        selectable=True,
-        bulk_actions=bulk,
-        total_items=0,
-        extra_info=f"{unread_count} unread" if unread_count > 0 else "",
+    return InboxMessages(
+        account_id=email, folder=folder, messages=messages,
+        total_in_folder=total_in_folder, unread_in_folder=unread_in_folder,
+        next_cursor=next_cursor_encoded, fetched_at=datetime.now(timezone.utc),
     )
 
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
-    refresh="on_event:mail.received,mail.archived,mail.deleted,mail.mail_action,mail.account_switched,mail.account_connected,mail.account_disconnected",
+    refresh="on_event:archived,deleted,bulk_archived,bulk_deleted,marked_read,"
+            "marked_unread,sent,mail.action,account.switched,account.connected,account.disconnected",
 )
 async def inbox_panel(
     ctx,
-    cursor: str = "",
     folder: str = "INBOX",
-    account: str = "",
-    limit: int = 10,
-    # Inline action — executed BEFORE fetching (no event dependency).
     do_action: str = "",
     do_message_id: str = "",
-    # Inline account switch — updates DB + uses new account for this render.
     do_switch_account: str = "",
-    # Tolerate unknown UI params (e.g. active_message_id from newer panel
-    # clients) so a UI-side evolution never 500s the render.
+    load_more_cursor: str = "",
+    search_query: str = "",
     **_unused_kwargs,
 ):
     accounts = await _all_accounts(ctx)
     if not accounts:
         return ui.Empty(message="No email accounts connected")
 
-    # ── Inline account switch ─────────────────────────────────────────────── #
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
-        # Use the switched account for this render (don't rely on DB re-query).
-        account = do_switch_account
+        folder, search_query, load_more_cursor = "INBOX", "", ""
+        for _fkey in [f["key"] for f in FOLDERS]:
+            await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
-    acc, _ = await _get_acc(ctx, account)
+    from providers.helpers import _active_account as _resolve_active
+    acc = await _resolve_active(ctx, "")
     if not acc:
         return ui.Empty(message="No email account available")
 
     provider     = get_provider(acc)
     active_email = acc.get("email", "")
 
-    # ── Inline single-message action ──────────────────────────────────────── #
-    await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
+    await _execute_panel_action(ctx, provider, acc, do_action, do_message_id, folder)
 
-    # ── Header: account indicator + refresh ───────────────────────────────── #
-    # No Select — account switching via right Accounts panel is reliable.
-    # Select's param_name injection is fragile; explicit button calls are not.
-    account_info = ui.Stack([
-        ui.Text(active_email[:32], variant="caption"),
-        ui.Button("", icon="Users", variant="ghost", size="sm",
-                   on_click=ui.Call("__panel__accounts")),
-        ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
-                   on_click=ui.Call("__panel__inbox", folder=folder, account=active_email)),
-    ], direction="horizontal", gap=1)
+    msgs_key = _inbox_messages_key(active_email, folder)
 
-    # ── Folder tabs: explicit buttons, no param_name injection ────────────── #
-    folder_tabs = _build_folder_tabs(folder, active_email)
-
-    # ── Fetch inbox page via ctx.cache.get_or_fetch (SDK v1.6.0) ──────────── #
-    cursor_data = decode_cursor(cursor) if cursor else None
-    clamped     = max(1, min(limit, 100))
-
-    async def _fetch_page() -> InboxPage:
-        messages, next_cursor_data, has_more = await provider.fetch_page(
-            ctx, acc, folder, clamped, cursor_data,
-        )
-        provider_key = acc.get("provider", "oauth")
-        next_cur = encode_cursor(provider_key, next_cursor_data) or ""
-        # Normalise message dicts (id → message_id) so the consumer is consistent.
-        norm = []
-        for m in messages:
-            if "id" in m and "message_id" not in m:
-                m = {**m, "message_id": m["id"]}
-            norm.append(m)
-        return InboxPage(
-            account_id=active_email,
-            folder=folder,
-            cursor=cursor or "",
-            messages=norm,
-            next_cursor=next_cur,
-            has_more=bool(has_more),
-            fetched_at=datetime.now(timezone.utc),
-        )
-
-    try:
-        page = await ctx.cache.get_or_fetch(
-            key=_inbox_page_key(active_email, folder, cursor),
-            model=InboxPage,
-            fetcher=_fetch_page,
-            ttl_seconds=120,
-        )
-    except Exception as e:
-        log.warning("inbox panel fetch_page failed folder=%s: %s", folder, e)
-        return ui.Stack([
-            account_info, folder_tabs,
-            ui.Error(message=f"Failed to load {folder}: {e}"),
-        ])
-
-    messages = page.messages
-    next_cursor = page.next_cursor or None
-    has_more = page.has_more
-
-    # ── Unread count via ctx.cache.get_or_fetch ───────────────────────────── #
-    async def _fetch_unread() -> UnreadSummary:
+    # Load more: fetch the next 25 from API and extend the cached list.
+    # Guard: only run if the cache still belongs to this account/folder so
+    # stale on_end_reached state replays (folder switch, account switch) are
+    # silently ignored instead of loading wrong data.
+    if load_more_cursor:
+        existing = None
         try:
-            count = await provider.get_unread_count(ctx, acc, folder)
-        except Exception:
-            count = sum(1 for m in messages if m.get("unread"))
-        return UnreadSummary(account_id=active_email, folder=folder, unread_count=int(count or 0))
+            existing    = await ctx.cache.get(msgs_key, InboxMessages)
+            cursor_data = decode_cursor(load_more_cursor)
+            cursor_owner = cursor_data.get("_a") if cursor_data else None
+            stale = not cursor_owner or cursor_owner != active_email
+            if (not stale
+                    and existing
+                    and existing.folder == folder
+                    and existing.account_id == active_email):
+                clean_cursor = {k: v for k, v in cursor_data.items() if k != "_a"}
+                more, next_data, has_more = await asyncio.wait_for(
+                    provider.fetch_page(ctx, acc, folder, 25, clean_cursor),
+                    timeout=10.0,
+                )
+                more = [
+                    {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
+                    for m in more
+                ]
+                new_cursor = (
+                    encode_cursor(
+                        acc.get("provider", "oauth"), next_data,
+                        account=active_email) or ""
+                    if has_more and next_data else ""
+                )
+                extended = InboxMessages(
+                    account_id=active_email, folder=folder,
+                    messages=existing.messages + more,
+                    total_in_folder=existing.total_in_folder,
+                    unread_in_folder=existing.unread_in_folder,
+                    next_cursor=new_cursor,
+                    fetched_at=datetime.now(timezone.utc),
+                )
+                await ctx.cache.set(msgs_key, extended, ttl_seconds=INBOX_CACHE_TTL)
+        except (asyncio.TimeoutError, Exception) as e:
+            log.warning("load_more failed folder=%s: %s", folder, e)
+            # Clear the cursor so on_end_reached stops firing on repeated scrolls
+            if existing and existing.next_cursor:
+                try:
+                    await ctx.cache.set(msgs_key, InboxMessages(
+                        account_id=existing.account_id, folder=existing.folder,
+                        messages=existing.messages,
+                        total_in_folder=existing.total_in_folder,
+                        unread_in_folder=existing.unread_in_folder,
+                        next_cursor="",
+                        fetched_at=existing.fetched_at,
+                    ), ttl_seconds=INBOX_CACHE_TTL)
+                except Exception:
+                    pass
+
+    header = ui.Stack([
+        ui.Text(active_email[:32], variant="caption"),
+        ui.Button("", icon="RefreshCw", variant="ghost", size="sm",
+                   on_click=ui.Call("__panel__inbox", folder=folder)),
+    ], direction="h", gap=1)
 
     try:
-        summary = await ctx.cache.get_or_fetch(
-            key=_unread_summary_key(active_email, folder),
-            model=UnreadSummary,
-            fetcher=_fetch_unread,
-            ttl_seconds=30,
-        )
-        unread_count = summary.unread_count
-    except Exception:
-        unread_count = sum(1 for m in messages if m.get("unread"))
+        if do_switch_account:
+            inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
+            try:
+                await ctx.cache.set(msgs_key, inbox_msgs, ttl_seconds=INBOX_CACHE_TTL)
+            except Exception:
+                pass
+        else:
+            inbox_msgs = await ctx.cache.get_or_fetch(
+                msgs_key, InboxMessages,
+                lambda: _fetch_inbox_messages(ctx, provider, acc, folder),
+                ttl_seconds=INBOX_CACHE_TTL,
+            )
+            if inbox_msgs.account_id != active_email or inbox_msgs.folder != folder:
+                inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
+                try:
+                    await ctx.cache.set(msgs_key, inbox_msgs, ttl_seconds=INBOX_CACHE_TTL)
+                except Exception:
+                    pass
+    except Exception as e:
+        log.warning("inbox panel load failed folder=%s: %s", folder, e)
+        folder_tabs = _build_folder_tabs(folder, active_email)
+        return ui.Stack([header, folder_tabs,
+                         ui.Error(message=f"Failed to load {folder}: {e}")])
 
-    email_list = _build_email_list(messages, next_cursor, has_more, folder, active_email, unread_count)
+    # Show unread count badge on the active folder tab
+    folder_tabs = _build_folder_tabs(
+        folder, active_email,
+        folder_unread={folder: inbox_msgs.unread_in_folder} if inbox_msgs.unread_in_folder else None,
+    )
 
-    return ui.Stack([account_info, folder_tabs, email_list])
+    q = search_query.strip()
+    if q and len(q) >= 2:
+        ql = q.lower()
+        local = [
+            m for m in inbox_msgs.messages
+            if ql in (m.get("subject", "") + " " + m.get("from", "") + " " + m.get("snippet", "")).lower()
+        ]
+        local_ids = {m.get("message_id", "") for m in local}
+        server_extra: list[dict] = []
+        try:
+            sr = await provider.search(ctx, acc, query=q, max_results=30)
+            for m in sr.get("results", []):
+                mid = m.get("message_id", m.get("id", ""))
+                if mid and mid not in local_ids:
+                    if "message_id" not in m:
+                        m = {**m, "message_id": mid}
+                    server_extra.append(m)
+        except Exception:
+            pass
+        display_messages = local + server_extra
+        unread_display   = 0
+        show_cursor      = ""
+        show_total       = 0
+    else:
+        display_messages = inbox_msgs.messages
+        unread_display   = inbox_msgs.unread_in_folder
+        show_cursor      = inbox_msgs.next_cursor
+        show_total       = inbox_msgs.total_in_folder
+
+    search_bar = ui.Input(
+        placeholder="Search…",
+        param_name="search_query",
+        value=search_query,
+        on_submit=ui.Call("__panel__inbox", folder=folder),
+    )
+
+    search_status = None
+    if q:
+        n = len(display_messages)
+        search_status = ui.Stack([
+            ui.Badge(f'"{q}"', color="blue"),
+            ui.Text(f"{n} result{'s' if n != 1 else ''}", variant="caption"),
+            ui.Button("✕", variant="ghost", size="sm",
+                      on_click=ui.Call("__panel__inbox", folder=folder, search_query="")),
+        ], direction="h", gap=1)
+
+    email_list = _build_email_list(
+        display_messages, active_email, folder,
+        unread_count=unread_display,
+        next_cursor=show_cursor,
+        total_items=show_total,
+    )
+
+    children = [header, folder_tabs, search_bar]
+    if search_status:
+        children.append(search_status)
+    children.append(email_list)
+    return ui.Stack(children, gap=1)
 
 
-@ext.panel("email_viewer", slot="center", title="Email", icon="Mail")
+@ext.panel("email_viewer", slot="center", title="Email", icon="Mail", center_overlay=True)
 async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
                               folder: str = "INBOX"):
     if not message_id:
-        return await build_accounts_panel(ctx)
+        return ui.Empty(message="Select an email to read", icon="Mail")
     return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index, folder)
 
 
-@ext.panel("accounts", slot="right", title="Accounts", icon="Users")
-async def accounts_panel(ctx, show_add: bool = False):
-    return await build_accounts_panel(ctx, show_add)
+@ext.panel(
+    "accounts", slot="right", title="Accounts", icon="Users",
+    refresh="on_event:account.switched,account.connected,account.disconnected",
+)
+async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_remove: str = ""):
+    return await build_accounts_panel(ctx, show_add, do_switch, do_remove)
 
 
-@ext.panel("compose", slot="center", title="Compose", icon="PenSquare")
+@ext.panel("compose", slot="center", title="Compose", icon="PenSquare",
+           center_overlay=True, refresh="on_event:account.switched")
 async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                          account: str = "", prefill_to: str = "",
                          prefill_subject: str = "", reply_all: str = ""):
@@ -291,6 +290,7 @@ async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                                       prefill_to, prefill_subject, reply_all_bool)
 
 
-@ext.panel("add_account", slot="right", title="Add Account", icon="UserPlus")
+@ext.panel("add_account", slot="overlay", title="Add Account", icon="UserPlus",
+           center_overlay=True)
 async def add_account_panel(ctx, step: str = "providers", email: str = "", error: str = ""):
     return await build_add_account_panel(ctx, step, email, error)

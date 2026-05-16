@@ -1,46 +1,55 @@
-"""
-Mail Client — Extension instance + lifecycle (SDK v2.0.0).
-
-Migration notes (2026-04-24, Plan 3 Task 3):
-  * Base class switched from legacy ``ChatExtension`` to v2 ``Extension``.
-    The :class:`~tools.MailExtension` subclass in ``tools.py`` registers
-    every tool via ``@sdk_ext.tool(output_schema=...)``. Webbee Narrator
-    grounds user-facing prose against those schemas kernel-side, so the
-    per-extension ``system_prompt.txt`` is gone.
-  * Panels (``panels.py`` / ``panels_*.py``), skeleton (``skeleton.py``),
-    cache models (``cache_models.py``) + health check keep their v1
-    instance-based decorators (``@ext.panel`` / ``@ext.skeleton`` /
-    ``@ext.cache_model`` / ``@ext.health_check``) — those surfaces are
-    unchanged in v2.0.0 and register against the module-level ``ext``.
-  * Business logic stays in ``handlers_*.py`` as ``impl_*`` functions so
-    the envelope swap (ActionResult → Pydantic return) is minimal.
-  * Context helpers (``_user_id`` / ``_get_acc``) live in ``ctx_helpers``
-    to keep the import graph acyclic — ``tools.py`` imports the handler
-    modules, which imported ``_get_acc`` from here in v1; moving them
-    out breaks the ``app → tools → handlers_* → app`` cycle.
-"""
+"""Mail Client — Extension instance + lifecycle (SDK v3.x / ChatExtension)."""
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+
+from imperal_sdk import Extension
+from imperal_sdk.chat import ChatExtension
 
 from providers.helpers import _all_accounts
 
-from tools import MailExtension
-
 log = logging.getLogger("mail")
 
+# ── System prompt ─────────────────────────────────────────────────────────────
 
-# ── Extension instance ────────────────────────────────────────────────────────
-#
-# Module-level ``ext`` so v1 instance-based decorators (``@ext.panel`` /
-# ``@ext.skeleton`` / ``@ext.cache_model`` / ``@ext.health_check``) continue
-# to register across panels.py / skeleton.py / cache_models.py without edits.
+_SYSTEM_PROMPT = (Path(__file__).parent / "system_prompt.txt").read_text()
 
-ext = MailExtension(app_id="mail", version="5.0.0")
+# ── Extension + ChatExtension ─────────────────────────────────────────────────
 
+ext = Extension(
+    "mail",
+    version="5.3.3",
+    display_name="Mail Client",
+    description=(
+        "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "
+        "Inbox, send, reply, forward, search, archive, manage emails, contacts."
+    ),
+    icon="mail.svg",
+    actions_explicit=True,
+    capabilities=["store:read", "store:write", "notify:push"],
+)
+
+# SDK 5.0.0 auto-registers a "secrets" panel on slot="right" in Extension.__init__.
+# Mail-client doesn't use ctx.secrets — move it away so Accounts is the sole right panel.
+try:
+    if "secrets" in ext._panels:
+        ext._panels["secrets"]["slot"] = "overlay"
+except (AttributeError, TypeError):
+    pass
+
+chat = ChatExtension(
+    ext=ext,
+    tool_name="tool_mail_client_chat",
+    description=(
+        "Mail Client — inbox, read emails, send, reply, forward, search, archive, "
+        "delete, mark read/unread, star, browse folders, view threads, bulk operations, "
+        "contacts CRUD + sync. Connect Google, Microsoft, Yahoo, IMAP."
+    ),
+    system_prompt=_SYSTEM_PROMPT,
+)
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
-
 
 @ext.health_check
 async def health(ctx) -> dict:
@@ -50,9 +59,8 @@ async def health(ctx) -> dict:
 
 @ext.on_install
 async def on_install(ctx):
-    log.info(
-        f"mail installed for user {ctx.user.id if ctx and hasattr(ctx, 'user') and ctx.user else 'system'}"
-    )
+    uid = ctx.user.imperal_id if ctx and hasattr(ctx, "user") and ctx.user else "system"
+    log.info(f"mail installed for user {uid}")
 
 
 @ext.on_event("email.received")

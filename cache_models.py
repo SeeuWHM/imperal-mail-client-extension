@@ -14,16 +14,12 @@ from __future__ import annotations
 
 from app import ext
 
-from cache_model_defs import AccountList, InboxPage, UnreadSummary
+from cache_model_defs import AccountList, InboxMessages, UnreadSummary
 
 
-# Re-export so imports of ``cache_models`` still find the classes (legacy
-# handler paths). New handler code should prefer ``cache_model_defs``.
-__all__ = ["AccountList", "InboxPage", "UnreadSummary"]
+__all__ = ["AccountList", "InboxMessages", "UnreadSummary"]
 
 
-# Register each model with the v2 ext instance. ``ext.cache_model`` is the
-# v1.6.0 decorator surface kept unchanged in v2.0.0.
-ext.cache_model("inbox_page")(InboxPage)
+ext.cache_model("inbox_messages")(InboxMessages)
 ext.cache_model("unread_summary")(UnreadSummary)
 ext.cache_model("account_list")(AccountList)
