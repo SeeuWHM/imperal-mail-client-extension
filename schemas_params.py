@@ -137,7 +137,7 @@ class AddImapParams(BaseModel):
 
 
 class ComposeSendParams(BaseModel):
-    to: str = Field(description="Recipient email address(es)")
+    to: str = Field(default="", description="Recipient email address(es)")
     subject: str = Field(default="", description="Subject (required for new emails)")
     body: str = Field(default="", description="Email body (plain text or HTML)")
     mode: str = Field(default="new", description="Mode: new, reply, forward")

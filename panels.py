@@ -107,7 +107,7 @@ async def inbox_panel(
     provider     = get_provider(acc)
     active_email = acc.get("email", "")
 
-    await _execute_panel_action(ctx, provider, acc, do_action, do_message_id)
+    await _execute_panel_action(ctx, provider, acc, do_action, do_message_id, folder)
 
     msgs_key = _inbox_messages_key(active_email, folder)
 
@@ -116,18 +116,16 @@ async def inbox_panel(
     # stale on_end_reached state replays (folder switch, account switch) are
     # silently ignored instead of loading wrong data.
     if load_more_cursor:
+        existing = None
         try:
             existing    = await ctx.cache.get(msgs_key, InboxMessages)
             cursor_data = decode_cursor(load_more_cursor)
-            # Reject cursor if it was issued for a different account (_a field).
-            # Old cursors without _a are also rejected to be safe.
             cursor_owner = cursor_data.get("_a") if cursor_data else None
             stale = not cursor_owner or cursor_owner != active_email
             if (not stale
                     and existing
                     and existing.folder == folder
                     and existing.account_id == active_email):
-                # Strip _a before passing to provider (unknown field)
                 clean_cursor = {k: v for k, v in cursor_data.items() if k != "_a"}
                 more, next_data, has_more = await asyncio.wait_for(
                     provider.fetch_page(ctx, acc, folder, 25, clean_cursor),
@@ -154,6 +152,19 @@ async def inbox_panel(
                 await ctx.cache.set(msgs_key, extended, ttl_seconds=INBOX_CACHE_TTL)
         except (asyncio.TimeoutError, Exception) as e:
             log.warning("load_more failed folder=%s: %s", folder, e)
+            # Clear the cursor so on_end_reached stops firing on repeated scrolls
+            if existing and existing.next_cursor:
+                try:
+                    await ctx.cache.set(msgs_key, InboxMessages(
+                        account_id=existing.account_id, folder=existing.folder,
+                        messages=existing.messages,
+                        total_in_folder=existing.total_in_folder,
+                        unread_in_folder=existing.unread_in_folder,
+                        next_cursor="",
+                        fetched_at=existing.fetched_at,
+                    ), ttl_seconds=INBOX_CACHE_TTL)
+                except Exception:
+                    pass
 
     header = ui.Stack([
         ui.Text(active_email[:32], variant="caption"),
@@ -249,7 +260,7 @@ async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
                               folder: str = "INBOX"):
     if not message_id:
-        return await build_accounts_panel(ctx)
+        return ui.Empty(message="Select an email to read", icon="Mail")
     return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index, folder)
 
 
@@ -261,7 +272,8 @@ async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_re
     return await build_accounts_panel(ctx, show_add, do_switch, do_remove)
 
 
-@ext.panel("compose", slot="center", title="Compose", icon="PenSquare")
+@ext.panel("compose", slot="center", title="Compose", icon="PenSquare",
+           refresh="on_event:account.switched")
 async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                          account: str = "", prefill_to: str = "",
                          prefill_subject: str = "", reply_all: str = ""):

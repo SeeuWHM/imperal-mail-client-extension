@@ -45,6 +45,9 @@ async def impl_mail_action(ctx, action: str, message_id: str = "",
         "mark_unread": lambda mid: provider.mark_read(ctx, acc, mid, read=False),
         "star":        lambda mid: provider.star(ctx, acc, mid, starred=True),
         "unstar":      lambda mid: provider.star(ctx, acc, mid, starred=False),
+        "unspam":      lambda mid: provider.move(ctx, acc, mid, "spam",    "INBOX"),
+        "unarchive":   lambda mid: provider.move(ctx, acc, mid, "archive", "INBOX"),
+        "restore":     lambda mid: provider.move(ctx, acc, mid, "trash",   "INBOX"),
     }
     fn = action_map.get(action)
     if not fn:

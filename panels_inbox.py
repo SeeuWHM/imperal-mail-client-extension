@@ -1,6 +1,8 @@
 """Mail Client · Inbox panel helpers — actions, account switch, list builders."""
 from __future__ import annotations
 
+import datetime as _dt
+import email.utils as _eu
 import logging
 
 from imperal_sdk import ui
@@ -20,7 +22,31 @@ FOLDERS = [
 ]
 
 
-async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str) -> None:
+def _format_msg_date(date_str: str) -> str:
+    """Today → HH:MM, yesterday → Yesterday, this year → Jan 05, older → Jan 05 2025."""
+    if not date_str:
+        return ""
+    try:
+        try:
+            parsed = _eu.parsedate_to_datetime(date_str)
+        except Exception:
+            parsed = _dt.datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        now  = _dt.datetime.now(_dt.timezone.utc)
+        msg  = parsed.astimezone(_dt.timezone.utc)
+        diff = (now.date() - msg.date()).days
+        if diff == 0:
+            return msg.strftime("%H:%M")
+        if diff == 1:
+            return "Yesterday"
+        if msg.year == now.year:
+            return msg.strftime("%b %d")
+        return msg.strftime("%b %d %Y")
+    except Exception:
+        return date_str[:10]
+
+
+async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str,
+                                 folder: str = "INBOX") -> None:
     """Execute a single-message action inline before the inbox list renders."""
     if not action or not message_id:
         return
@@ -40,7 +66,16 @@ async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str
             await provider.star(ctx, acc, message_id, starred=True)
         elif action == "unstar":
             await provider.star(ctx, acc, message_id, starred=False)
+        elif action == "unspam":
+            await provider.move(ctx, acc, message_id, "spam", "INBOX")
+        elif action == "unarchive":
+            await provider.move(ctx, acc, message_id, "archive", "INBOX")
+        elif action == "restore":
+            await provider.move(ctx, acc, message_id, "trash", "INBOX")
+        # Invalidate INBOX + current folder (if different) so both views refresh
         await _invalidate_first_page(ctx, email, "INBOX")
+        if folder.upper() != "INBOX":
+            await _invalidate_first_page(ctx, email, folder)
     except Exception as e:
         log.warning("panel action=%s message=%s failed: %s", action, message_id[:16], e)
 
@@ -85,43 +120,139 @@ def _build_email_list(
     next_cursor: str = "",
     total_items: int = 0,
 ) -> ui.UINode:
-    """Email list with native pagination and search via ui.List(page_size=25).
-
-    total_items: real inbox size so the paginator shows the full < 1/N > range.
-    next_cursor: when set, enables on_end_reached — clicking > beyond cached
-    pages fires a panel call that fetches the next batch from API and extends
-    the cached list seamlessly.
-    """
+    """Email list with contextual per-folder actions, per-message star/read toggles,
+    smart date formatting, and on-demand pagination via on_end_reached."""
+    folder_lower = folder.lower()
     msg_ids  = [msg.get("message_id", msg.get("id", "")) for msg in messages]
     full_ids = ",".join(msg_ids)
 
+    # ── Folder-context primary action (archive vs unarchive vs unspam etc.) ──
+    if folder_lower in ("spam", "junk"):
+        def _primary(mid):
+            return {"label": "Not Spam", "icon": "ShieldCheck",
+                    "on_click": ui.Call("__panel__inbox", folder=folder,
+                                        do_action="unspam", do_message_id=mid)}
+    elif folder_lower == "archive":
+        def _primary(mid):
+            return {"label": "To Inbox", "icon": "Inbox",
+                    "on_click": ui.Call("__panel__inbox", folder=folder,
+                                        do_action="unarchive", do_message_id=mid)}
+    elif folder_lower in ("trash", "deleted"):
+        def _primary(mid):
+            return {"label": "Restore", "icon": "Undo",
+                    "on_click": ui.Call("__panel__inbox", folder=folder,
+                                        do_action="restore", do_message_id=mid)}
+    else:
+        def _primary(mid):
+            return {"label": "Archive", "icon": "Archive",
+                    "on_click": ui.Call("__panel__inbox", folder=folder,
+                                        do_action="archive", do_message_id=mid)}
+
+    # ── Bulk actions (context-aware per folder) ──────────────────────────────
+    if folder_lower in ("spam", "junk"):
+        bulk = [
+            {"label": "Not Spam", "icon": "ShieldCheck",
+             "action": ui.Call("mail_action", action="unspam",     account=active_email)},
+            {"label": "Delete",   "icon": "Trash2",
+             "action": ui.Call("mail_action", action="delete",     account=active_email)},
+            {"label": "Read",     "icon": "MailOpen",
+             "action": ui.Call("mail_action", action="mark_read",  account=active_email)},
+            {"label": "Unread",   "icon": "Mail",
+             "action": ui.Call("mail_action", action="mark_unread",account=active_email)},
+        ]
+    elif folder_lower == "archive":
+        bulk = [
+            {"label": "To Inbox", "icon": "Inbox",
+             "action": ui.Call("mail_action", action="unarchive",  account=active_email)},
+            {"label": "Delete",   "icon": "Trash2",
+             "action": ui.Call("mail_action", action="delete",     account=active_email)},
+            {"label": "Read",     "icon": "MailOpen",
+             "action": ui.Call("mail_action", action="mark_read",  account=active_email)},
+            {"label": "Unread",   "icon": "Mail",
+             "action": ui.Call("mail_action", action="mark_unread",account=active_email)},
+        ]
+    elif folder_lower in ("trash", "deleted"):
+        bulk = [
+            {"label": "Restore", "icon": "Undo",
+             "action": ui.Call("mail_action", action="restore",    account=active_email)},
+            {"label": "Delete",  "icon": "Trash2",
+             "action": ui.Call("mail_action", action="delete",     account=active_email)},
+            {"label": "Read",    "icon": "MailOpen",
+             "action": ui.Call("mail_action", action="mark_read",  account=active_email)},
+        ]
+    elif folder_lower == "starred":
+        bulk = [
+            {"label": "Unstar",  "icon": "StarOff",
+             "action": ui.Call("mail_action", action="unstar",     account=active_email)},
+            {"label": "Archive", "icon": "Archive",
+             "action": ui.Call("mail_action", action="archive",    account=active_email)},
+            {"label": "Delete",  "icon": "Trash2",
+             "action": ui.Call("mail_action", action="delete",     account=active_email)},
+            {"label": "Read",    "icon": "MailOpen",
+             "action": ui.Call("mail_action", action="mark_read",  account=active_email)},
+        ]
+    else:
+        bulk = [
+            {"label": "Archive", "icon": "Archive",
+             "action": ui.Call("mail_action", action="archive",    account=active_email)},
+            {"label": "Delete",  "icon": "Trash2",
+             "action": ui.Call("mail_action", action="delete",     account=active_email)},
+            {"label": "Star",    "icon": "Star",
+             "action": ui.Call("mail_action", action="star",       account=active_email)},
+            {"label": "Read",    "icon": "MailOpen",
+             "action": ui.Call("mail_action", action="mark_read",  account=active_email)},
+            {"label": "Unread",  "icon": "Mail",
+             "action": ui.Call("mail_action", action="mark_unread",account=active_email)},
+        ]
+
+    # ── Per-message items ────────────────────────────────────────────────────
     items = []
     for i, msg in enumerate(messages):
-        mid     = msg_ids[i]
-        starred = msg.get("starred", False)
+        mid       = msg_ids[i]
+        starred   = msg.get("starred", False)
+        is_unread = msg.get("unread", False)
+
+        # Star toggle based on current message state
+        star_act   = "unstar" if starred else "star"
+        star_label = "Unstar" if starred else "Star"
+        star_icon  = "StarOff" if starred else "Star"
+
+        # Read/Unread toggle based on current message state
+        read_act   = "mark_read" if is_unread else "mark_unread"
+        read_label = "Read"      if is_unread else "Unread"
+        read_icon  = "MailOpen"  if is_unread else "Mail"
 
         item_actions = [
-            {"label": "Reply",   "icon": "Reply",
+            {"label": "Reply",    "icon": "Reply",
              "on_click": ui.Call("__panel__compose", mode="reply",
                                  message_id=mid, account=active_email)},
-            {"label": "Archive", "icon": "Archive",
+            {"label": star_label, "icon": star_icon,
              "on_click": ui.Call("__panel__inbox", folder=folder,
-                                 do_action="archive", do_message_id=mid)},
-            {"label": "Delete",  "icon": "Trash2",
+                                 do_action=star_act, do_message_id=mid)},
+            _primary(mid),
+            {"label": "Delete",   "icon": "Trash2",
              "on_click": ui.Call("__panel__inbox", folder=folder,
                                  do_action="delete", do_message_id=mid)},
-            {"label": "Read",    "icon": "MailOpen",
+            {"label": read_label, "icon": read_icon,
              "on_click": ui.Call("__panel__inbox", folder=folder,
-                                 do_action="mark_read", do_message_id=mid)},
+                                 do_action=read_act, do_message_id=mid)},
         ]
+
+        # Badge: unread=blue, starred-but-read=yellow, neither=None
+        if is_unread:
+            badge = ui.Badge("new", color="blue")
+        elif starred:
+            badge = ui.Badge("★", color="yellow")
+        else:
+            badge = None
 
         items.append(ui.ListItem(
             id=mid,
             title=msg.get("from", "Unknown")[:40],
             subtitle=msg.get("subject", "(no subject)")[:60],
-            meta=msg.get("date", "")[:10],
+            meta=_format_msg_date(msg.get("date", "")),
             icon="Star" if starred else "",
-            badge=ui.Badge("new", color="blue") if msg.get("unread") else None,
+            badge=badge,
             on_click=ui.Call(
                 "__panel__email_viewer",
                 message_id=mid,
@@ -133,22 +264,8 @@ def _build_email_list(
             actions=item_actions,
         ))
 
-    bulk = [
-        {"label": "Archive", "icon": "Archive",
-         "action": ui.Call("mail_action", action="archive", account=active_email)},
-        {"label": "Delete",  "icon": "Trash2",
-         "action": ui.Call("mail_action", action="delete",  account=active_email)},
-        {"label": "Read",    "icon": "MailOpen",
-         "action": ui.Call("mail_action", action="mark_read",   account=active_email)},
-        {"label": "Unread",  "icon": "Mail",
-         "action": ui.Call("mail_action", action="mark_unread", account=active_email)},
-    ]
-
     info = f"{unread_count} unread" if unread_count > 0 else ""
 
-    # on_end_reached fires when user navigates beyond the last loaded page.
-    # total_items tells the paginator the real inbox size so the < > arrows
-    # show the full page range even before all messages are fetched.
     on_end = (
         ui.Call("__panel__inbox", folder=folder, load_more_cursor=next_cursor)
         if next_cursor else None

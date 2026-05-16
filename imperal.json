@@ -1146,6 +1146,7 @@
       "params_schema": {
         "properties": {
           "to": {
+            "default": "",
             "description": "Recipient email address(es)",
             "title": "To",
             "type": "string"
@@ -1193,9 +1194,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "to"
-        ],
         "title": "ComposeSendParams",
         "type": "object"
       },
