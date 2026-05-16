@@ -27,7 +27,7 @@ from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
 
-INBOX_INLINE_LIMIT = 70    # ~3 pages from cache; skeleton pre-warms more in background
+INBOX_INLINE_LIMIT = 25    # one page; additional pages load on demand via on_end_reached
 INBOX_CACHE_TTL    = 90
 
 
@@ -38,15 +38,12 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
     except (asyncio.TimeoutError, Exception):
         pass
 
-    if folder.upper() == "INBOX":
-        try:
-            stats = await asyncio.wait_for(
-                provider.get_folder_stats(ctx, acc, folder), timeout=5.0)
-            total_in_folder  = stats.get("total", 0)
-            unread_in_folder = stats.get("unread", 0)
-        except (asyncio.TimeoutError, Exception):
-            total_in_folder = unread_in_folder = 0
-    else:
+    try:
+        stats = await asyncio.wait_for(
+            provider.get_folder_stats(ctx, acc, folder), timeout=5.0)
+        total_in_folder  = stats.get("total", 0)
+        unread_in_folder = stats.get("unread", 0)
+    except (asyncio.TimeoutError, Exception):
         total_in_folder = unread_in_folder = 0
 
     messages, next_cursor_encoded = [], ""
@@ -164,8 +161,6 @@ async def inbox_panel(
                    on_click=ui.Call("__panel__inbox", folder=folder)),
     ], direction="h", gap=1)
 
-    folder_tabs = _build_folder_tabs(folder, active_email)
-
     try:
         if do_switch_account:
             inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
@@ -179,8 +174,15 @@ async def inbox_panel(
                 inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
     except Exception as e:
         log.warning("inbox panel load failed folder=%s: %s", folder, e)
+        folder_tabs = _build_folder_tabs(folder, active_email)
         return ui.Stack([header, folder_tabs,
                          ui.Error(message=f"Failed to load {folder}: {e}")])
+
+    # Show unread count badge on the active folder tab
+    folder_tabs = _build_folder_tabs(
+        folder, active_email,
+        folder_unread={folder: inbox_msgs.unread_in_folder} if inbox_msgs.unread_in_folder else None,
+    )
 
     q = search_query.strip()
     if q and len(q) >= 2:
@@ -268,6 +270,7 @@ async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                                       prefill_to, prefill_subject, reply_all_bool)
 
 
-@ext.panel("add_account", slot="right", title="Add Account", icon="UserPlus")
+@ext.panel("add_account", slot="overlay", title="Add Account", icon="UserPlus",
+           center_overlay=True)
 async def add_account_panel(ctx, step: str = "providers", email: str = "", error: str = ""):
     return await build_add_account_panel(ctx, step, email, error)

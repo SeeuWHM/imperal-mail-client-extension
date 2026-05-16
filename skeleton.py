@@ -1,17 +1,15 @@
-"""Mail Client · Skeleton tools (SDK v3.x).
+"""Mail Client · Skeleton tools.
 
-Per I-SKELETON-LLM-ONLY: the skeleton carries scalar fields for the classifier
-envelope only — no message lists, no full inbox blobs. Panel rendering reads
-from ``ctx.cache`` via ``InboxMessages`` / ``UnreadSummary`` models.
+Per I-SKELETON-LLM-ONLY: the skeleton carries ONLY scalar fields for the
+classifier envelope — no message lists, no blobs. Panel rendering fetches
+directly from API on demand (one page, 25 messages) and caches the result
+in ``ctx.cache`` for 90 s.
 
-The refresh tool continues to fetch the latest inbox so it can:
+The skeleton does:
 1. Surface ``unread_total`` + per-account ``unread_count`` for the classifier.
-2. Diff against ``last_message_ids`` stored per-account (ctx.store) to fire
-   ``ctx.notify(...)`` for genuinely new messages.
-3. Pre-warm InboxMessages (flat list) so the panel renders instantly.
+2. Diff against ``last_message_ids`` to fire ``ctx.notify()`` for new mail.
 
-It does NOT call ``ctx.skeleton.update(...)`` — the kernel persists the
-returned dict via the ``skeleton_save_section`` activity.
+It does NOT pre-warm message lists and does NOT call ``ctx.skeleton.update()``.
 """
 from __future__ import annotations
 
@@ -26,9 +24,7 @@ from app import ext
 from providers import get_provider
 from providers.helpers import (
     _all_accounts, _refresh_token_if_needed, COLLECTION, INBOX_FETCH_SIZE,
-    _inbox_messages_key, encode_cursor,
 )
-from cache_model_defs import InboxMessages
 from schemas import InboxSummary, PerAccountUnread
 
 log = logging.getLogger("mail")
@@ -86,50 +82,6 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                 "unread_count": unread,
                 "message_count": len(messages),
             })
-
-            # Normalise message_id field
-            norm = []
-            for m in messages:
-                if "id" in m and "message_id" not in m:
-                    m = {**m, "message_id": m["id"]}
-                norm.append(m)
-
-            # Pre-warm InboxMessages (flat list for ui.List native pagination).
-            # Fetch up to 150 items (6 pages at 25 each). Page 1 is already in
-            # `norm`; fetch up to 5 more pages sequentially.
-            all_msgs = list(norm)
-            cursor_data_pw = next_cursor_data
-            for _ in range(11):  # up to 300 messages (20 initial + 11 × 25)
-                if not cursor_data_pw or len(all_msgs) >= 300:
-                    break
-                try:
-                    more, next_pw, has_pw = await provider.fetch_page(
-                        ctx, acc, "INBOX", 25, cursor_data_pw)
-                    more = [
-                        {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
-                        for m in more
-                    ]
-                    all_msgs.extend(more)
-                    if not has_pw or not next_pw:
-                        break
-                    cursor_data_pw = next_pw
-                except Exception:
-                    break
-            try:
-                # Store next_cursor so the panel can "load more" beyond 150
-                final_cursor = encode_cursor(acc.get("provider", "oauth"), cursor_data_pw) if cursor_data_pw else ""
-                inbox_msgs = InboxMessages(
-                    account_id=email, folder="INBOX",
-                    messages=all_msgs[:300],
-                    total_in_folder=total,
-                    unread_in_folder=unread,
-                    next_cursor=final_cursor,
-                    fetched_at=datetime.now(timezone.utc),
-                )
-                await ctx.cache.set(_inbox_messages_key(email, "INBOX"),
-                                    inbox_msgs, ttl_seconds=120)
-            except Exception as e:
-                log.debug("skeleton: InboxMessages cache failed for %s: %s", email, e)
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {

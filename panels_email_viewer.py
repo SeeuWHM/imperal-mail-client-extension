@@ -136,26 +136,9 @@ async def build_email_viewer(
     else:
         msg_children.append(ui.Empty(message="No content", icon="FileText"))
 
-    # ── Tab 1: Headers ─────────────────────────────────────────────────
-    headers_items = [
-        {"key": "Subject", "value": subject},
-        {"key": "From",    "value": from_name},
-        {"key": "To",      "value": to_field  or "—"},
-        {"key": "CC",      "value": cc_field  or "—"},
-        {"key": "Date",    "value": date_str  or "—"},
-        {"key": "Message", "value": message_id},
-        {"key": "Folder",  "value": folder},
-    ]
-
     return ui.Stack([
         _action_bar(message_id, account_email,
                     has_cc=bool(cc_field), folder=folder,
                     email_list_ids=email_list_ids, current_index=current_index),
-        ui.Tabs(
-            tabs=[
-                {"label": "Message", "content": ui.Stack(msg_children, gap=2)},
-                {"label": "Headers", "content": ui.KeyValue(items=headers_items, columns=1)},
-            ],
-            default_tab=0,
-        ),
+        ui.Stack(msg_children, gap=2),
     ], className="px-4 pb-4")

@@ -19,7 +19,7 @@ _SYSTEM_PROMPT = (Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "mail",
-    version="5.3.2",
+    version="5.3.3",
     display_name="Mail Client",
     description=(
         "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "
@@ -29,6 +29,11 @@ ext = Extension(
     actions_explicit=True,
     capabilities=["store:read", "store:write", "notify:push"],
 )
+
+# SDK 5.0.0 auto-registers a "secrets" panel on slot="right" in Extension.__init__.
+# Mail-client doesn't use ctx.secrets — move it away so Accounts is the sole right panel.
+if "secrets" in ext._panels:
+    ext._panels["secrets"]["slot"] = "overlay"
 
 chat = ChatExtension(
     ext=ext,

@@ -58,16 +58,22 @@ async def _switch_active_account(ctx, target_email: str) -> None:
         log.warning("switch_active_account to %s failed: %s", target_email, e)
 
 
-def _build_folder_tabs(folder: str, active_email: str) -> ui.UINode:
-    buttons = [
-        ui.Button(
-            f["label"],
-            variant="primary" if f["key"] == folder else "ghost",
+def _build_folder_tabs(folder: str, active_email: str,
+                       folder_unread: dict | None = None) -> ui.UINode:
+    """Folder tab buttons. folder_unread maps folder key → unread count."""
+    counts = folder_unread or {}
+    buttons = []
+    for f in FOLDERS:
+        key   = f["key"]
+        label = f["label"]
+        n     = counts.get(key, 0)
+        label_str = f"{label} ({n})" if n > 0 else label
+        buttons.append(ui.Button(
+            label_str,
+            variant="primary" if key == folder else "ghost",
             size="sm",
-            on_click=ui.Call("__panel__inbox", folder=f["key"]),
-        )
-        for f in FOLDERS
-    ]
+            on_click=ui.Call("__panel__inbox", folder=key),
+        ))
     return ui.Stack(buttons, direction="h", wrap=True, gap=1)
 
 
