@@ -113,6 +113,7 @@ async def build_compose_panel(
             ],
             action="compose_send",
             submit_label="Send",
-            defaults={"mode": mode, "message_id": message_id, "account": account_email},
+            defaults={"mode": mode, "message_id": message_id, "account": account_email,
+                      "to": ",".join(to_tags), "cc": ",".join(cc_tags)},
         ),
     ], className="px-4 pb-4")

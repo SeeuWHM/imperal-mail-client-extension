@@ -18,6 +18,17 @@ log = logging.getLogger(__name__)
 async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: str = "",
                             subject: str = "", body: str = "", cc: str = "", bcc: str = "",
                             account: str = "") -> ComposeSendResult:
+    # TagInput may not submit pre-filled values when user doesn't interact with the field.
+    # For reply mode, recover the original sender from the message so the form still works.
+    if not to and mode == "reply" and message_id:
+        try:
+            acc_tmp, prov_tmp = await _get_acc(ctx, account)
+            if acc_tmp:
+                orig = await prov_tmp.read_email(ctx, acc_tmp, message_id)
+                if orig.get("RESULT") != "ERROR":
+                    to = orig.get("from", "")
+        except Exception:
+            pass
     if not to:
         raise RuntimeError("Recipient (to) is required.")
     acc, provider = await _get_acc(ctx, account)

@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.3.4] — 2026-05-17
+
+### Fixed
+- **Bug 2 — Reply "TO field empty" error** (`handlers_panel_compose.py`): TagInput pre-filled `values=` are display-only and not always submitted by the SDK form. For reply mode, if `to` arrives empty but `message_id` is set, the handler now fetches the original message's `from` field as a server-side fallback before raising the "required" error.
+- **Bug 3 — Unconfirmed TagInput text lost on submit** (`panels_compose.py`): Added `to` and `cc` to Form `defaults` so pre-filled recipient tags have a fallback value even when the user never interacts with (and thus never "confirms") the TagInput field.
+- **Bug 1 — Starred email read/unread state not updating visually** (`panels.py`): Applied optimistic in-memory patch to cached `InboxMessages` after `mark_read`, `mark_unread`, `star`, and `unstar` inline panel actions. Patches the specific message's `unread`/`starred` flag and writes the result back to cache, bypassing Gmail eventual-consistency lag that caused the old state to survive the next `fetch_page` call.
+
+---
+
 ## [5.3.3-patch2] — 2026-05-17
 
 ### Fixed

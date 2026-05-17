@@ -189,6 +189,36 @@ async def inbox_panel(
         return ui.Stack([header, folder_tabs,
                          ui.Error(message=f"Failed to load {folder}: {e}")])
 
+    # Optimistic patch — bypasses Gmail eventual-consistency lag for per-message state changes.
+    # Provider API may still return the old state on the very next fetch_page call, so we
+    # apply the known outcome directly to the cached object and write it back.
+    if do_action in ("mark_read", "mark_unread", "star", "unstar") and do_message_id:
+        patched = []
+        for m in inbox_msgs.messages:
+            if m.get("message_id") == do_message_id:
+                m = dict(m)
+                if do_action == "mark_read":
+                    m["unread"] = False
+                elif do_action == "mark_unread":
+                    m["unread"] = True
+                elif do_action == "star":
+                    m["starred"] = True
+                elif do_action == "unstar":
+                    m["starred"] = False
+            patched.append(m)
+        inbox_msgs = InboxMessages(
+            account_id=inbox_msgs.account_id, folder=inbox_msgs.folder,
+            messages=patched,
+            total_in_folder=inbox_msgs.total_in_folder,
+            unread_in_folder=inbox_msgs.unread_in_folder,
+            next_cursor=inbox_msgs.next_cursor,
+            fetched_at=inbox_msgs.fetched_at,
+        )
+        try:
+            await ctx.cache.set(msgs_key, inbox_msgs, ttl_seconds=INBOX_CACHE_TTL)
+        except Exception:
+            pass
+
     # Show unread count badge on the active folder tab
     folder_tabs = _build_folder_tabs(
         folder, active_email,
