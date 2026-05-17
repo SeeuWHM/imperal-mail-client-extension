@@ -13,9 +13,9 @@ It does NOT pre-warm message lists and does NOT call ``ctx.skeleton.update()``.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time as _time
-from datetime import datetime, timezone
 
 from imperal_sdk.chat.action_result import ActionResult
 
@@ -50,21 +50,24 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
         prev_ids = set(acc.get("last_message_ids", []) or [])
 
         try:
-            acc = await _refresh_token_if_needed(ctx, acc)
+            acc = await asyncio.wait_for(_refresh_token_if_needed(ctx, acc), timeout=5.0)
             provider = get_provider(acc)
 
             # Get folder stats (total + unread) via dedicated API endpoint
             try:
-                stats = await provider.get_folder_stats(ctx, acc, "INBOX")
+                stats = await asyncio.wait_for(
+                    provider.get_folder_stats(ctx, acc, "INBOX"), timeout=5.0)
                 total = stats.get("total", 0)
                 unread = int(stats.get("unread", 0))
-            except Exception:
+            except (asyncio.TimeoutError, Exception):
                 total = 0
                 unread = 0
 
-            # Fetch page 1 via fetch_page (gives us next_cursor for manifest)
-            messages, next_cursor_data, has_more = await provider.fetch_page(
-                ctx, acc, "INBOX", INBOX_FETCH_SIZE, None)
+            # Fetch page 1 via fetch_page (gives us message IDs for new-mail detection)
+            messages, next_cursor_data, has_more = await asyncio.wait_for(
+                provider.fetch_page(ctx, acc, "INBOX", INBOX_FETCH_SIZE, None),
+                timeout=10.0,
+            )
             curr_ids = {
                 m.get("id", m.get("message_id", ""))
                 for m in messages
@@ -107,7 +110,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                     )
                 except Exception:
                     pass
-        except Exception as e:
+        except (asyncio.TimeoutError, Exception) as e:
             log.error(f"Mail refresh error {email}: {e}")
             # Best-effort fallback — preserve last known per-account unread.
             per_account.append({
@@ -131,4 +134,20 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
 @ext.tool("skeleton_alert_mail_inbox_summary",
           description="Alert check for new unread emails.")
 async def skeleton_alert_mail_inbox_summary(ctx) -> ActionResult:
-    return ActionResult.success(data={}, summary="")
+    """Lightweight alert check — reads last-known unread counts from store (no API calls).
+    The kernel uses the returned unread_total for badge display and push-notification gating."""
+    try:
+        accounts = await _all_accounts(ctx)
+        unread_total = sum(int(a.get("unread_count", 0)) for a in accounts)
+        per_account  = [
+            {"email": a.get("email", ""), "unread_count": int(a.get("unread_count", 0))}
+            for a in accounts
+        ]
+        summary = f"{unread_total} unread" if unread_total else "0 unread"
+        return ActionResult.success(
+            data={"unread_total": unread_total, "per_account": per_account},
+            summary=summary,
+        )
+    except Exception as e:
+        log.debug("skeleton_alert failed: %s", e)
+        return ActionResult.success(data={"unread_total": 0, "per_account": []}, summary="")

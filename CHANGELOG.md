@@ -1,5 +1,16 @@
 # Changelog
 
+## [5.3.5] — 2026-05-17
+
+### Fixed
+- **`skeleton.py` — `skeleton_alert_mail_inbox_summary` стаб** (регрессия из merge-конфликта v5.3.3): alert tool был заглушкой `data={}, summary=""`. Реализован как lightweight check: читает `unread_count` из store для каждого аккаунта (без API-вызовов) и возвращает `unread_total` + `per_account`. Ядро использует это для значка и gating push-уведомлений.
+- **`skeleton.py` — нет таймаутов**: `_refresh_token_if_needed`, `get_folder_stats`, `fetch_page` вызывались без `asyncio.wait_for`. Зависший IMAP/OAuth-коннект мог заморозить весь skeleton indefinitely. Добавлены таймауты: 5 s на token refresh + folder stats, 10 s на fetch_page (аналогично panels.py).
+
+### Verified OK (не требует изменений)
+- Открытие письма → mark as read: все 3 провайдера (Gmail, Microsoft, IMAP) вызывают `_update_read_in_cache` → `_invalidate_first_page` внутри `read_email`. Когда пользователь возвращается в inbox, кеш уже инвалидирован → fetch fresh → письмо отображается как прочитанное.
+
+---
+
 ## [5.3.4] — 2026-05-17
 
 ### Fixed
