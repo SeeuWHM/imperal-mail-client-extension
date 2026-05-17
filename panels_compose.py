@@ -36,7 +36,7 @@ async def build_compose_panel(
     suggestions: list[str] = []
     try:
         docs = await ctx.store.query(CONTACTS_COLLECTION, limit=200)
-        suggestions = sorted({d.get("email", "") for d in docs if d.get("email")})
+        suggestions = sorted({d.data.get("email", "") for d in docs.data if d.data.get("email")})
     except Exception:
         pass
 

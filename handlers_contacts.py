@@ -42,9 +42,9 @@ async def impl_contacts(ctx, search: str = "", limit: int = 50) -> ContactsList:
     docs = await ctx.store.query(CONTACTS_COLLECTION, limit=min(limit, 200))
     sq = search.lower() if search else ""
     contacts = [
-        ContactEntry(email=d.get("email", ""), name=d.get("name", ""), source=d.get("source", "manual"))
-        for d in docs
-        if not sq or sq in d.get("email", "").lower() or sq in d.get("name", "").lower()
+        ContactEntry(email=d.data.get("email", ""), name=d.data.get("name", ""), source=d.data.get("source", "manual"))
+        for d in docs.data
+        if not sq or sq in d.data.get("email", "").lower() or sq in d.data.get("name", "").lower()
     ]
     contacts.sort(key=lambda c: (c.name or c.email))
     return ContactsList(contacts=contacts, total=len(contacts))
@@ -55,7 +55,7 @@ async def impl_add_contact(ctx, email: str, name: str = "") -> ContactAdded:
     if "@" not in email_l:
         raise RuntimeError("Valid email address is required.")
     existing = await ctx.store.query(CONTACTS_COLLECTION, where={"email": email_l})
-    if existing:
+    if existing.data:
         raise RuntimeError(f"Contact {email_l} already exists.")
     now = int(_time.time())
     await ctx.store.create(CONTACTS_COLLECTION,
