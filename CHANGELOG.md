@@ -1,5 +1,38 @@
 # Changelog
 
+## [5.3.3-patch2] — 2026-05-17
+
+### Fixed
+- **`handlers_contacts.py:impl_contacts`** — `for d in docs` + `d.get()` on `Page` объект → `for d in docs.data` + `d.data.get()`. Список контактов через чат всегда возвращал пустой массив.
+- **`handlers_contacts.py:impl_add_contact`** — `if existing:` всегда True (Page truthy даже когда пустой) → `if existing.data:`. Добавление контактов было невозможно: сразу выпадал "already exists".
+- **`panels_compose.py`** — contact suggestions: та же ошибка `for d in docs` + `d.get("email")` → `docs.data` + `d.data.get("email")`. Autocomplete поля "Кому" в compose всегда был пустой.
+- **`main.py`** — docstring версия исправлена с `v5.2.0` на `v5.3.3 / SDK v5.0.0`.
+
+---
+
+## [5.3.3-patch1] — 2026-05-17
+
+### Fixed
+- **Layout: compose холодный старт** — `compose_panel` всегда рендерил UI при вызове с дефолтными параметрами, занимая center slot при восстановлении состояния Kernel. Добавлен параметр `compose_active: str = ""` — панель возвращает `None` пока не передан `compose_active=True`. Все 4 точки вызова обновлены: Reply/Reply All/Forward в `panels_email_viewer.py`, Reply в `panels_inbox.py`.
+- **Layout: email viewer холодный старт** — `email_viewer_panel` возвращал `ui.Empty(...)` при пустом `message_id`, занимая center slot. Изменён на `return None`.
+- **Layout: slot="overlay"** — `email_viewer` и `compose` переведены с `slot="center"` на `slot="overlay"` + `center_overlay=True`, чтобы чат занимал центр по умолчанию.
+
+---
+
+## [5.3.3] — 2026-05-17
+
+### Fixed
+- **`schemas.py:EmailBody`** — поля `body_text`/`body_html` переименованы в `body`/`body_type` (соответствие реальному выводу всех трёх провайдеров). LLM никогда не получал тело письма.
+- **`providers/helpers.py:_active_account`** — `for d in docs` → `for d in docs.data`, `if not docs` → `if not docs.data`, `d.get()` → `d.data.get()`. Document/Page паттерн был неправильный.
+- **`panels.py:compose`** — добавлен `center_overlay=True` в `@ext.panel` декоратор.
+- **`panels.py`** — cache write-back после account switch и integrity guard re-fetch.
+- **`handlers_manage.py`** — добавлен `_invalidate_first_page()` во все 7 `impl_*` функций (archive/delete/mark_read/mark_unread/star/move/purge). До этого inbox показывал устаревшее состояние до 90 сек.
+- **`skeleton.py`** — alert tool был пустым стабом, реализован полностью.
+- **`app.py`** — `ext._panels["secrets"]` обёрнут в `try/except` для совместимости с SDK 5.0.0.
+- **`handlers_ui.py`** — `body.body_text` → `body.body` (следствие EmailBody fix).
+
+---
+
 ## [5.3.1-patch] — 2026-05-10
 
 ### Fixed
