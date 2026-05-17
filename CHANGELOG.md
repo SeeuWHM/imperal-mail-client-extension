@@ -1,5 +1,18 @@
 # Changelog
 
+## [5.3.6] — 2026-05-17
+
+### Fixed
+- **`handlers_ui.py:_email_ui`** — `body.body_text` → `body.body` (поле переименовано в v5.3.3, legacy-имя не обновили). Рендеринг полученного письма в inline чат-UI вызывал `AttributeError`.
+- **`schemas.py:SkeletonAlertMessage`** — модель описывала `message: str` вместо актуального ответа `{unread_total: int, per_account: list}`. Приведена в соответствие с `skeleton_alert_mail_inbox_summary`.
+- **`main.py`** — docstring всё ещё говорил `v5.2.0 / SDK v4.x`. Обновлён до `v5.3.6 / SDK v5.0.0`.
+
+### Docs
+- **`README.md`** — SDK badge `2.0.0` → `5.0.0`, версия `5.0.0` → `5.3.6`, убран несуществующий `tools.py`, исправлены слоты панелей (email_viewer/compose/add_account — overlay+center_overlay, не center/right), `InboxPage` → `InboxMessages`, добавлены все новые файлы в архитектурную таблицу, обновлена секция skeleton.
+- **`extensions/mail-client.md`** — версия/дата/коммит; "Optimistic UI" перемещена из Known Limitations в What Works; добавлены v5.3.4+v5.3.5 в changelog таблицу; исправлена заметка про panels_compose.py (password → TagInput defaults); обновлён security invariant `compose_send to`.
+
+---
+
 ## [5.3.5] — 2026-05-17
 
 ### Fixed

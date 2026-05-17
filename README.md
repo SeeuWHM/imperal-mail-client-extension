@@ -1,7 +1,7 @@
 # imperal-mail-client-extension
 
-[![Imperal SDK](https://img.shields.io/badge/imperal--sdk-2.0.0-blue)](https://pypi.org/project/imperal-sdk/)
-[![Version](https://img.shields.io/badge/version-5.0.0-green)](https://github.com/SeeuWHM/imperal-mail-client-extension/releases)
+[![Imperal SDK](https://img.shields.io/badge/imperal--sdk-5.0.0-blue)](https://pypi.org/project/imperal-sdk/)
+[![Version](https://img.shields.io/badge/version-5.3.5-green)](https://github.com/SeeuWHM/imperal-mail-client-extension/releases)
 [![License](https://img.shields.io/badge/license-LGPL--2.1-orange)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Imperal%20Cloud-purple)](https://panel.imperal.io)
 
@@ -44,7 +44,7 @@ Or use the panel — click emails to open them, reply/forward with one click, mu
 
 ## Capabilities
 
-### Tools (35)
+### Tools (37 total: 35 @chat.function + 2 skeleton)
 
 **Account management:** `connect`, `connect_microsoft`, `connect_yahoo`, `connect_imap`, `disconnect`, `status`, `switch_account`
 
@@ -60,54 +60,65 @@ Or use the panel — click emails to open them, reply/forward with one click, mu
 
 **Panel:** `mail_action`, `folder_counts`, `get_oauth_url`, `add_imap`, `compose_send`
 
-### Panel (5 `@ext.panel` handlers)
+**Skeleton:** `skeleton_refresh_mail_inbox_summary`, `skeleton_alert_mail_inbox_summary`
+
+### Panel (5 `@ext.panel` handlers + 1 SDK-auto `secrets`)
 
 | Panel | Slot | Purpose |
 |-------|------|---------|
-| `inbox` | left | Email list with infinite scroll, bulk select, folder tabs |
-| `email_viewer` | center | Full email with HTML rendering, attachments, action bar |
-| `accounts` | right | Connected accounts list with active indicator |
-| `compose` | center | Reply / forward / new email form |
-| `add_account` | right | 3-step wizard: OAuth / password / advanced IMAP settings |
+| `inbox` | left (permanent) | Email list with infinite scroll, bulk select, folder tabs |
+| `email_viewer` | overlay (center_overlay=True) | Full email with HTML rendering, attachments, action bar |
+| `accounts` | right (permanent) | Connected accounts list with active indicator |
+| `compose` | overlay (center_overlay=True) | Reply / forward / new email form |
+| `add_account` | overlay (center_overlay=True) | 3-step wizard: OAuth / password / advanced IMAP settings |
+| `secrets` | overlay | SDK auto-registered; moved from right → overlay |
 
 ---
 
-## Architecture (v5.0.0 / SDK v2.0.0)
+## Architecture (v5.3.5 / SDK v5.0.0)
 
 ```
 imperal-mail-client-extension/
 ├── main.py                   # Entry point — sys.modules cleanup + imports
-├── app.py                    # MailExtension instance (v2 Extension) + lifecycle
-├── tools.py                  # Tool class with @sdk_ext.tool methods (35 tools)
-├── schemas.py                # Pydantic output schemas for all tools
-├── ctx_helpers.py            # _user_id / _get_acc (shared by handlers + panels)
-├── cache_model_defs.py       # Pure Pydantic cache models (InboxPage, UnreadSummary)
+├── app.py                    # Extension instance (SDK v5.0.0) + ChatExtension + lifecycle
+├── schemas.py                # Pydantic response schemas for all tools
+├── schemas_params.py         # Pydantic input param models for @chat.function handlers
+├── ctx_helpers.py            # _user_id / _get_acc / _oauth_state (break import cycle)
+├── cache_model_defs.py       # Pure Pydantic cache models (InboxMessages, UnreadSummary, AccountList)
 ├── cache_models.py           # ctx.cache model registrations
-├── skeleton.py               # Skeleton: inbox summary + alert (LLM-Only, SDK v1.6.0)
-├── handlers_connect.py       # impl_connect / impl_status / impl_switch / impl_disconnect
-├── handlers_inbox.py         # impl_inbox / impl_read_email / impl_search / impl_send / impl_reply
-├── handlers_manage.py        # impl_archive / impl_delete / impl_star / impl_move / impl_bulk_*
-├── handlers_contacts.py      # impl_contacts / impl_add_contact / impl_sync / impl_delete_contact
-├── handlers_panel_actions.py # impl_mail_action / impl_folder_counts / impl_get_oauth_url / impl_add_imap
-├── handlers_panel_compose.py # impl_compose_send
-├── panels.py                 # @ext.panel: inbox + email_viewer + accounts + compose + add_account
-├── panels_email_viewer.py    # Email viewer builder (HTML + attachments)
-├── panels_accounts.py        # Accounts panel builder
-├── panels_add_account.py     # Add account wizard builder
-├── panels_compose.py         # Compose panel builder
-├── imperal.json              # Extension manifest (v5.0.0, sdk_version 2.0.0)
+├── skeleton.py               # @ext.skeleton: inbox summary (TTL 60s, alert=True) + alert tool
+├── handlers_connect.py       # connect / connect_microsoft / connect_yahoo / connect_imap
+│                             # status / switch_account / disconnect
+├── handlers_inbox.py         # inbox / read_email / search / folder / get_thread
+│                             # send / reply / forward
+├── handlers_manage.py        # archive / delete / mark_read / mark_unread / star
+│                             # move / purge / bulk_archive / bulk_delete / bulk_mark_*
+├── handlers_contacts.py      # contacts / add_contact / sync_contacts / delete_contact
+├── handlers_panel_actions.py # mail_action / folder_counts / get_oauth_url / add_imap
+├── handlers_panel_compose.py # compose_send
+├── handlers_ui.py            # Inline chat UI builders: _inbox_ui / _email_ui / _search_ui
+├── panels.py                 # @ext.panel registrations + inbox_panel handler
+├── panels_inbox.py           # FOLDERS / _execute_panel_action / _build_folder_tabs / _build_email_list
+├── panels_email_viewer.py    # build_email_viewer() — HTML sandbox, prev/next nav, action bar
+├── panels_accounts.py        # build_accounts_panel()
+├── panels_add_account.py     # build_add_account_panel() — 3-step wizard
+├── panels_compose.py         # build_compose_panel() — reply/forward/new + TagInput autocomplete
+├── panels_schedule.py        # Retired schedule stub (inbox_warmup removed)
+├── imperal.json              # Extension manifest (schema v3, sdk_version 5.0.0)
 └── providers/
     ├── __init__.py           # Provider factory (get_provider)
-    ├── base.py               # BaseMailProvider abstract interface
-    ├── google.py             # Gmail REST API (class skeleton + normalizer)
-    ├── google_read.py        # Gmail read: inbox, fetch_page, unread_count, read, search
+    ├── base.py               # BaseMailProvider abstract interface (16 methods)
+    ├── google.py             # Gmail: class skeleton + normalizer
+    ├── google_read.py        # Gmail read: inbox, fetch_page, stats, read_email, search
     ├── google_write.py       # Gmail write: send, reply, forward, archive, delete, mark, star, move, purge
-    ├── microsoft.py          # Microsoft Graph API implementation
+    ├── microsoft.py          # Microsoft Graph API: read + write
+    ├── microsoft_write.py    # Microsoft write helpers
     ├── imap.py               # IMAP/SMTP provider (password + XOAUTH2)
     ├── imap_connection.py    # IMAP/SMTP connect + auth helpers
-    ├── imap_read.py          # IMAP read: inbox, fetch_page, unread_count, read, search, folder
+    ├── imap_read.py          # IMAP read: inbox, fetch_page, stats, search, folder
+    ├── imap_read_message.py  # IMAP single-message fetch + \Seen flag
     ├── imap_write.py         # IMAP write: send, move, flag, purge, save_to_sent
-    ├── helpers.py            # Constants, account helpers, IMAP detection, ctx.cache key helpers
+    ├── helpers.py            # Constants, account helpers, IMAP detection, cache key helpers
     ├── token_refresh.py      # OAuth token refresh + HTTP wrappers (Google/MS/Yahoo)
     └── text_utils.py         # Header decode, body extract, MIME builder, Fernet crypto
 ```
@@ -118,17 +129,17 @@ imperal-mail-client-extension/
 
 | Collection | Contents |
 |------------|----------|
-| `gmail_accounts` | Connected accounts — OAuth tokens, IMAP credentials (Fernet-encrypted passwords) |
+| `gmail_accounts` | Connected accounts — OAuth tokens, IMAP credentials (Fernet-encrypted passwords), `unread_count`, `last_message_ids`, `last_fetched` |
 | `mail_contacts` | Email contacts — name, email, source, last_seen |
-| `mail_last_read` | Last read message metadata — for reply continuity |
+| `mail_last_read` | Last read message metadata — message_id, subject, sender, thread_id, **account** (for reply account restoration) |
 
 > **Note:** Collection is named `gmail_accounts` for legacy backwards compatibility. It stores all provider types (Google, Microsoft, IMAP, Yahoo).
 
 ---
 
-## Skeleton (SDK v1.6.0)
+## Skeleton (SDK v5.0.0)
 
-`skeleton_refresh_mail_inbox_summary` runs every 60s and returns a compact scalar envelope per I-SKELETON-LLM-ONLY:
+`skeleton_refresh_mail_inbox_summary` runs every 60s (TTL=60, alert=True):
 
 ```json
 {
@@ -141,7 +152,9 @@ imperal-mail-client-extension/
 }
 ```
 
-Panel inbox rendering uses `ctx.cache` (InboxPage / UnreadSummary models), not the skeleton.
+`skeleton_alert_mail_inbox_summary` is a lightweight check — reads last-known `unread_count` from store (no API calls) and returns `{unread_total, per_account}` for kernel badge display and push-notification gating.
+
+Panel inbox rendering uses `ctx.cache` (`InboxMessages` model, TTL=90s), not the skeleton.
 
 ---
 
@@ -163,5 +176,5 @@ Panel inbox rendering uses `ctx.cache` (InboxPage / UnreadSummary models), not t
 
 ## Built with
 
-- [imperal-sdk](https://github.com/imperalcloud/imperal-sdk) 2.0.0
+- [imperal-sdk](https://github.com/imperalcloud/imperal-sdk) 5.0.0
 - [Imperal Cloud](https://panel.imperal.io)

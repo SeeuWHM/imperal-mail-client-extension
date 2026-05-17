@@ -278,9 +278,10 @@ class InboxSummary(BaseModel):
 
 
 class SkeletonAlertMessage(BaseModel):
-    """skeleton_alert_mail_inbox_summary — proactive new-mail narration."""
+    """skeleton_alert_mail_inbox_summary — lightweight unread count from store (no API calls)."""
 
-    message: str = ""
+    unread_total: int = 0
+    per_account: list[dict] = Field(default_factory=list)
 
 
 # Re-export param models so handler imports (from schemas import FooParams) keep working.
