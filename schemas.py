@@ -125,6 +125,7 @@ class EmailBody(BaseModel):
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     unread: Optional[bool] = None
     starred: Optional[bool] = None
+    replied: Optional[bool] = None
     folder: Optional[str] = None
 
     model_config = {"populate_by_name": True}

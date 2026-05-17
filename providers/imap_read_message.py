@@ -70,16 +70,28 @@ def _sync_imap_read(email_addr: str, host: str, port: int, message_id: str,
                 continue
             msg = email_lib.message_from_bytes(raw)
             imap.uid("STORE", uid_bytes, "+FLAGS", "\\Seen")
+            replied = False
+            try:
+                _, flags_resp = imap.uid("FETCH", uid_bytes, "FLAGS")
+                if flags_resp and flags_resp[0]:
+                    flags_line = flags_resp[0]
+                    if isinstance(flags_line, tuple):
+                        flags_line = flags_line[0]
+                    replied = b"\\Answered" in (flags_line if isinstance(flags_line, bytes) else b"")
+            except Exception:
+                pass
             imap.logout()
             body, body_type = _parse_imap_body(msg)
             return {
                 "subject":           _decode_header(msg.get("Subject", "(no subject)")),
                 "from":              _decode_header(msg.get("From", "unknown")),
                 "to":                _decode_header(msg.get("To", "")),
+                "cc":                _decode_header(msg.get("Cc", "")),
                 "date":              msg.get("Date", ""),
                 "body":              body,
                 "body_type":         body_type,
                 "message_id_header": msg.get("Message-ID", ""),
+                "replied":           replied,
             }
         except Exception:
             continue

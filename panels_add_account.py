@@ -55,7 +55,7 @@ def _step_password(email: str, error: str) -> ui.UINode:
         children.append(ui.Alert(message=error, type="error"))
 
     children.append(ui.Form(
-        children=[ui.Password(placeholder="Password or App Password", param_name="password")],
+        children=[ui.Input(placeholder="Password or App Password", param_name="password")],
         action="add_imap",
         submit_label="Connect",
         defaults={
@@ -83,7 +83,7 @@ def _step_advanced(email: str, error: str) -> ui.UINode:
 
     children.append(ui.Form(
         children=[
-            ui.Password(placeholder="Password", param_name="password"),
+            ui.Input(placeholder="Password", param_name="password"),
             ui.Input(placeholder="IMAP Host", value=detected.get("imap_host", ""), param_name="imap_host"),
             ui.Input(placeholder="IMAP Port", value=str(detected.get("imap_port", 993)), param_name="imap_port"),
             ui.Input(placeholder="SMTP Host", value=detected.get("smtp_host", ""), param_name="smtp_host"),

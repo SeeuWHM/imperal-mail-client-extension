@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.0.0",
   "app_id": "mail",
-  "version": "5.3.6",
+  "version": "5.4.0",
   "name": "Mail Client",
   "description": "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. Inbox, send, reply, forward, search, archive, manage emails, contacts.",
   "icon": "mail.svg",

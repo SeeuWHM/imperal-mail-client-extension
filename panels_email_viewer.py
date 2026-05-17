@@ -102,6 +102,7 @@ async def build_email_viewer(
     body        = result.get("body", "")
     body_type   = result.get("body_type", "html")
     attachments = result.get("attachments", [])
+    replied     = result.get("replied", False)
 
     # ── Tab 0: Message ──────────────────────────────────────────────────
     meta_items = [{"key": "From", "value": from_name}]
@@ -109,8 +110,13 @@ async def build_email_viewer(
     if cc_field:  meta_items.append({"key": "CC",   "value": cc_field})
     if date_str:  meta_items.append({"key": "Date", "value": date_str})
 
+    subject_row: list = [ui.Header(text=subject, level=3)]
+    if replied:
+        subject_row.append(ui.Badge("↩ Replied", color="green"))
+
     msg_children: list = [
-        ui.Header(text=subject, level=3),
+        ui.Stack(subject_row, direction="h", gap=2, align="center") if replied
+        else ui.Header(text=subject, level=3),
         ui.KeyValue(items=meta_items, columns=1),
     ]
     if attachments:

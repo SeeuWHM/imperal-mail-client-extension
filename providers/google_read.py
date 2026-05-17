@@ -114,6 +114,7 @@ class GoogleReadMixin:
         subject = _header(headers, "Subject") or "(no subject)"
         sender  = _header(headers, "From")    or "unknown"
         to_addr = _header(headers, "To")      or ""
+        cc_addr = _header(headers, "Cc")      or ""
         date    = _header(headers, "Date")    or ""
         mid_h   = _header(headers, "Message-ID") or ""
         body, body_type = _decode_body_with_type(msg.get("payload", {}))
@@ -139,7 +140,7 @@ class GoogleReadMixin:
 
         result: dict = {
             "message_id": message_id, "subject": subject, "from": sender,
-            "to": to_addr, "date": date, "body": body,
+            "to": to_addr, "cc": cc_addr, "date": date, "body": body,
             "thread_id": msg.get("threadId", ""), "body_type": body_type,
         }
         attachments = _walk_attachments(msg.get("payload", {}))

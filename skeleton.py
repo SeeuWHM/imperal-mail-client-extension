@@ -1,15 +1,9 @@
 """Mail Client · Skeleton tools.
 
-Per I-SKELETON-LLM-ONLY: the skeleton carries ONLY scalar fields for the
-classifier envelope — no message lists, no blobs. Panel rendering fetches
-directly from API on demand (one page, 25 messages) and caches the result
-in ``ctx.cache`` for 90 s.
-
 The skeleton does:
 1. Surface ``unread_total`` + per-account ``unread_count`` for the classifier.
 2. Diff against ``last_message_ids`` to fire ``ctx.notify()`` for new mail.
-
-It does NOT pre-warm message lists and does NOT call ``ctx.skeleton.update()``.
+3. Write first page of INBOX to ctx.cache so the panel opens instantly (0 extra API calls).
 """
 from __future__ import annotations
 
@@ -21,9 +15,11 @@ from imperal_sdk.chat.action_result import ActionResult
 
 from app import ext
 
+from cache_model_defs import InboxMessages
 from providers import get_provider
 from providers.helpers import (
-    _all_accounts, _refresh_token_if_needed, COLLECTION, INBOX_FETCH_SIZE,
+    _all_accounts, _inbox_messages_key, _refresh_token_if_needed,
+    COLLECTION, INBOX_FETCH_SIZE, encode_cursor,
 )
 from schemas import InboxSummary, PerAccountUnread
 
@@ -95,6 +91,32 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                 })
             except Exception:
                 pass
+
+            # Write first inbox page to cache — panel reads this instantly, no extra API call.
+            try:
+                _normalized = [
+                    {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
+                    for m in messages
+                ]
+                _next_cursor = ""
+                if has_more and next_cursor_data:
+                    _next_cursor = encode_cursor(
+                        acc.get("provider", "oauth"), next_cursor_data, account=email
+                    ) or ""
+                await ctx.cache.set(
+                    _inbox_messages_key(email, "INBOX"),
+                    InboxMessages(
+                        account_id=email, folder="INBOX",
+                        messages=_normalized,
+                        total_in_folder=total,
+                        unread_in_folder=unread,
+                        next_cursor=_next_cursor,
+                        fetched_at=datetime.now(timezone.utc),
+                    ),
+                    ttl_seconds=60,
+                )
+            except Exception as e:
+                log.debug("skeleton cache write failed %s: %s", email, e)
 
             if truly_new:
                 try:

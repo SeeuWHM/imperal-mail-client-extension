@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 # ── Storage constants ──────────────────────────────────────────────────────
 COLLECTION          = "gmail_accounts"   # kept for backwards compat with stored data
 CONTACTS_COLLECTION = "mail_contacts"
-INBOX_FETCH_SIZE    = 20
+INBOX_FETCH_SIZE    = 25
 
 # ── Google OAuth / Gmail REST ──────────────────────────────────────────────
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"

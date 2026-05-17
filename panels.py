@@ -27,29 +27,34 @@ from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
 
-INBOX_INLINE_LIMIT = 25    # one page; additional pages load on demand via on_end_reached
-INBOX_CACHE_TTL    = 90
+INBOX_INLINE_LIMIT = 25    # messages per server page
+INBOX_CACHE_TTL    = 60    # matches skeleton TTL so panel always sees fresh data
 
 
-async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
+async def _fetch_inbox_messages(ctx, provider, acc, folder,
+                                cursor_data: dict | None = None) -> InboxMessages:
+    """Fetch one page of messages. cursor_data=None → page 1; dict → next page."""
     email = acc.get("email", "")
     try:
         acc = await asyncio.wait_for(_refresh_token_if_needed(ctx, acc), timeout=5.0)
     except (asyncio.TimeoutError, Exception):
         pass
 
-    try:
-        stats = await asyncio.wait_for(
-            provider.get_folder_stats(ctx, acc, folder), timeout=5.0)
-        total_in_folder  = stats.get("total", 0)
-        unread_in_folder = stats.get("unread", 0)
-    except (asyncio.TimeoutError, Exception):
-        total_in_folder = unread_in_folder = 0
+    total_in_folder = unread_in_folder = 0
+    if cursor_data is None:
+        # Only fetch stats on page 1 (stats don't change between pages)
+        try:
+            stats = await asyncio.wait_for(
+                provider.get_folder_stats(ctx, acc, folder), timeout=5.0)
+            total_in_folder  = stats.get("total", 0)
+            unread_in_folder = stats.get("unread", 0)
+        except (asyncio.TimeoutError, Exception):
+            pass
 
     messages, next_cursor_encoded = [], ""
     try:
         msgs, next_cursor_data, has_more = await asyncio.wait_for(
-            provider.fetch_page(ctx, acc, folder, INBOX_INLINE_LIMIT, None),
+            provider.fetch_page(ctx, acc, folder, INBOX_INLINE_LIMIT, cursor_data),
             timeout=10.0,
         )
         messages = [
@@ -57,8 +62,6 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder) -> InboxMessages:
             for m in msgs
         ]
         if has_more and next_cursor_data:
-            # Bind cursor to this account so stale cursors from switched-away
-            # accounts are rejected in the load_more guard (duplicate-emails fix).
             next_cursor_encoded = encode_cursor(
                 acc.get("provider", "oauth"), next_cursor_data,
                 account=email) or ""
@@ -85,7 +88,7 @@ async def inbox_panel(
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
-    load_more_cursor: str = "",
+    page_cursor: str = "",
     search_query: str = "",
     **_unused_kwargs,
 ):
@@ -95,7 +98,7 @@ async def inbox_panel(
 
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
-        folder, search_query, load_more_cursor = "INBOX", "", ""
+        folder, search_query, page_cursor = "INBOX", "", ""
         for _fkey in [f["key"] for f in FOLDERS]:
             await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
@@ -108,63 +111,11 @@ async def inbox_panel(
     active_email = acc.get("email", "")
 
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id, folder)
+    # After any structural action reset to page 1 — cursor position may be stale.
+    if do_action in ("archive", "delete", "spam", "restore", "unarchive", "unspam"):
+        page_cursor = ""
 
     msgs_key = _inbox_messages_key(active_email, folder)
-
-    # Load more: fetch the next 25 from API and extend the cached list.
-    # Guard: only run if the cache still belongs to this account/folder so
-    # stale on_end_reached state replays (folder switch, account switch) are
-    # silently ignored instead of loading wrong data.
-    if load_more_cursor:
-        existing = None
-        try:
-            existing    = await ctx.cache.get(msgs_key, InboxMessages)
-            cursor_data = decode_cursor(load_more_cursor)
-            cursor_owner = cursor_data.get("_a") if cursor_data else None
-            stale = not cursor_owner or cursor_owner != active_email
-            if (not stale
-                    and existing
-                    and existing.folder == folder
-                    and existing.account_id == active_email):
-                clean_cursor = {k: v for k, v in cursor_data.items() if k != "_a"}
-                more, next_data, has_more = await asyncio.wait_for(
-                    provider.fetch_page(ctx, acc, folder, 25, clean_cursor),
-                    timeout=10.0,
-                )
-                more = [
-                    {**m, "message_id": m["id"]} if "id" in m and "message_id" not in m else m
-                    for m in more
-                ]
-                new_cursor = (
-                    encode_cursor(
-                        acc.get("provider", "oauth"), next_data,
-                        account=active_email) or ""
-                    if has_more and next_data else ""
-                )
-                extended = InboxMessages(
-                    account_id=active_email, folder=folder,
-                    messages=existing.messages + more,
-                    total_in_folder=existing.total_in_folder,
-                    unread_in_folder=existing.unread_in_folder,
-                    next_cursor=new_cursor,
-                    fetched_at=datetime.now(timezone.utc),
-                )
-                await ctx.cache.set(msgs_key, extended, ttl_seconds=INBOX_CACHE_TTL)
-        except (asyncio.TimeoutError, Exception) as e:
-            log.warning("load_more failed folder=%s: %s", folder, e)
-            # Clear the cursor so on_end_reached stops firing on repeated scrolls
-            if existing and existing.next_cursor:
-                try:
-                    await ctx.cache.set(msgs_key, InboxMessages(
-                        account_id=existing.account_id, folder=existing.folder,
-                        messages=existing.messages,
-                        total_in_folder=existing.total_in_folder,
-                        unread_in_folder=existing.unread_in_folder,
-                        next_cursor="",
-                        fetched_at=existing.fetched_at,
-                    ), ttl_seconds=INBOX_CACHE_TTL)
-                except Exception:
-                    pass
 
     header = ui.Stack([
         ui.Text(active_email[:32], variant="caption"),
@@ -173,7 +124,15 @@ async def inbox_panel(
     ], direction="h", gap=1)
 
     try:
-        if do_switch_account:
+        if page_cursor:
+            # Page 2+ — decode cursor and fetch fresh (not cached)
+            raw_cursor = decode_cursor(page_cursor)
+            clean_cursor = (
+                {k: v for k, v in raw_cursor.items() if k != "_a"}
+                if raw_cursor else None
+            )
+            inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder, clean_cursor)
+        elif do_switch_account:
             inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
         else:
             inbox_msgs = await ctx.cache.get_or_fetch(
@@ -190,9 +149,8 @@ async def inbox_panel(
                          ui.Error(message=f"Failed to load {folder}: {e}")])
 
     # Optimistic patch — bypasses Gmail eventual-consistency lag for per-message state changes.
-    # Provider API may still return the old state on the very next fetch_page call, so we
-    # apply the known outcome directly to the cached object and write it back.
-    if do_action in ("mark_read", "mark_unread", "star", "unstar") and do_message_id:
+    # Optimistic patch only on page 1 (page_cursor == "") — page 2 data is not in cache.
+    if not page_cursor and do_action in ("mark_read", "mark_unread", "star", "unstar") and do_message_id:
         patched = []
         for m in inbox_msgs.messages:
             if m.get("message_id") == do_message_id:
@@ -274,14 +232,27 @@ async def inbox_panel(
     email_list = _build_email_list(
         display_messages, active_email, folder,
         unread_count=unread_display,
-        next_cursor=show_cursor,
-        total_items=show_total,
     )
+
+    # Page navigation — explicit Prev/Next buttons instead of infinite scroll.
+    nav_buttons: list = []
+    if page_cursor and not q:
+        nav_buttons.append(ui.Button(
+            "← Первая страница", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__inbox", folder=folder),
+        ))
+    if show_cursor and not q:
+        nav_buttons.append(ui.Button(
+            "Следующая страница →", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__inbox", folder=folder, page_cursor=show_cursor),
+        ))
 
     children = [header, folder_tabs, search_bar]
     if search_status:
         children.append(search_status)
     children.append(email_list)
+    if nav_buttons:
+        children.append(ui.Stack(nav_buttons, direction="h", gap=2))
     return ui.Stack(children, gap=1)
 
 

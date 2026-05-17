@@ -117,8 +117,6 @@ def _build_email_list(
     active_email: str,
     folder: str,
     unread_count: int = 0,
-    next_cursor: str = "",
-    total_items: int = 0,
 ) -> ui.UINode:
     """Email list with contextual per-folder actions, per-message star/read toggles,
     smart date formatting, and on-demand pagination via on_end_reached."""
@@ -266,17 +264,7 @@ def _build_email_list(
 
     info = f"{unread_count} unread" if unread_count > 0 else ""
 
-    on_end = (
-        ui.Call("__panel__inbox", folder=folder, load_more_cursor=next_cursor)
-        if next_cursor else None
-    )
-    show_total = total_items if total_items > len(messages) else 0
-
     return ui.Stack([
         ui.Text(info, variant="caption") if info else ui.Stack([]),
-        ui.List(
-            items=items, page_size=25, selectable=True, bulk_actions=bulk,
-            on_end_reached=on_end,
-            total_items=show_total,
-        ),
+        ui.List(items=items, selectable=True, bulk_actions=bulk),
     ], gap=1)

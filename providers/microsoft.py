@@ -8,7 +8,7 @@ from imperal_sdk import Context
 from .base import BaseMailProvider
 from .microsoft_write import MicrosoftWriteMixin
 from .helpers import (
-    _graph_get,
+    _graph_get, _graph_patch,
     _refresh_token_if_needed,
     _save_last_read, _update_read_in_cache,
     _strip_html, _norm_graph_msg,
@@ -106,7 +106,15 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
         msg       = resp.json()
         from_data = msg.get("from", {}).get("emailAddress", {})
         to_list   = msg.get("toRecipients", [])
-        to_addr   = to_list[0].get("emailAddress", {}).get("address", "") if to_list else ""
+        to_addr   = ", ".join(
+            r.get("emailAddress", {}).get("address", "")
+            for r in to_list if r.get("emailAddress", {}).get("address")
+        )
+        cc_list = msg.get("ccRecipients", [])
+        cc_addr = ", ".join(
+            r.get("emailAddress", {}).get("address", "")
+            for r in cc_list if r.get("emailAddress", {}).get("address")
+        )
         body_obj  = msg.get("body", {})
         body      = body_obj.get("content", "")
         body_type = "html" if body_obj.get("contentType", "text").lower() == "html" else "text"
@@ -135,8 +143,9 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
             "subject":    msg.get("subject") or "(no subject)",
             "from":       from_data.get("address", "unknown"),
             "to":         to_addr,
+            "cc":         cc_addr,
             "date":       msg.get("receivedDateTime", ""),
-            "body":       body[:4000],
+            "body":       body,
             "thread_id":  msg.get("conversationId", ""),
             "body_type":  body_type,
         }
