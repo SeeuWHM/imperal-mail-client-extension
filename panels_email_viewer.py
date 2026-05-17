@@ -50,18 +50,15 @@ def _action_bar(message_id: str, account_email: str, has_cc: bool,
                              email_list_ids=email_list_ids, current_index=current_index + 1)))
     buttons.append(ui.Button("Reply", icon="Reply", variant="primary", size="sm",
                    on_click=ui.Call("__panel__compose", mode="reply",
-                                    message_id=message_id, account=account_email,
-                                    compose_active=True)))
+                                    message_id=message_id, account=account_email)))
     if has_cc:
         buttons.append(ui.Button("Reply All", icon="Reply", variant="outline", size="sm",
             on_click=ui.Call("__panel__compose", mode="reply",
-                             message_id=message_id, account=account_email,
-                             reply_all=True, compose_active=True)))
+                             message_id=message_id, account=account_email, reply_all=True)))
     buttons.extend([
         ui.Button("Forward", icon="Forward", variant="outline", size="sm",
                    on_click=ui.Call("__panel__compose", mode="forward",
-                                    message_id=message_id, account=account_email,
-                                    compose_active=True)),
+                                    message_id=message_id, account=account_email)),
         ui.Button("Archive", icon="Archive", variant="outline", size="sm",
                    on_click=ui.Call("__panel__inbox", folder=folder, account=account_email,
                                     do_action="archive", do_message_id=message_id)),

@@ -24,7 +24,6 @@ from app import ext
 from providers import get_provider
 from providers.helpers import (
     _all_accounts, _refresh_token_if_needed, COLLECTION, INBOX_FETCH_SIZE,
-    _invalidate_first_page,
 )
 from schemas import InboxSummary, PerAccountUnread
 
@@ -96,10 +95,6 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
 
             if truly_new:
                 try:
-                    await _invalidate_first_page(ctx, email, "INBOX")
-                except Exception:
-                    pass
-                try:
                     new_msgs = [
                         m for m in messages
                         if m.get("id") in truly_new or m.get("message_id") in truly_new
@@ -136,24 +131,4 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
 @ext.tool("skeleton_alert_mail_inbox_summary",
           description="Alert check for new unread emails.")
 async def skeleton_alert_mail_inbox_summary(ctx) -> ActionResult:
-    try:
-        accounts = await _all_accounts(ctx)
-        if not accounts:
-            return ActionResult.success(data={}, summary="")
-        total_unread = sum(int(a.get("unread_count", 0) or 0) for a in accounts)
-        if total_unread == 0:
-            return ActionResult.success(data={}, summary="")
-        n_acc = len(accounts)
-        pl_email = "s" if total_unread != 1 else ""
-        if n_acc == 1:
-            email = accounts[0].get("email", "")
-            summary = f"{total_unread} unread email{pl_email} in {email}."
-        else:
-            pl_acc = "s" if n_acc != 1 else ""
-            summary = f"{total_unread} unread email{pl_email} across {n_acc} account{pl_acc}."
-        return ActionResult.success(
-            data={"unread_total": total_unread, "accounts": n_acc},
-            summary=summary,
-        )
-    except Exception:
-        return ActionResult.success(data={}, summary="")
+    return ActionResult.success(data={}, summary="")

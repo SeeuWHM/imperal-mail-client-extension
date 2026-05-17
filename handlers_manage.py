@@ -5,7 +5,7 @@ from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 
-from providers.helpers import _remove_multiple_from_cache, _invalidate_first_page
+from providers.helpers import _remove_multiple_from_cache
 
 from schemas import (
     BulkOperationResult, OperationResult,
@@ -34,49 +34,36 @@ async def impl_archive(ctx, message_id: str, account: str = "") -> OperationResu
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = _unwrap(await provider.archive(ctx, acc, message_id), "archive", message_id)
-    await _invalidate_first_page(ctx, acc.get("email", ""), "INBOX")
-    await _invalidate_first_page(ctx, acc.get("email", ""), "archive")
-    return result
+    return _unwrap(await provider.archive(ctx, acc, message_id), "archive", message_id)
 
 
 async def impl_delete(ctx, message_id: str, account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = _unwrap(await provider.delete(ctx, acc, message_id), "delete", message_id)
-    await _invalidate_first_page(ctx, acc.get("email", ""), "INBOX")
-    await _invalidate_first_page(ctx, acc.get("email", ""), "trash")
-    return result
+    return _unwrap(await provider.delete(ctx, acc, message_id), "delete", message_id)
 
 
 async def impl_mark_read(ctx, message_id: str, account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = _unwrap(await provider.mark_read(ctx, acc, message_id, read=True), "mark_read", message_id)
-    await _invalidate_first_page(ctx, acc.get("email", ""), "INBOX")
-    return result
+    return _unwrap(await provider.mark_read(ctx, acc, message_id, read=True), "mark_read", message_id)
 
 
 async def impl_mark_unread(ctx, message_id: str, account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = _unwrap(await provider.mark_read(ctx, acc, message_id, read=False), "mark_unread", message_id)
-    await _invalidate_first_page(ctx, acc.get("email", ""), "INBOX")
-    return result
+    return _unwrap(await provider.mark_read(ctx, acc, message_id, read=False), "mark_unread", message_id)
 
 
 async def impl_star(ctx, message_id: str, starred: bool = True, account: str = "") -> OperationResult:
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = _unwrap(await provider.star(ctx, acc, message_id, starred=starred),
-                     "star" if starred else "unstar", message_id)
-    await _invalidate_first_page(ctx, acc.get("email", ""), "INBOX")
-    await _invalidate_first_page(ctx, acc.get("email", ""), "starred")
-    return result
+    return _unwrap(await provider.star(ctx, acc, message_id, starred=starred),
+                   "star" if starred else "unstar", message_id)
 
 
 async def impl_move(ctx, message_id: str, from_folder: str, to_folder: str,
@@ -84,12 +71,9 @@ async def impl_move(ctx, message_id: str, from_folder: str, to_folder: str,
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = _unwrap(await provider.move(ctx, acc, message_id,
-                                         from_folder=from_folder, to_folder=to_folder),
-                     "move", message_id)
-    await _invalidate_first_page(ctx, acc.get("email", ""), from_folder)
-    await _invalidate_first_page(ctx, acc.get("email", ""), to_folder)
-    return result
+    return _unwrap(await provider.move(ctx, acc, message_id,
+                                       from_folder=from_folder, to_folder=to_folder),
+                   "move", message_id)
 
 
 async def impl_purge(ctx, message_id: str, from_folder: str = "Trash",
@@ -97,10 +81,8 @@ async def impl_purge(ctx, message_id: str, from_folder: str = "Trash",
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = _unwrap(await provider.purge(ctx, acc, message_id, from_folder=from_folder),
-                     "purge", message_id)
-    await _invalidate_first_page(ctx, acc.get("email", ""), from_folder)
-    return result
+    return _unwrap(await provider.purge(ctx, acc, message_id, from_folder=from_folder),
+                   "purge", message_id)
 
 
 async def _run_bulk(ctx, message_ids: str, operation: str, account: str = "") -> BulkOperationResult:

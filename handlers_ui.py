@@ -38,7 +38,7 @@ def _email_ui(body) -> ui.UINode:
     kv.append({"key": "Date",    "value": body.date    or "—"})
     kv.append({"key": "Subject", "value": body.subject or "(no subject)"})
 
-    text    = (body.body or "").strip()
+    text    = (body.body_text or "").strip()
     snippet = text[:400] + "…" if len(text) > 400 else text
 
     children: list = [ui.KeyValue(items=kv, columns=1)]

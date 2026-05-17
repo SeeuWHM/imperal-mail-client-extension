@@ -62,16 +62,7 @@ async def impl_mail_action(ctx, action: str, message_id: str = "",
             errors.append(f"{mid}: {e}")
     if errors:
         raise RuntimeError(f"Some actions failed: {'; '.join(errors)}")
-    email = acc.get("email", "")
-    await _invalidate_first_page(ctx, email, "INBOX")
-    _extra_folder = {
-        "spam": "spam", "unspam": "spam",
-        "archive": "archive", "unarchive": "archive",
-        "delete": "trash", "restore": "trash",
-        "star": "starred", "unstar": "starred",
-    }.get(action)
-    if _extra_folder:
-        await _invalidate_first_page(ctx, email, _extra_folder)
+    await _invalidate_first_page(ctx, acc.get("email", ""), "INBOX")
     return MailActionResult(action=action, count=len(ids))
 
 

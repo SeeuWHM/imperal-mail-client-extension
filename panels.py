@@ -175,10 +175,6 @@ async def inbox_panel(
     try:
         if do_switch_account:
             inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
-            try:
-                await ctx.cache.set(msgs_key, inbox_msgs, ttl_seconds=INBOX_CACHE_TTL)
-            except Exception:
-                pass
         else:
             inbox_msgs = await ctx.cache.get_or_fetch(
                 msgs_key, InboxMessages,
@@ -187,10 +183,6 @@ async def inbox_panel(
             )
             if inbox_msgs.account_id != active_email or inbox_msgs.folder != folder:
                 inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
-                try:
-                    await ctx.cache.set(msgs_key, inbox_msgs, ttl_seconds=INBOX_CACHE_TTL)
-                except Exception:
-                    pass
     except Exception as e:
         log.warning("inbox panel load failed folder=%s: %s", folder, e)
         folder_tabs = _build_folder_tabs(folder, active_email)
@@ -263,12 +255,12 @@ async def inbox_panel(
     return ui.Stack(children, gap=1)
 
 
-@ext.panel("email_viewer", slot="overlay", title="Email", icon="Mail", center_overlay=True)
+@ext.panel("email_viewer", slot="center", title="Email", icon="Mail", center_overlay=True)
 async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
                               folder: str = "INBOX"):
     if not message_id:
-        return None
+        return ui.Empty(message="Select an email to read", icon="Mail")
     return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index, folder)
 
 
@@ -280,14 +272,11 @@ async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_re
     return await build_accounts_panel(ctx, show_add, do_switch, do_remove)
 
 
-@ext.panel("compose", slot="overlay", title="Compose", icon="PenSquare",
-           center_overlay=True, refresh="on_event:account.switched")
+@ext.panel("compose", slot="center", title="Compose", icon="PenSquare",
+           refresh="on_event:account.switched")
 async def compose_panel(ctx, mode: str = "new", message_id: str = "",
                          account: str = "", prefill_to: str = "",
-                         prefill_subject: str = "", reply_all: str = "",
-                         compose_active: str = ""):
-    if str(compose_active).lower() not in ("true", "1", "yes"):
-        return None
+                         prefill_subject: str = "", reply_all: str = ""):
     reply_all_bool = str(reply_all).lower() in ("true", "1", "yes")
     return await build_compose_panel(ctx, mode, message_id, account,
                                       prefill_to, prefill_subject, reply_all_bool)
