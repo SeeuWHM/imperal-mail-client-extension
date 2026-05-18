@@ -5,7 +5,8 @@ from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 
-from providers.helpers import _remove_multiple_from_cache
+from providers import get_provider
+from providers.helpers import _all_accounts, _remove_multiple_from_cache
 
 from schemas import (
     BulkOperationResult, OperationResult,
@@ -30,40 +31,78 @@ def _unwrap(result: dict, op: str, message_id: str = "") -> OperationResult:
 # ─── impl_* business logic ────────────────────────────────────────────── #
 
 
-async def impl_archive(ctx, message_id: str, account: str = "") -> OperationResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
+async def _try_all_accounts(ctx, message_id: str, op_name: str, op_fn) -> OperationResult:
+    """Try op_fn(acc, provider) across all connected accounts — first success wins.
+
+    Needed because single-message operations (star, archive, etc.) receive a
+    message_id that may belong to any connected account, not just the active one.
+    Mirrors the multi-account fallback in impl_read_email and impl_forward.
+    """
+    accounts = await _all_accounts(ctx)
+    if not accounts:
         raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(await provider.archive(ctx, acc, message_id), "archive", message_id)
+    last_err = "Message not found in any connected account."
+    for acc in accounts:
+        try:
+            provider = get_provider(acc)
+            result = await op_fn(acc, provider)
+            if result.get("RESULT") != "ERROR":
+                return _unwrap(result, op_name, message_id)
+            last_err = result.get("error", last_err)
+        except Exception as e:
+            last_err = str(e)
+    raise RuntimeError(last_err)
+
+
+async def impl_archive(ctx, message_id: str, account: str = "") -> OperationResult:
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        return _unwrap(await provider.archive(ctx, acc, message_id), "archive", message_id)
+    return await _try_all_accounts(ctx, message_id, "archive",
+                                   lambda acc, prov: prov.archive(ctx, acc, message_id))
 
 
 async def impl_delete(ctx, message_id: str, account: str = "") -> OperationResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(await provider.delete(ctx, acc, message_id), "delete", message_id)
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        return _unwrap(await provider.delete(ctx, acc, message_id), "delete", message_id)
+    return await _try_all_accounts(ctx, message_id, "delete",
+                                   lambda acc, prov: prov.delete(ctx, acc, message_id))
 
 
 async def impl_mark_read(ctx, message_id: str, account: str = "") -> OperationResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(await provider.mark_read(ctx, acc, message_id, read=True), "mark_read", message_id)
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        return _unwrap(await provider.mark_read(ctx, acc, message_id, read=True), "mark_read", message_id)
+    return await _try_all_accounts(ctx, message_id, "mark_read",
+                                   lambda acc, prov: prov.mark_read(ctx, acc, message_id, read=True))
 
 
 async def impl_mark_unread(ctx, message_id: str, account: str = "") -> OperationResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(await provider.mark_read(ctx, acc, message_id, read=False), "mark_unread", message_id)
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        return _unwrap(await provider.mark_read(ctx, acc, message_id, read=False), "mark_unread", message_id)
+    return await _try_all_accounts(ctx, message_id, "mark_unread",
+                                   lambda acc, prov: prov.mark_read(ctx, acc, message_id, read=False))
 
 
 async def impl_star(ctx, message_id: str, starred: bool = True, account: str = "") -> OperationResult:
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
-    return _unwrap(await provider.star(ctx, acc, message_id, starred=starred),
-                   "star" if starred else "unstar", message_id)
+    op = "star" if starred else "unstar"
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+        return _unwrap(await provider.star(ctx, acc, message_id, starred=starred), op, message_id)
+    return await _try_all_accounts(ctx, message_id, op,
+                                   lambda acc, prov: prov.star(ctx, acc, message_id, starred=starred))
 
 
 async def impl_move(ctx, message_id: str, from_folder: str, to_folder: str,

@@ -19,7 +19,7 @@ _SYSTEM_PROMPT = (Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "mail",
-    version="5.4.0",
+    version="5.4.1",
     display_name="Mail Client",
     description=(
         "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "
