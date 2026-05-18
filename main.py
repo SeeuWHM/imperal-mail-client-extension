@@ -12,7 +12,9 @@ if _dir not in sys.path:
 _MODULES = (
     "app", "ctx_helpers", "schemas", "schemas_params",
     "handlers_ui",
-    "handlers_connect", "handlers_inbox", "handlers_manage",
+    "handlers_connect",
+    "handlers_inbox_impl", "handlers_inbox",
+    "handlers_manage_impl", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
     "skeleton", "panels", "panels_inbox", "panels_email_viewer", "panels_compose",
     "panels_accounts", "panels_add_account",
@@ -28,7 +30,9 @@ from app import ext, chat  # noqa: E402, F401
 import cache_models  # noqa: E402, F401
 
 import handlers_connect           # noqa: E402, F401
+import handlers_inbox_impl        # noqa: E402, F401
 import handlers_inbox             # noqa: E402, F401
+import handlers_manage_impl       # noqa: E402, F401
 import handlers_manage            # noqa: E402, F401
 import handlers_contacts          # noqa: E402, F401
 import handlers_panel_compose     # noqa: E402, F401
