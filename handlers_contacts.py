@@ -184,7 +184,7 @@ async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
     try:
         r = await impl_contacts(ctx, search=params.search, limit=params.limit)
         return ActionResult.success(data=r.model_dump(), summary=f"{r.total} contact(s).")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -196,7 +196,7 @@ async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
     try:
         r = await impl_add_contact(ctx, email=params.email, name=params.name)
         return ActionResult.success(data=r.model_dump(), summary=f"Added contact {r.email}.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -211,7 +211,7 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
                                     summary=f"Synced contacts: {r.added} added, {r.total} total.")
     except TaskCancelled:
         return ActionResult.error("Sync cancelled.", retryable=True)
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
@@ -223,5 +223,5 @@ async def fn_delete_contact(ctx, params: DeleteContactParams) -> ActionResult:
     try:
         r = await impl_delete_contact(ctx, email=params.email)
         return ActionResult.success(data=r.model_dump(), summary=f"Deleted contact {r.email}.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)

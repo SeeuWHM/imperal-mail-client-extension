@@ -156,7 +156,7 @@ async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"{params.action}: {r.count} message(s).",
                                     refresh_panels=["inbox"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -168,7 +168,7 @@ async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
         r = await impl_folder_counts(ctx, account=params.account)
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"INBOX: {r.counts.get('INBOX', 0)} unread.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
@@ -179,7 +179,7 @@ async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
     try:
         r = await impl_get_oauth_url(ctx, provider=params.provider)
         return ActionResult.success(data=r.model_dump(), summary=f"OAuth URL for {params.provider}.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -194,5 +194,5 @@ async def fn_add_imap(ctx, params: AddImapParams) -> ActionResult:
                                 imap_port=params.imap_port, smtp_port=params.smtp_port)
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Connected {r.email} via IMAP ({r.imap_server}).")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)

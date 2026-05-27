@@ -174,7 +174,7 @@ async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
         r = await impl_connect(ctx)
         return ActionResult.success(data=r.model_dump(),
                                     summary="Already connected." if r.already_connected else "OAuth URL ready.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -186,7 +186,7 @@ async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
         r = await impl_connect_microsoft(ctx)
         return ActionResult.success(data=r.model_dump(),
                                     summary="Already connected." if r.already_connected else "OAuth URL ready.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -198,7 +198,7 @@ async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
         r = await impl_connect_yahoo(ctx)
         return ActionResult.success(data=r.model_dump(),
                                     summary="Already connected." if r.already_connected else "OAuth URL ready.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -214,7 +214,7 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Connected {r.email} via IMAP ({r.imap_server}).",
                                     refresh_panels=["accounts", "inbox"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -226,7 +226,7 @@ async def fn_status(ctx, params: EmptyParams) -> ActionResult:
         r = await impl_status(ctx)
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"{r.total} account(s) connected." if r.connected else "No accounts connected.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -240,7 +240,7 @@ async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Switched to {r.active_account}.",
                                     refresh_panels=["inbox", "accounts"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -254,5 +254,5 @@ async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Disconnected {r.email}. {r.remaining} account(s) remaining.",
                                     refresh_panels=["accounts", "inbox"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)

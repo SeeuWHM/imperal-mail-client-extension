@@ -69,5 +69,5 @@ async def fn_compose_send(ctx, params: ComposeSendParams) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Email sent to {params.to}.",
                                     refresh_panels=["inbox"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)

@@ -17,7 +17,7 @@ from schemas import (
 
 @chat.function("inbox", action_type="read",
                data_model=InboxPageResult,
-               description="Fetch a page of messages from the mailbox. Use folder= to browse non-INBOX folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, and read state. Prefer this over folder() for any folder.")
+               description="PRIMARY function to list emails. Use this when user asks for recent/latest/new emails, wants to see their inbox, or check mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, read state. Do NOT use search() for listing recent emails — use inbox().")
 async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
     try:
         r = await impl_inbox(ctx, folder=params.folder, cursor=params.cursor,
@@ -27,7 +27,7 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
             summary=f"{len(r.messages)} message(s) in {params.folder}.",
             ui=_inbox_ui(r.messages, params.folder),
         )
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
@@ -43,13 +43,13 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
             summary=f"Email: {subj}",
             ui=_email_ui(r),
         )
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
 @chat.function("search", action_type="read",
                data_model=SearchResult,
-               description="Full-mailbox search across all folders. Accepts free-text or provider syntax (Gmail: from:, subject:, label:; Outlook and IMAP: free-text). Returns matching message previews.")
+               description="Find specific emails by content, sender, or subject. Use free-text or provider syntax (Gmail: from:sender, subject:topic, label:name; Outlook/IMAP: free-text). Only use when searching for something specific. For listing recent/latest emails use inbox() instead.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     try:
         r = await impl_search(ctx, query=params.query, max_results=params.max_results,
@@ -59,7 +59,7 @@ async def fn_search(ctx, params: SearchParams) -> ActionResult:
             summary=f"{r.total} result(s) for '{params.query}'.",
             ui=_search_ui(r.results, params.query),
         )
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
@@ -72,7 +72,7 @@ async def fn_folder(ctx, params: InboxParams) -> ActionResult:
                               limit=params.limit, account=params.account)
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"{len(r.messages)} message(s) in {params.folder}.")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
@@ -84,7 +84,7 @@ async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
         r = await impl_get_thread(ctx, thread_id=params.thread_id, account=params.account)
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Thread '{r.subject}' — {r.total} message(s).")
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
@@ -99,7 +99,7 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Email sent to {params.to}.",
                                     refresh_panels=["inbox"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -114,7 +114,7 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Reply sent to {r.to}.",
                                     refresh_panels=["inbox"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
@@ -129,5 +129,5 @@ async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
         return ActionResult.success(data=r.model_dump(),
                                     summary=f"Forwarded to {params.to}.",
                                     refresh_panels=["inbox"])
-    except RuntimeError as e:
+    except Exception as e:
         return ActionResult.error(str(e), retryable=False)
