@@ -271,11 +271,15 @@ class PerAccountUnread(BaseModel):
 
 class InboxSummary(BaseModel):
     """skeleton_refresh_mail_inbox_summary — roster + per-account unread
-    counts for the classifier envelope."""
+    counts for the classifier envelope + recent message previews for Webbee."""
 
     accounts_connected: int = 0
     unread_total: int = 0
     per_account: list[PerAccountUnread] = Field(default_factory=list)
+    recent_messages: list[dict] = Field(
+        default_factory=list,
+        description="Recent inbox previews (subject/from/date/snippet only — no body).",
+    )
 
 
 class SkeletonAlertMessage(BaseModel):

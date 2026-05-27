@@ -41,6 +41,9 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
 
     per_account: list[dict] = []
     unread_total = 0
+    # Preview fields only — no body, no html. LLM sees these via classifier envelope.
+    _PREVIEW_KEYS = {"message_id", "subject", "from", "date", "snippet", "unread", "starred"}
+    recent_messages: list[dict] = []
 
     for acc in accounts:
         email = acc.get("email", "")
@@ -82,6 +85,14 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                 "unread_count": unread,
                 "message_count": len(messages),
             })
+
+            # Collect previews from the first account that succeeds.
+            # One page worth (INBOX_FETCH_SIZE) — subject/from/date/snippet only.
+            if not recent_messages and messages:
+                recent_messages = [
+                    {k: m.get(k) for k in _PREVIEW_KEYS if m.get(k) is not None}
+                    for m in messages
+                ]
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {
@@ -149,6 +160,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
             accounts_connected=len(accounts),
             unread_total=unread_total,
             per_account=per_account,
+            recent_messages=recent_messages,
         ).model_dump(),
         summary=f"{unread_total} unread across {len(accounts)} account(s)",
     )

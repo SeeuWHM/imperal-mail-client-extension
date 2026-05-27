@@ -72,10 +72,14 @@ async def _execute_panel_action(ctx, provider, acc, action: str, message_id: str
             await provider.move(ctx, acc, message_id, "archive", "INBOX")
         elif action == "restore":
             await provider.move(ctx, acc, message_id, "trash", "INBOX")
-        # Invalidate INBOX + current folder (if different) so both views refresh
-        await _invalidate_first_page(ctx, email, "INBOX")
-        if folder.upper() != "INBOX":
-            await _invalidate_first_page(ctx, email, folder)
+        # Only invalidate cache for structural changes (messages move between folders).
+        # State-only changes (star/unstar/mark_read/mark_unread) are handled by
+        # the optimistic patch in inbox_panel — no re-fetch needed, avoids
+        # Gmail eventual-consistency returning stale unread state.
+        if action in ("archive", "delete", "spam", "unspam", "unarchive", "restore"):
+            await _invalidate_first_page(ctx, email, "INBOX")
+            if folder.upper() != "INBOX":
+                await _invalidate_first_page(ctx, email, folder)
     except Exception as e:
         log.warning("panel action=%s message=%s failed: %s", action, message_id[:16], e)
 
@@ -107,7 +111,9 @@ def _build_folder_tabs(folder: str, active_email: str,
             label_str,
             variant="primary" if key == folder else "ghost",
             size="sm",
-            on_click=ui.Call("__panel__inbox", folder=key, page_cursor=""),
+            on_click=ui.Call("__panel__inbox", folder=key,
+                              page_cursor="", prev_cursor="", page_num=1,
+                              folder_stats_unread=0),
         ))
     return ui.Stack(buttons, direction="h", wrap=True, gap=1)
 

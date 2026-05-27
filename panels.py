@@ -89,6 +89,9 @@ async def inbox_panel(
     do_message_id: str = "",
     do_switch_account: str = "",
     page_cursor: str = "",
+    prev_cursor: str = "",
+    page_num: int = 1,
+    folder_stats_unread: int = 0,
     search_query: str = "",
     **_unused_kwargs,
 ):
@@ -98,7 +101,8 @@ async def inbox_panel(
 
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
-        folder, search_query, page_cursor = "INBOX", "", ""
+        folder, search_query = "INBOX", ""
+        page_cursor, prev_cursor, page_num, folder_stats_unread = "", "", 1, 0
         for _fkey in [f["key"] for f in FOLDERS]:
             await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
@@ -111,11 +115,25 @@ async def inbox_panel(
     active_email = acc.get("email", "")
 
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id, folder)
-    # After any structural action reset to page 1 — cursor position may be stale.
+    # Structural actions: reset to page 1 and invalidate all cached pages.
     if do_action in ("archive", "delete", "spam", "restore", "unarchive", "unspam"):
-        page_cursor = ""
+        page_cursor, prev_cursor, page_num, folder_stats_unread = "", "", 1, 0
+        base_key = _inbox_messages_key(active_email, folder)
+        for _p in range(2, 6):
+            try:
+                await ctx.cache.delete(f"{base_key}:p{_p}")
+            except Exception:
+                pass
+        if folder.upper() != "INBOX":
+            base_inbox = _inbox_messages_key(active_email, "INBOX")
+            for _p in range(2, 6):
+                try:
+                    await ctx.cache.delete(f"{base_inbox}:p{_p}")
+                except Exception:
+                    pass
 
     msgs_key = _inbox_messages_key(active_email, folder)
+    current_page_key = msgs_key if page_num <= 1 else f"{msgs_key}:p{page_num}"
 
     header = ui.Stack([
         ui.Text(active_email[:32], variant="caption"),
@@ -125,13 +143,18 @@ async def inbox_panel(
 
     try:
         if page_cursor:
-            # Page 2+ — decode cursor and fetch fresh (not cached)
+            # Page 2+ — check page-specific cache first, then fetch fresh.
+            # Pages are cached under {base_key}:p{page_num} so back navigation is instant.
             raw_cursor = decode_cursor(page_cursor)
             clean_cursor = (
                 {k: v for k, v in raw_cursor.items() if k != "_a"}
                 if raw_cursor else None
             )
-            inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder, clean_cursor)
+            inbox_msgs = await ctx.cache.get_or_fetch(
+                current_page_key, InboxMessages,
+                lambda: _fetch_inbox_messages(ctx, provider, acc, folder, clean_cursor),
+                ttl_seconds=INBOX_CACHE_TTL,
+            )
         elif do_switch_account:
             inbox_msgs = await _fetch_inbox_messages(ctx, provider, acc, folder)
         else:
@@ -148,9 +171,10 @@ async def inbox_panel(
         return ui.Stack([header, folder_tabs,
                          ui.Error(message=f"Failed to load {folder}: {e}")])
 
-    # Optimistic patch — bypasses Gmail eventual-consistency lag for per-message state changes.
-    # Optimistic patch only on page 1 (page_cursor == "") — page 2 data is not in cache.
-    if not page_cursor and do_action in ("mark_read", "mark_unread", "star", "unstar") and do_message_id:
+    # Optimistic patch — bypasses Gmail eventual-consistency lag.
+    # Works on any page (we now cache all pages). Cache is not invalidated for
+    # state-only actions, so we always patch the known-good cached data.
+    if do_action in ("mark_read", "mark_unread", "star", "unstar") and do_message_id:
         patched = []
         for m in inbox_msgs.messages:
             if m.get("message_id") == do_message_id:
@@ -173,14 +197,15 @@ async def inbox_panel(
             fetched_at=inbox_msgs.fetched_at,
         )
         try:
-            await ctx.cache.set(msgs_key, inbox_msgs, ttl_seconds=INBOX_CACHE_TTL)
+            await ctx.cache.set(current_page_key, inbox_msgs, ttl_seconds=INBOX_CACHE_TTL)
         except Exception:
             pass
 
-    # Show unread count badge on the active folder tab
+    # On page 2+ the provider doesn't return folder stats — carry them via accumulated param.
+    effective_unread = inbox_msgs.unread_in_folder or (folder_stats_unread if page_num > 1 else 0)
     folder_tabs = _build_folder_tabs(
         folder, active_email,
-        folder_unread={folder: inbox_msgs.unread_in_folder} if inbox_msgs.unread_in_folder else None,
+        folder_unread={folder: effective_unread} if effective_unread else None,
     )
 
     q = search_query.strip()
@@ -206,17 +231,21 @@ async def inbox_panel(
         unread_display   = 0
         show_cursor      = ""
         show_total       = 0
+        carried_unread   = folder_stats_unread
     else:
         display_messages = inbox_msgs.messages
-        unread_display   = inbox_msgs.unread_in_folder
+        unread_display   = effective_unread
         show_cursor      = inbox_msgs.next_cursor
         show_total       = inbox_msgs.total_in_folder
+        # Stats to carry forward when paginating
+        carried_unread = inbox_msgs.unread_in_folder or folder_stats_unread
 
     search_bar = ui.Input(
         placeholder="Search…",
         param_name="search_query",
         value=search_query,
-        on_submit=ui.Call("__panel__inbox", folder=folder, page_cursor=""),
+        on_submit=ui.Call("__panel__inbox", folder=folder,
+                           page_cursor="", prev_cursor="", page_num=1, folder_stats_unread=0),
     )
 
     search_status = None
@@ -226,7 +255,8 @@ async def inbox_panel(
             ui.Badge(f'"{q}"', color="blue"),
             ui.Text(f"{n} result{'s' if n != 1 else ''}", variant="caption"),
             ui.Button("✕", variant="ghost", size="sm",
-                      on_click=ui.Call("__panel__inbox", folder=folder, search_query="", page_cursor="")),
+                      on_click=ui.Call("__panel__inbox", folder=folder, search_query="",
+                                        page_cursor="", prev_cursor="", page_num=1)),
         ], direction="h", gap=1)
 
     email_list = _build_email_list(
@@ -234,18 +264,30 @@ async def inbox_panel(
         unread_count=unread_display,
     )
 
-    # Page navigation — explicit Prev/Next buttons instead of infinite scroll.
+    # Page navigation — ← page_num → with prev/next cursor chain.
+    # prev_cursor="" means "back to page 1" (no cursor = first page).
     nav_buttons: list = []
-    if page_cursor and not q:
-        nav_buttons.append(ui.Button(
-            "← Первая страница", variant="ghost", size="sm",
-            on_click=ui.Call("__panel__inbox", folder=folder, page_cursor=""),
-        ))
-    if show_cursor and not q:
-        nav_buttons.append(ui.Button(
-            "Следующая страница →", variant="ghost", size="sm",
-            on_click=ui.Call("__panel__inbox", folder=folder, page_cursor=show_cursor),
-        ))
+    if not q:
+        has_prev = page_num > 1
+        has_next = bool(show_cursor)
+        if has_prev or has_next:
+            if has_prev:
+                nav_buttons.append(ui.Button(
+                    "←", variant="ghost", size="sm",
+                    on_click=ui.Call("__panel__inbox", folder=folder,
+                                      page_cursor=prev_cursor, prev_cursor="",
+                                      page_num=max(1, page_num - 1),
+                                      folder_stats_unread=carried_unread),
+                ))
+            nav_buttons.append(ui.Text(str(page_num), variant="caption"))
+            if has_next:
+                nav_buttons.append(ui.Button(
+                    "→", variant="ghost", size="sm",
+                    on_click=ui.Call("__panel__inbox", folder=folder,
+                                      page_cursor=show_cursor, prev_cursor=page_cursor,
+                                      page_num=page_num + 1,
+                                      folder_stats_unread=carried_unread),
+                ))
 
     children = [header, folder_tabs, search_bar]
     if search_status:
