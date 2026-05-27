@@ -16,7 +16,8 @@ _MODULES = (
     "handlers_inbox_impl", "handlers_inbox",
     "handlers_manage_impl", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
-    "skeleton", "panels", "panels_inbox", "panels_email_viewer", "panels_compose",
+    "skeleton", "panels", "panels_inbox", "panels_inbox_panel",
+    "panels_email_viewer", "panels_compose",
     "panels_accounts", "panels_add_account",
     "cache_models", "cache_model_defs",
 )
@@ -42,4 +43,5 @@ import panels_email_viewer        # noqa: E402, F401
 import panels_compose             # noqa: E402, F401
 import panels_accounts            # noqa: E402, F401
 import panels_add_account         # noqa: E402, F401
+import panels_inbox_panel         # noqa: E402, F401
 import panels                     # noqa: E402, F401
