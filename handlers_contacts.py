@@ -218,6 +218,7 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
 @chat.function("delete_contact", action_type="destructive", event="contact.deleted",
                effects=["delete:contact"],
                data_model=ContactDeleted,
+               id_projection="email",
                description="Remove a contact from the address book by their exact email address.")
 async def fn_delete_contact(ctx, params: DeleteContactParams) -> ActionResult:
     try:

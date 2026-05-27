@@ -17,6 +17,7 @@ from schemas import (
 @chat.function("archive", action_type="write", event="archived",
                effects=["update:email"],
                data_model=OperationResult,
+               id_projection="message_id",
                description="Archive a single email — removes it from INBOX into the archive folder. Remains searchable and recoverable. Not the same as delete().")
 async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
     try:
@@ -29,6 +30,7 @@ async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
 @chat.function("delete", action_type="write", event="deleted",
                effects=["update:email"],
                data_model=OperationResult,
+               id_projection="message_id",
                description="Move a single email to Trash — recoverable until trash is emptied. Use purge() for permanent unrecoverable deletion.")
 async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
     try:
@@ -41,6 +43,7 @@ async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
 @chat.function("mark_read", action_type="write", event="marked_read",
                effects=["update:email"],
                data_model=OperationResult,
+               id_projection="message_id",
                description="Mark a single email as read (clears the unread indicator). For multiple emails use bulk_mark_read().")
 async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
     try:
@@ -53,6 +56,7 @@ async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
 @chat.function("mark_unread", action_type="write", event="marked_unread",
                effects=["update:email"],
                data_model=OperationResult,
+               id_projection="message_id",
                description="Mark a single email as unread (restores the unread indicator). For multiple emails use bulk_mark_unread().")
 async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
     try:
@@ -65,6 +69,7 @@ async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
 @chat.function("star", action_type="write", event="starred",
                effects=["update:email"],
                data_model=OperationResult,
+               id_projection="message_id",
                description="Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle.")
 async def fn_star(ctx, params: StarParams) -> ActionResult:
     try:
@@ -79,6 +84,7 @@ async def fn_star(ctx, params: StarParams) -> ActionResult:
 @chat.function("move", action_type="write", event="moved",
                effects=["update:email"],
                data_model=OperationResult,
+               id_projection="message_id",
                description="Move an email from one folder to another — e.g. INBOX→spam, Trash→INBOX (untrash). Requires both from_folder and to_folder.")
 async def fn_move(ctx, params: MoveParams) -> ActionResult:
     try:
@@ -94,6 +100,7 @@ async def fn_move(ctx, params: MoveParams) -> ActionResult:
 @chat.function("purge", action_type="destructive", event="purged",
                effects=["delete:email"],
                data_model=OperationResult,
+               id_projection="message_id",
                description="Permanently delete an email from a folder (default: Trash) — cannot be recovered. Use delete() to move to Trash first if unsure.")
 async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
     try:

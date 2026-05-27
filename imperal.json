@@ -226,7 +226,7 @@
     },
     {
       "name": "inbox",
-      "description": "Fetch a page of messages from the mailbox. Use folder= to browse non-INBOX folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, and read state. Prefer this over folder() for any folder.",
+      "description": "PRIMARY function to list emails. Use this when user asks for recent/latest/new emails, wants to see their inbox, or check mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, read state. Do NOT use search() for listing recent emails — use inbox().",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -274,7 +274,7 @@
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -304,7 +304,7 @@
     },
     {
       "name": "search",
-      "description": "Full-mailbox search across all folders. Accepts free-text or provider syntax (Gmail: from:, subject:, label:; Outlook and IMAP: free-text). Returns matching message previews.",
+      "description": "Find specific emails by content, sender, or subject. Use free-text or provider syntax (Gmail: from:sender, subject:topic, label:name; Outlook/IMAP: free-text). Only use when searching for something specific. For listing recent/latest emails use inbox() instead.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -392,7 +392,7 @@
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
-      "id_projection": "",
+      "id_projection": "thread_id",
       "params_schema": {
         "properties": {
           "thread_id": {
@@ -482,13 +482,13 @@
     },
     {
       "name": "reply",
-      "description": "Reply to an email — sends to the original sender. Provide message_id to target a specific email; omit it to reply to the last opened message. Use send() for brand-new emails, not this.",
+      "description": "Reply to an email by message_id. In a multi-step chain always call inbox() or search() first to get the message_id, then pass it here. Omit message_id only if the email was already opened with read_email() in this session. Use send() for new emails.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
         "create:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "body": {
@@ -540,13 +540,13 @@
     },
     {
       "name": "forward",
-      "description": "Forward an existing email to a new address. Requires message_id of the email to forward and a to recipient. Optionally prepend a comment above the forwarded body.",
+      "description": "Forward an existing email by message_id to a new address. In a multi-step chain call inbox() or search() first to get the message_id. Requires message_id and to address.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
         "create:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -594,7 +594,7 @@
       "effects": [
         "update:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -630,7 +630,7 @@
       "effects": [
         "update:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -666,7 +666,7 @@
       "effects": [
         "update:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -702,7 +702,7 @@
       "effects": [
         "update:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -738,7 +738,7 @@
       "effects": [
         "update:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -780,7 +780,7 @@
       "effects": [
         "update:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -828,7 +828,7 @@
       "effects": [
         "delete:email"
       ],
-      "id_projection": "",
+      "id_projection": "message_id",
       "params_schema": {
         "properties": {
           "message_id": {
@@ -1112,7 +1112,7 @@
       "effects": [
         "delete:contact"
       ],
-      "id_projection": "",
+      "id_projection": "email",
       "params_schema": {
         "properties": {
           "email": {
