@@ -101,6 +101,10 @@ async def build_email_viewer(
     date_str    = result.get("date", "")
     body        = result.get("body", "")
     body_type   = result.get("body_type", "html")
+    # Auto-detect HTML: RichEditor sends HTML bodies that some providers
+    # return without body_type="html" (e.g. sent items with text/plain MIME).
+    if body_type != "html" and body and body.lstrip().startswith("<"):
+        body_type = "html"
     attachments = result.get("attachments", [])
     replied     = result.get("replied", False)
 

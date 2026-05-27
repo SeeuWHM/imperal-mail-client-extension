@@ -88,6 +88,7 @@ async def inbox_panel(
     page_num: int = 1,
     folder_stats_unread: int = 0,
     search_query: str = "",
+    do_was_unread: bool = False,
     **_unused_kwargs,
 ):
     accounts = await _all_accounts(ctx)
@@ -174,8 +175,10 @@ async def inbox_panel(
                     m["unread"] = True
                 elif do_action == "star":
                     m["starred"] = True
+                    m["unread"] = do_was_unread  # restore state shown in UI at click time
                 elif do_action == "unstar":
                     m["starred"] = False
+                    m["unread"] = do_was_unread  # restore state shown in UI at click time
             patched.append(m)
         inbox_msgs = InboxMessages(
             account_id=inbox_msgs.account_id, folder=inbox_msgs.folder,

@@ -30,10 +30,12 @@ async def accounts_panel(ctx, show_add: bool = False, do_switch: str = "", do_re
 
 
 @ext.panel("compose", slot="center", title="Compose", icon="PenSquare",
-           refresh="on_event:account.switched")
-async def compose_panel(ctx, mode: str = "new", message_id: str = "",
+           center_overlay=True, refresh="on_event:account.switched")
+async def compose_panel(ctx, mode: str = "", message_id: str = "",
                          account: str = "", prefill_to: str = "",
                          prefill_subject: str = "", reply_all: str = ""):
+    if not mode:
+        return None  # only render when explicitly opened with mode=reply/forward/new
     reply_all_bool = str(reply_all).lower() in ("true", "1", "yes")
     return await build_compose_panel(ctx, mode, message_id, account,
                                       prefill_to, prefill_subject, reply_all_bool)
