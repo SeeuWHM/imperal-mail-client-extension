@@ -216,7 +216,7 @@ async def inbox_panel(
         placeholder="Search…",
         param_name="search_query",
         value=search_query,
-        on_submit=ui.Call("__panel__inbox", folder=folder),
+        on_submit=ui.Call("__panel__inbox", folder=folder, page_cursor=""),
     )
 
     search_status = None
@@ -226,7 +226,7 @@ async def inbox_panel(
             ui.Badge(f'"{q}"', color="blue"),
             ui.Text(f"{n} result{'s' if n != 1 else ''}", variant="caption"),
             ui.Button("✕", variant="ghost", size="sm",
-                      on_click=ui.Call("__panel__inbox", folder=folder, search_query="")),
+                      on_click=ui.Call("__panel__inbox", folder=folder, search_query="", page_cursor="")),
         ], direction="h", gap=1)
 
     email_list = _build_email_list(
@@ -239,7 +239,7 @@ async def inbox_panel(
     if page_cursor and not q:
         nav_buttons.append(ui.Button(
             "← Первая страница", variant="ghost", size="sm",
-            on_click=ui.Call("__panel__inbox", folder=folder),
+            on_click=ui.Call("__panel__inbox", folder=folder, page_cursor=""),
         ))
     if show_cursor and not q:
         nav_buttons.append(ui.Button(
@@ -261,7 +261,7 @@ async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
                               folder: str = "INBOX"):
     if not message_id:
-        return ui.Empty(message="Select an email to read", icon="Mail")
+        return None  # center slot stays null → chat fills full width
     return await build_email_viewer(ctx, message_id, account, email_list_ids, current_index, folder)
 
 

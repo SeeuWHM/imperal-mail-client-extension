@@ -107,7 +107,7 @@ def _build_folder_tabs(folder: str, active_email: str,
             label_str,
             variant="primary" if key == folder else "ghost",
             size="sm",
-            on_click=ui.Call("__panel__inbox", folder=key),
+            on_click=ui.Call("__panel__inbox", folder=key, page_cursor=""),
         ))
     return ui.Stack(buttons, direction="h", wrap=True, gap=1)
 
