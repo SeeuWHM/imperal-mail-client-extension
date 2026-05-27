@@ -1,5 +1,34 @@
 # Changelog
 
+## [5.4.2+] — 2026-05-28
+
+### Fixed
+- **Star badge (blue dot on read email after starring)** — `_execute_panel_action` no longer invalidates cache for state-only actions (`star/unstar/mark_read/mark_unread`). Only structural actions (archive/delete/spam/restore/unarchive/unspam) invalidate. Optimistic patch now receives `do_was_unread=is_unread` from the star button click, explicitly preserving the displayed read state on `star/unstar`.
+- **HTML tags visible as text in sent emails** — `panels_email_viewer.py`: auto-detect HTML body when `body_type != "html"` but content starts with `<`. Fixes RichEditor-composed emails returning `body_type="text"` from some providers.
+- **Compose panel conflict with email_viewer** — `compose`: added `center_overlay=True`, changed `mode` default to `""`, added `return None` guard when `mode=""`. Prevents compose from occupying center slot on cold start and conflicting with email_viewer (both are now proper center overlays).
+- **`email_viewer` showing "Select an email" on cold start** — Returns `None` instead of `ui.Empty(...)` when `message_id=""`. Center slot stays null; chat fills full width by default.
+- **Pagination cursor not resetting on folder/search switch** — `page_cursor=""`, `prev_cursor=""`, `page_num=1` explicitly passed in all reset points (folder tabs, search bar submit, ✕ clear button, account switch).
+- **No unread count on pages 2+** — `folder_stats_unread` accumulated param carries unread count across page navigation; provider doesn't return stats on page 2+.
+- **ERROR without message on provider failures** — all `@chat.function` wrappers changed from `except RuntimeError` to `except Exception`. Network/SSL/timeout errors from providers now surface as readable error messages.
+- **`ui.Password` regression in add_account wizard** — both password fields in `_step_password` and `_step_advanced` restored to `ui.Password` (were reverted to `ui.Input` during v5.4.2 file split).
+
+### Added
+- **Pagination ← N → navigation** — arrow-only buttons (no Russian text) with page number between them. `prev_cursor` param enables true back-navigation to previous page (not just page 1). Pages 2+ cached under `msgs:{email}:{folder}:p{N}` (TTL=60s) — back navigation hits cache instantly.
+- **Skeleton `recent_messages`** — `InboxSummary.ActionResult.data` now includes up to 25 message previews from first account (`message_id/subject/from/date/snippet/unread/starred`, NO body). Enters LLM classifier envelope → Webbee knows inbox contents without calling `inbox()`.
+- **`id_projection` on 12 functions** — SDK v4.1.2: `message_id` on read_email/reply/forward/archive/delete/mark_read/mark_unread/star/move/purge; `thread_id` on get_thread; `email` on delete_contact. Tells kernel chain planner which params field carries the target ID.
+- **`data_model=` on all 35 handlers** — V23 (read) and V24 (write) SDK 5.0.1 validators satisfied. Schemas already existed; wired up to decorators.
+
+### SDK Compliance
+- **Removed `system_prompt=`** from `ChatExtension` (no-op in SDK 5.0.0, LLM router removed).
+- **Removed `_SYSTEM_PROMPT` file load** from `app.py` (wasted I/O at startup).
+- **Removed secrets panel hack** from `app.py` (`ext._panels["secrets"]["slot"] = "overlay"`) — dead code in SDK 5.0.1+ which lazy-registers secrets panel only when `@ext.secret` is declared.
+- **Updated function descriptions** — `inbox`: PRIMARY function for listing emails; `search`: only for specific searches; `reply`/`forward`: instructs chain planner to call `inbox()` first.
+
+### Refactor
+- **`panels.py` split** (v5.4.2 300-line rule) — `inbox_panel` + `_fetch_inbox_messages` extracted to `panels_inbox_panel.py`. `panels.py` reduced to ~45 lines (panel decorators only). `main.py` updated with new module in `_MODULES` + import.
+
+---
+
 ## [5.3.6] — 2026-05-17
 
 ### Fixed
