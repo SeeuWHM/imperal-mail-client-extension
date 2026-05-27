@@ -92,7 +92,7 @@ async def build_email_viewer(
                                       account=account_email, folder=folder))
 
     if result.get("RESULT") == "ERROR":
-        return ui.Error(message=result.get("error", "Failed to load email"))
+        return ui.Error(message=result.get("error") or "Failed to load email")
 
     subject     = result.get("subject", "(no subject)")
     from_name   = result.get("from", "Unknown")

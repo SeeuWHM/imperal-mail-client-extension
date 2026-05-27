@@ -11,10 +11,12 @@ from handlers_inbox_impl import (
 from schemas import (
     InboxParams, MessageIdParams, SearchParams, ThreadParams,
     SendParams, ReplyParams, ForwardParams,
+    InboxPageResult, EmailBody, SearchResult, ThreadView, SendResult,
 )
 
 
 @chat.function("inbox", action_type="read",
+               data_model=InboxPageResult,
                description="Fetch a page of messages from the mailbox. Use folder= to browse non-INBOX folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, and read state. Prefer this over folder() for any folder.")
 async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
     try:
@@ -30,6 +32,7 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
 
 
 @chat.function("read_email", action_type="read",
+               data_model=EmailBody,
                description="Open a specific email by message_id — returns full body (HTML + plain text), sender, all recipients, date, and attachment list. Also marks the message as read.")
 async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
     try:
@@ -45,6 +48,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
 
 
 @chat.function("search", action_type="read",
+               data_model=SearchResult,
                description="Full-mailbox search across all folders. Accepts free-text or provider syntax (Gmail: from:, subject:, label:; Outlook and IMAP: free-text). Returns matching message previews.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     try:
@@ -60,6 +64,7 @@ async def fn_search(ctx, params: SearchParams) -> ActionResult:
 
 
 @chat.function("folder", action_type="read",
+               data_model=InboxPageResult,
                description="Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive). Functionally identical to inbox() with folder= — prefer inbox() unless explicit folder routing is needed.")
 async def fn_folder(ctx, params: InboxParams) -> ActionResult:
     try:
@@ -72,6 +77,7 @@ async def fn_folder(ctx, params: InboxParams) -> ActionResult:
 
 
 @chat.function("get_thread", action_type="read",
+               data_model=ThreadView,
                description="Load a complete email conversation by thread_id — all messages in chronological order. Works on Google and Microsoft; IMAP returns a single-message fallback.")
 async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
     try:
@@ -84,6 +90,7 @@ async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
 
 @chat.function("send", action_type="write", event="sent",
                effects=["create:email"],
+               data_model=SendResult,
                description="Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Use reply() or forward() when responding to an existing message.")
 async def fn_send(ctx, params: SendParams) -> ActionResult:
     try:
@@ -98,6 +105,7 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
 
 @chat.function("reply", action_type="write", event="sent",
                effects=["create:email"],
+               data_model=SendResult,
                description="Reply to an email — sends to the original sender. Provide message_id to target a specific email; omit it to reply to the last opened message. Use send() for brand-new emails, not this.")
 async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
     try:
@@ -112,6 +120,7 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
 
 @chat.function("forward", action_type="write", event="sent",
                effects=["create:email"],
+               data_model=SendResult,
                description="Forward an existing email to a new address. Requires message_id of the email to forward and a to recipient. Optionally prepend a comment above the forwarded body.")
 async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
     try:

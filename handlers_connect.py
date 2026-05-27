@@ -167,6 +167,7 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
 
 
 @chat.function("connect", action_type="read",
+               data_model=ConnectOAuthResult,
                description="Start Google/Gmail OAuth — returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.")
 async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
     try:
@@ -178,6 +179,7 @@ async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
 
 
 @chat.function("connect_microsoft", action_type="read",
+               data_model=ConnectOAuthResult,
                description="Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.")
 async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
     try:
@@ -189,6 +191,7 @@ async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
 
 
 @chat.function("connect_yahoo", action_type="read",
+               data_model=ConnectOAuthResult,
                description="Start Yahoo or AOL OAuth — returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.")
 async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
     try:
@@ -201,6 +204,7 @@ async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("connect_imap", action_type="write", event="account.connected",
                effects=["create:account"],
+               data_model=ConnectImapResult,
                description="Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.")
 async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
     try:
@@ -215,6 +219,7 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
 
 
 @chat.function("status", action_type="read",
+               data_model=AccountsStatus,
                description="List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and current unread count for each.")
 async def fn_status(ctx, params: EmptyParams) -> ActionResult:
     try:
@@ -227,6 +232,7 @@ async def fn_status(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("switch_account", action_type="write", event="account.switched",
                effects=["update:account"],
+               data_model=AccountSwitched,
                description="Change the active email account. All subsequent inbox, send, and manage operations will use this account until switched again.")
 async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
     try:
@@ -240,6 +246,7 @@ async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
 
 @chat.function("disconnect", action_type="destructive", event="account.disconnected",
                effects=["delete:account"],
+               data_model=AccountDisconnected,
                description="Remove a connected email account and permanently delete its stored credentials and access tokens.")
 async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
     try:

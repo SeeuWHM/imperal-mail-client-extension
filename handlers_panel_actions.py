@@ -147,6 +147,7 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
 
 @chat.function("mail_action", action_type="write", event="mail.action",
                effects=["update:email"],
+               data_model=MailActionResult,
                description="Panel UI action dispatcher — called by inbox row buttons, not LLM chat. From chat use archive(), delete(), mark_read(), star() etc. individually.")
 async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
     try:
@@ -160,6 +161,7 @@ async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
 
 
 @chat.function("folder_counts", action_type="read",
+               data_model=FolderCountsResult,
                description="Get current unread message count for all 7 folders simultaneously — INBOX, sent, drafts, spam, trash, starred, archive.")
 async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
     try:
@@ -171,6 +173,7 @@ async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
 
 
 @chat.function("get_oauth_url", action_type="read",
+               data_model=OAuthUrlResult,
                description="Panel add-account wizard helper — returns OAuth URL for Google or Microsoft. From LLM chat use connect() or connect_microsoft() instead.")
 async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
     try:
@@ -182,6 +185,7 @@ async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
 
 @chat.function("add_imap", action_type="write", event="account.connected",
                effects=["create:account"],
+               data_model=ConnectImapResult,
                description="Panel add-account wizard helper — connects an IMAP account from the UI form. From LLM chat use connect_imap() instead.")
 async def fn_add_imap(ctx, params: AddImapParams) -> ActionResult:
     try:

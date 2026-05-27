@@ -50,7 +50,7 @@ async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: st
         log.error("compose_send failed mode=%s: %s", mode, e)
         raise RuntimeError(f"Failed to send: {e}")
     if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", "Send failed"))
+        raise RuntimeError(result.get("error") or "Send failed")
     return ComposeSendResult(sent=True, to=to, mode=mode)
 
 
@@ -59,6 +59,7 @@ async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: st
 
 @chat.function("compose_send", action_type="write", event="sent",
                effects=["create:email"],
+               data_model=ComposeSendResult,
                description="Panel compose form submit — sends from the UI compose panel (mode: new/reply/forward). From LLM chat use send(), reply(), or forward() instead.")
 async def fn_compose_send(ctx, params: ComposeSendParams) -> ActionResult:
     try:

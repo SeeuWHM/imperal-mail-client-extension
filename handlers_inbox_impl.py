@@ -53,7 +53,7 @@ async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
             raise RuntimeError("Account not found.")
         result = await provider.read_email(ctx, acc, message_id)
         if result.get("RESULT") == "ERROR":
-            raise RuntimeError(result.get("error", "Unknown provider error"))
+            raise RuntimeError(result.get("error") or "Unknown provider error")
         data = {k: v for k, v in result.items() if k != "RESULT"}
         return EmailBody.model_validate(data)
 
@@ -67,7 +67,7 @@ async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
             provider = get_provider(acc)
             result = await provider.read_email(ctx, acc, message_id)
             if result.get("RESULT") == "ERROR":
-                last_err = result.get("error", last_err)
+                last_err = result.get("error") or last_err
                 continue
             data = {k: v for k, v in result.items() if k != "RESULT"}
             return EmailBody.model_validate(data)
@@ -83,7 +83,7 @@ async def impl_search(ctx, query: str, max_results: int = 10, account: str = "")
             raise RuntimeError("Account not found.")
         result = await provider.search(ctx, acc, query=query, max_results=max_results)
         if result.get("RESULT") == "ERROR":
-            raise RuntimeError(result.get("error", "Unknown provider error"))
+            raise RuntimeError(result.get("error") or "Unknown provider error")
         results = result.get("results", []) or []
         return SearchResult(query=query, results=results,
                             total=int(result.get("total", len(results)) or 0))
@@ -155,7 +155,7 @@ async def impl_get_thread(ctx, thread_id: str, account: str = "") -> ThreadView:
         raise RuntimeError("No email account connected. Connect one first.")
     result = await provider.get_thread(ctx, acc, thread_id)
     if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", "Unknown provider error"))
+        raise RuntimeError(result.get("error") or "Unknown provider error")
     messages = result.get("messages", []) or []
     return ThreadView(
         thread_id=result.get("thread_id") or thread_id,
@@ -179,7 +179,7 @@ async def impl_send(ctx, to: str, subject: str = "", body: str = "",
         raise RuntimeError("No email account connected. Connect one first.")
     result = await provider.send(ctx, acc, to=to, subject=subject, body=body, cc=cc, bcc=bcc)
     if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", "Send failed"))
+        raise RuntimeError(result.get("error") or "Send failed")
     return SendResult(sent=True, to=to, subject=subject,
                       message_id=result.get("message_id") or result.get("id"))
 
@@ -206,7 +206,7 @@ async def impl_reply(ctx, body: str, message_id: str = "", to: str = "",
         raise RuntimeError("No email account connected. Connect one first.")
     result = await provider.reply(ctx, acc, message_id=mid, body=body, to=to, cc=cc, bcc=bcc)
     if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", "Reply failed"))
+        raise RuntimeError(result.get("error") or "Reply failed")
     return SendResult(sent=True, to=result.get("to") or to,
                       message_id=result.get("message_id") or result.get("id"))
 
@@ -219,7 +219,7 @@ async def impl_forward(ctx, message_id: str, to: str,
             raise RuntimeError("Account not found.")
         result = await provider.forward(ctx, acc, message_id=message_id, to=to, comment=comment)
         if result.get("RESULT") == "ERROR":
-            raise RuntimeError(result.get("error", "Forward failed"))
+            raise RuntimeError(result.get("error") or "Forward failed")
         return SendResult(sent=True, to=to,
                           message_id=result.get("message_id") or result.get("id"))
 
@@ -233,7 +233,7 @@ async def impl_forward(ctx, message_id: str, to: str,
             provider = get_provider(acc)
             result = await provider.forward(ctx, acc, message_id=message_id, to=to, comment=comment)
             if result.get("RESULT") == "ERROR":
-                last_err = result.get("error", last_err)
+                last_err = result.get("error") or last_err
                 continue
             return SendResult(sent=True, to=to,
                               message_id=result.get("message_id") or result.get("id"))

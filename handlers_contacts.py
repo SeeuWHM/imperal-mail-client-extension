@@ -178,6 +178,7 @@ async def impl_delete_contact(ctx, email: str) -> ContactDeleted:
 
 
 @chat.function("contacts", action_type="read",
+               data_model=ContactsList,
                description="List address book contacts, optionally filtered by name or email fragment. Results sorted by name.")
 async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
     try:
@@ -189,6 +190,7 @@ async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
 
 @chat.function("add_contact", action_type="write", event="contact.added",
                effects=["create:contact"],
+               data_model=ContactAdded,
                description="Save a new contact to the address book manually. Email is required; display name is optional.")
 async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
     try:
@@ -200,6 +202,7 @@ async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
 
 @chat.function("sync_contacts", action_type="write", event="contacts.synced",
                effects=["create:contact", "update:contact"],
+               data_model=ContactsSyncResult,
                description="Import contacts from the connected email account — Google People API, Microsoft Graph, or sender/CC header harvest from recent messages.")
 async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
     try:
@@ -214,6 +217,7 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
 
 @chat.function("delete_contact", action_type="destructive", event="contact.deleted",
                effects=["delete:contact"],
+               data_model=ContactDeleted,
                description="Remove a contact from the address book by their exact email address.")
 async def fn_delete_contact(ctx, params: DeleteContactParams) -> ActionResult:
     try:

@@ -9,7 +9,7 @@ from schemas import BulkOperationResult, OperationResult
 
 def _unwrap(result: dict, op: str, message_id: str = "") -> OperationResult:
     if result.get("RESULT") == "ERROR":
-        raise RuntimeError(result.get("error", f"{op} failed"))
+        raise RuntimeError(result.get("error") or f"{op} failed")
     detail = None
     for k in ("detail", "status", "message", "summary"):
         v = result.get(k)
@@ -37,9 +37,9 @@ async def _try_all_accounts(ctx, message_id: str, op_name: str, op_fn) -> Operat
             result = await op_fn(acc, provider)
             if result.get("RESULT") != "ERROR":
                 return _unwrap(result, op_name, message_id)
-            last_err = result.get("error", last_err)
+            last_err = result.get("error") or last_err
         except Exception as e:
-            last_err = str(e)
+            last_err = str(e) or last_err
     raise RuntimeError(last_err)
 
 
@@ -136,7 +136,7 @@ async def _run_bulk(ctx, message_ids: str, operation: str, account: str = "") ->
             if operation in ("archive", "delete"):
                 removed.append(mid)
         else:
-            failed.append(f"{mid[:16]}: {r.get('error', '?')}")
+            failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
     if removed:
         await _remove_multiple_from_cache(ctx, acc.get("email", ""), removed)
     per_op_field = {"archive": "archived", "delete": "deleted",

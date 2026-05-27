@@ -1,8 +1,7 @@
-"""Mail Client — Extension instance + lifecycle (SDK v3.x / ChatExtension)."""
+"""Mail Client — Extension instance + lifecycle (SDK v5.0.0)."""
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from imperal_sdk import Extension
 from imperal_sdk.chat import ChatExtension
@@ -10,10 +9,6 @@ from imperal_sdk.chat import ChatExtension
 from providers.helpers import _all_accounts
 
 log = logging.getLogger("mail")
-
-# ── System prompt ─────────────────────────────────────────────────────────────
-
-_SYSTEM_PROMPT = (Path(__file__).parent / "system_prompt.txt").read_text()
 
 # ── Extension + ChatExtension ─────────────────────────────────────────────────
 
@@ -30,14 +25,6 @@ ext = Extension(
     capabilities=["store:read", "store:write", "notify:push"],
 )
 
-# SDK 5.0.0 auto-registers a "secrets" panel on slot="right" in Extension.__init__.
-# Mail-client doesn't use ctx.secrets — move it away so Accounts is the sole right panel.
-try:
-    if "secrets" in ext._panels:
-        ext._panels["secrets"]["slot"] = "overlay"
-except (AttributeError, TypeError):
-    pass
-
 chat = ChatExtension(
     ext=ext,
     tool_name="tool_mail_client_chat",
@@ -46,7 +33,6 @@ chat = ChatExtension(
         "delete, mark read/unread, star, browse folders, view threads, bulk operations, "
         "contacts CRUD + sync. Connect Google, Microsoft, Yahoo, IMAP."
     ),
-    system_prompt=_SYSTEM_PROMPT,
 )
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
