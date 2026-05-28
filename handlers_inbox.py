@@ -34,7 +34,7 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
 @chat.function("read_email", action_type="read",
                data_model=EmailBody,
                id_projection="message_id",
-               description="Open a specific email by message_id — returns full body (HTML + plain text), sender, all recipients, date, and attachment list. Also marks the message as read.")
+               description="Open and read the full content of an email by message_id. Returns body (HTML + plain text), sender, all recipients, date, attachments. Also marks it as read. ALWAYS call this after inbox() or search() before replying, forwarding, archiving, or doing anything that requires knowing what the email says.")
 async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_read_email(ctx, message_id=params.message_id, account=params.account)
@@ -109,7 +109,7 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
                effects=["create:email"],
                data_model=SendResult,
                id_projection="message_id",
-               description="Reply to an email by message_id. In a multi-step chain always call inbox() or search() first to get the message_id, then pass it here. Omit message_id only if the email was already opened with read_email() in this session. Use send() for new emails.")
+               description="Reply to an email. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to read its content, 3) reply(message_id, body=<your response>). NEVER skip read_email() — you must know what you are replying to. Only omit message_id if read_email() was already called in this same session. Use send() for new emails, not replies.")
 async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
     try:
         r = await impl_reply(ctx, body=params.body, message_id=params.message_id,
@@ -125,7 +125,7 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
                effects=["create:email"],
                data_model=SendResult,
                id_projection="message_id",
-               description="Forward an existing email by message_id to a new address. In a multi-step chain call inbox() or search() first to get the message_id. Requires message_id and to address.")
+               description="Forward an existing email to a new address. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to load its content, 3) forward(message_id, to=<address>). NEVER skip read_email() — the original body must be loaded before forwarding. Requires message_id and to address.")
 async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
     try:
         r = await impl_forward(ctx, message_id=params.message_id, to=params.to,

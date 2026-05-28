@@ -18,7 +18,7 @@ from schemas import (
                effects=["update:email"],
                data_model=OperationResult,
                id_projection="message_id",
-               description="Archive a single email — removes it from INBOX into the archive folder. Remains searchable and recoverable. Not the same as delete().")
+               description="Archive a single email — removes it from INBOX, stays searchable and recoverable. Requires message_id: call inbox() or search() first if you don't have it yet. Not the same as delete().")
 async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_archive(ctx, message_id=params.message_id, account=params.account)
@@ -31,7 +31,7 @@ async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
                effects=["update:email"],
                data_model=OperationResult,
                id_projection="message_id",
-               description="Move a single email to Trash — recoverable until trash is emptied. Use purge() for permanent unrecoverable deletion.")
+               description="Move a single email to Trash — recoverable until emptied. Requires message_id: call inbox() or search() first if you don't have it yet. Use purge() for permanent deletion.")
 async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
     try:
         r = await impl_delete(ctx, message_id=params.message_id, account=params.account)
@@ -70,7 +70,7 @@ async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
                effects=["update:email"],
                data_model=OperationResult,
                id_projection="message_id",
-               description="Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle.")
+               description="Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle. Requires message_id: call inbox() or search() first if you don't have it yet.")
 async def fn_star(ctx, params: StarParams) -> ActionResult:
     try:
         r = await impl_star(ctx, message_id=params.message_id,
@@ -101,7 +101,7 @@ async def fn_move(ctx, params: MoveParams) -> ActionResult:
                effects=["delete:email"],
                data_model=OperationResult,
                id_projection="message_id",
-               description="Permanently delete an email from a folder (default: Trash) — cannot be recovered. Use delete() to move to Trash first if unsure.")
+               description="Permanently delete an email — cannot be recovered. Requires message_id: call inbox() or search() first if you don't have it. Use delete() to move to Trash first if unsure.")
 async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
     try:
         r = await impl_purge(ctx, message_id=params.message_id,
