@@ -1,4 +1,4 @@
-"""Mail Client · Panel action handlers — archive/delete/spam/mark/counts/oauth/imap."""
+"""Mail Client · Panel action handlers (SDK 5.2.0 / SDL)."""
 from __future__ import annotations
 
 import asyncio
@@ -19,8 +19,12 @@ from providers.helpers import (
 from providers.imap import _sync_imap_test
 
 from schemas import (
-    ConnectImapResult, FolderCountsResult, MailActionResult, OAuthUrlResult,
     MailActionParams, AccountParam, OAuthParams, AddImapParams,
+    ConnectImapResult, FolderCountsResult, MailActionResult, OAuthUrlResult,
+)
+from schemas_sdl_builders import (
+    MailActionOpResult, FolderCountsEntity, MailOAuthUrlResult, ImapConnectResult,
+    build_mail_action_op, build_folder_counts, build_oauth_url, build_imap_connect,
 )
 
 log = logging.getLogger(__name__)
@@ -147,52 +151,61 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
 
 @chat.function("mail_action", action_type="write", event="mail.action",
                effects=["update:email"],
-               data_model=MailActionResult,
+               data_model=MailActionOpResult,
                description="Panel UI action dispatcher — called by inbox row buttons, not LLM chat. From chat use archive(), delete(), mark_read(), star() etc. individually.")
 async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
     try:
         r = await impl_mail_action(ctx, action=params.action, message_id=params.message_id,
                                    message_ids=params.message_ids, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"{params.action}: {r.count} message(s).",
-                                    refresh_panels=["inbox"])
+        return ActionResult.success(
+            data=build_mail_action_op(r),
+            summary=f"{params.action}: {r.count} message(s).",
+            refresh_panels=["inbox"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("folder_counts", action_type="read",
-               data_model=FolderCountsResult,
+               data_model=FolderCountsEntity,
                description="Get current unread message count for all 7 folders simultaneously — INBOX, sent, drafts, spam, trash, starred, archive.")
 async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_folder_counts(ctx, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"INBOX: {r.counts.get('INBOX', 0)} unread.")
+        return ActionResult.success(
+            data=build_folder_counts(r),
+            summary=f"INBOX: {r.counts.get('INBOX', 0)} unread.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
 @chat.function("get_oauth_url", action_type="read",
-               data_model=OAuthUrlResult,
+               data_model=MailOAuthUrlResult,
                description="Panel add-account wizard helper — returns OAuth URL for Google or Microsoft. From LLM chat use connect() or connect_microsoft() instead.")
 async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
     try:
         r = await impl_get_oauth_url(ctx, provider=params.provider)
-        return ActionResult.success(data=r.model_dump(), summary=f"OAuth URL for {params.provider}.")
+        return ActionResult.success(
+            data=build_oauth_url(r),
+            summary=f"OAuth URL for {params.provider}.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("add_imap", action_type="write", event="account.connected",
                effects=["create:account"],
-               data_model=ConnectImapResult,
+               data_model=ImapConnectResult,
                description="Panel add-account wizard helper — connects an IMAP account from the UI form. From LLM chat use connect_imap() instead.")
 async def fn_add_imap(ctx, params: AddImapParams) -> ActionResult:
     try:
         r = await impl_add_imap(ctx, email=params.email, password=params.password,
                                 imap_host=params.imap_host, smtp_host=params.smtp_host,
                                 imap_port=params.imap_port, smtp_port=params.smtp_port)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Connected {r.email} via IMAP ({r.imap_server}).")
+        return ActionResult.success(
+            data=build_imap_connect(r),
+            summary=f"Connected {r.email} via IMAP ({r.imap_server}).",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)

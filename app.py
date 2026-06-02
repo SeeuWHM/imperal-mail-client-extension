@@ -1,4 +1,4 @@
-"""Mail Client — Extension instance + lifecycle (SDK v5.0.0)."""
+"""Mail Client — Extension instance + lifecycle (SDK v5.2.0 / SDL)."""
 from __future__ import annotations
 
 import logging
@@ -14,7 +14,7 @@ log = logging.getLogger("mail")
 
 ext = Extension(
     "mail",
-    version="5.4.2",
+    version="5.5.0",
     display_name="Mail Client",
     description=(
         "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "

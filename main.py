@@ -1,4 +1,4 @@
-"""Mail Client v5.4.2 — Multi-provider email for Imperal Cloud (SDK v5.0.0)."""
+"""Mail Client v5.5.0 — Multi-provider email for Imperal Cloud (SDK v5.2.0 / SDL)."""
 from __future__ import annotations
 
 import os
@@ -11,6 +11,7 @@ if _dir not in sys.path:
 
 _MODULES = (
     "app", "ctx_helpers", "schemas", "schemas_params",
+    "schemas_sdl", "schemas_sdl_builders",
     "handlers_ui",
     "handlers_connect",
     "handlers_inbox_impl", "handlers_inbox",
@@ -26,6 +27,10 @@ for _m in [k for k in sys.modules if k in _MODULES]:
 
 # ── Import core + submodules ─────────────────────────────────────────────────
 from app import ext, chat  # noqa: E402, F401
+
+# SDL entity classes must load before any handler that uses them.
+import schemas_sdl          # noqa: E402, F401
+import schemas_sdl_builders  # noqa: E402, F401
 
 # Register cache models BEFORE modules that use ctx.cache.get_or_fetch.
 import cache_models  # noqa: E402, F401

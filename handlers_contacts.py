@@ -1,4 +1,4 @@
-"""Mail Client · Contact handlers."""
+"""Mail Client · Contact handlers (SDK 5.2.0 / SDL)."""
 from __future__ import annotations
 
 import logging
@@ -17,8 +17,12 @@ from providers.helpers import (
 )
 
 from schemas import (
-    ContactAdded, ContactDeleted, ContactEntry, ContactsList, ContactsSyncResult,
     ContactsParams, AddContactParams, DeleteContactParams, AccountParam,
+    ContactAdded, ContactDeleted, ContactEntry, ContactsList, ContactsSyncResult,
+)
+from schemas_sdl_builders import (
+    ContactPage, ContactOpResult, ContactSyncResult,
+    build_contact_page, build_contact_added, build_contact_deleted, build_contact_sync,
 )
 
 log = logging.getLogger("mail")
@@ -42,7 +46,8 @@ async def impl_contacts(ctx, search: str = "", limit: int = 50) -> ContactsList:
     docs = await ctx.store.query(CONTACTS_COLLECTION, limit=min(limit, 200))
     sq = search.lower() if search else ""
     contacts = [
-        ContactEntry(email=d.data.get("email", ""), name=d.data.get("name", ""), source=d.data.get("source", "manual"))
+        ContactEntry(email=d.data.get("email", ""), name=d.data.get("name", ""),
+                     source=d.data.get("source", "manual"))
         for d in docs.data
         if not sq or sq in d.data.get("email", "").lower() or sq in d.data.get("name", "").lower()
     ]
@@ -77,10 +82,7 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
             raise RuntimeError("No email account connected. Connect one first.")
 
     await ctx.progress(percent=0, message=f"Preparing to sync {len(target_accs)} account(s)…")
-
-    # All own emails — never add self as a contact regardless of which account found them
     own_emails = {a.get("email", "").lower() for a in target_accs if a.get("email")}
-
     found: list[dict] = []
     notes: list[str] = []
 
@@ -178,37 +180,45 @@ async def impl_delete_contact(ctx, email: str) -> ContactDeleted:
 
 
 @chat.function("contacts", action_type="read",
-               data_model=ContactsList,
+               data_model=ContactPage,
                description="List address book contacts, optionally filtered by name or email fragment. Results sorted by name.")
 async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
     try:
         r = await impl_contacts(ctx, search=params.search, limit=params.limit)
-        return ActionResult.success(data=r.model_dump(), summary=f"{r.total} contact(s).")
+        return ActionResult.success(
+            data=build_contact_page(r),
+            summary=f"{r.total} contact(s).",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("add_contact", action_type="write", event="contact.added",
                effects=["create:contact"],
-               data_model=ContactAdded,
+               data_model=ContactOpResult,
                description="Save a new contact to the address book manually. Email is required; display name is optional.")
 async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
     try:
         r = await impl_add_contact(ctx, email=params.email, name=params.name)
-        return ActionResult.success(data=r.model_dump(), summary=f"Added contact {r.email}.")
+        return ActionResult.success(
+            data=build_contact_added(r),
+            summary=f"Added contact {r.email}.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("sync_contacts", action_type="write", event="contacts.synced",
                effects=["create:contact", "update:contact"],
-               data_model=ContactsSyncResult,
+               data_model=ContactSyncResult,
                description="Import contacts from the connected email account — Google People API, Microsoft Graph, or sender/CC header harvest from recent messages.")
 async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_sync_contacts(ctx, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Synced contacts: {r.added} added, {r.total} total.")
+        return ActionResult.success(
+            data=build_contact_sync(r),
+            summary=f"Synced contacts: {r.added} added, {r.total} total.",
+        )
     except TaskCancelled:
         return ActionResult.error("Sync cancelled.", retryable=True)
     except Exception as e:
@@ -217,12 +227,15 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
 
 @chat.function("delete_contact", action_type="destructive", event="contact.deleted",
                effects=["delete:contact"],
-               data_model=ContactDeleted,
+               data_model=ContactOpResult,
                id_projection="email",
                description="Remove a contact from the address book by their exact email address.")
 async def fn_delete_contact(ctx, params: DeleteContactParams) -> ActionResult:
     try:
         r = await impl_delete_contact(ctx, email=params.email)
-        return ActionResult.success(data=r.model_dump(), summary=f"Deleted contact {r.email}.")
+        return ActionResult.success(
+            data=build_contact_deleted(r),
+            summary=f"Deleted contact {r.email}.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)

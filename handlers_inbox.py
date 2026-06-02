@@ -1,4 +1,4 @@
-"""Mail Client · Inbox & compose @chat.function handlers."""
+"""Mail Client · Inbox & compose @chat.function handlers (SDK 5.2.0 / SDL)."""
 from __future__ import annotations
 
 from app import chat
@@ -8,22 +8,25 @@ from handlers_inbox_impl import (
     impl_inbox, impl_read_email, impl_search, impl_folder,
     impl_get_thread, impl_send, impl_reply, impl_forward,
 )
-from schemas import (
-    InboxParams, MessageIdParams, SearchParams, ThreadParams,
-    SendParams, ReplyParams, ForwardParams,
-    InboxPageResult, EmailBody, SearchResult, ThreadView, SendResult,
+from schemas import InboxParams, MessageIdParams, SearchParams, ThreadParams
+from schemas import SendParams, ReplyParams, ForwardParams
+from schemas_sdl_builders import (
+    EmailMessage, InboxPage, SearchPage,
+    EmailThread, SentEmailResult,
+    build_email_message, build_inbox_page, build_search_page,
+    build_email_thread, build_sent_result,
 )
 
 
 @chat.function("inbox", action_type="read",
-               data_model=InboxPageResult,
+               data_model=InboxPage,
                description="PRIMARY function to list emails. Use this when user asks for recent/latest/new emails, wants to see their inbox, or check mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, read state. Do NOT use search() for listing recent emails — use inbox().")
 async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
     try:
         r = await impl_inbox(ctx, folder=params.folder, cursor=params.cursor,
                              limit=params.limit, account=params.account)
         return ActionResult.success(
-            data=r.model_dump(),
+            data=build_inbox_page(r, folder=params.folder),
             summary=f"{len(r.messages)} message(s) in {params.folder}.",
             ui=_inbox_ui(r.messages, params.folder),
         )
@@ -32,7 +35,7 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
 
 
 @chat.function("read_email", action_type="read",
-               data_model=EmailBody,
+               data_model=EmailMessage,
                id_projection="message_id",
                description="Open and read the full content of an email by message_id. Returns body (HTML + plain text), sender, all recipients, date, attachments. Also marks it as read. ALWAYS call this after inbox() or search() before replying, forwarding, archiving, or doing anything that requires knowing what the email says.")
 async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
@@ -40,7 +43,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
         r = await impl_read_email(ctx, message_id=params.message_id, account=params.account)
         subj = r.subject or "(no subject)"
         return ActionResult.success(
-            data=r.model_dump(),
+            data=build_email_message(r, account=params.account),
             summary=f"Email: {subj}",
             ui=_email_ui(r),
         )
@@ -49,14 +52,14 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
 
 
 @chat.function("search", action_type="read",
-               data_model=SearchResult,
+               data_model=SearchPage,
                description="Find specific emails by content, sender, or subject. Use free-text or provider syntax (Gmail: from:sender, subject:topic, label:name; Outlook/IMAP: free-text). Only use when searching for something specific. For listing recent/latest emails use inbox() instead.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     try:
         r = await impl_search(ctx, query=params.query, max_results=params.max_results,
                               account=params.account)
         return ActionResult.success(
-            data=r.model_dump(),
+            data=build_search_page(r),
             summary=f"{r.total} result(s) for '{params.query}'.",
             ui=_search_ui(r.results, params.query),
         )
@@ -65,73 +68,83 @@ async def fn_search(ctx, params: SearchParams) -> ActionResult:
 
 
 @chat.function("folder", action_type="read",
-               data_model=InboxPageResult,
+               data_model=InboxPage,
                description="Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive). Functionally identical to inbox() with folder= — prefer inbox() unless explicit folder routing is needed.")
 async def fn_folder(ctx, params: InboxParams) -> ActionResult:
     try:
         r = await impl_folder(ctx, folder=params.folder, cursor=params.cursor,
                               limit=params.limit, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"{len(r.messages)} message(s) in {params.folder}.")
+        return ActionResult.success(
+            data=build_inbox_page(r, folder=params.folder),
+            summary=f"{len(r.messages)} message(s) in {params.folder}.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
 @chat.function("get_thread", action_type="read",
-               data_model=ThreadView,
+               data_model=EmailThread,
                id_projection="thread_id",
                description="Load a complete email conversation by thread_id — all messages in chronological order. Works on Google and Microsoft; IMAP returns a single-message fallback.")
 async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
     try:
         r = await impl_get_thread(ctx, thread_id=params.thread_id, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Thread '{r.subject}' — {r.total} message(s).")
+        return ActionResult.success(
+            data=build_email_thread(r),
+            summary=f"Thread '{r.subject}' — {r.total} message(s).",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
 @chat.function("send", action_type="write", event="sent",
                effects=["create:email"],
-               data_model=SendResult,
+               data_model=SentEmailResult,
                description="Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Use reply() or forward() when responding to an existing message.")
 async def fn_send(ctx, params: SendParams) -> ActionResult:
     try:
         r = await impl_send(ctx, to=params.to, subject=params.subject, body=params.body,
                             cc=params.cc, bcc=params.bcc, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Email sent to {params.to}.",
-                                    refresh_panels=["inbox"])
+        return ActionResult.success(
+            data=build_sent_result(r),
+            summary=f"Email sent to {params.to}.",
+            refresh_panels=["inbox"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("reply", action_type="write", event="sent",
                effects=["create:email"],
-               data_model=SendResult,
+               data_model=SentEmailResult,
                id_projection="message_id",
                description="Reply to an email. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to read its content, 3) reply(message_id, body=<your response>). NEVER skip read_email() — you must know what you are replying to. Only omit message_id if read_email() was already called in this same session. Use send() for new emails, not replies.")
 async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
     try:
         r = await impl_reply(ctx, body=params.body, message_id=params.message_id,
                              to=params.to, cc=params.cc, bcc=params.bcc, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Reply sent to {r.to}.",
-                                    refresh_panels=["inbox"])
+        return ActionResult.success(
+            data=build_sent_result(r),
+            summary=f"Reply sent to {r.to}.",
+            refresh_panels=["inbox"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("forward", action_type="write", event="sent",
                effects=["create:email"],
-               data_model=SendResult,
+               data_model=SentEmailResult,
                id_projection="message_id",
                description="Forward an existing email to a new address. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to load its content, 3) forward(message_id, to=<address>). NEVER skip read_email() — the original body must be loaded before forwarding. Requires message_id and to address.")
 async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
     try:
         r = await impl_forward(ctx, message_id=params.message_id, to=params.to,
                                comment=params.comment, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Forwarded to {params.to}.",
-                                    refresh_panels=["inbox"])
+        return ActionResult.success(
+            data=build_sent_result(r),
+            summary=f"Forwarded to {params.to}.",
+            refresh_panels=["inbox"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)

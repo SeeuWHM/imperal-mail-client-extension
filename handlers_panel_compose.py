@@ -1,4 +1,4 @@
-"""Mail Client · Compose send handler for panel."""
+"""Mail Client · Compose send handler for panel (SDK 5.2.0 / SDL)."""
 from __future__ import annotations
 
 import logging
@@ -7,7 +7,8 @@ from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 
-from schemas import ComposeSendResult, ComposeSendParams
+from schemas import ComposeSendParams, ComposeSendResult
+from schemas_sdl_builders import ComposeSentResult, build_compose_sent
 
 log = logging.getLogger(__name__)
 
@@ -18,8 +19,6 @@ log = logging.getLogger(__name__)
 async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: str = "",
                             subject: str = "", body: str = "", cc: str = "", bcc: str = "",
                             account: str = "") -> ComposeSendResult:
-    # TagInput may not submit pre-filled values when user doesn't interact with the field.
-    # For reply mode, recover the original sender from the message so the form still works.
     if not to and mode == "reply" and message_id:
         try:
             acc_tmp, prov_tmp = await _get_acc(ctx, account)
@@ -59,15 +58,17 @@ async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: st
 
 @chat.function("compose_send", action_type="write", event="sent",
                effects=["create:email"],
-               data_model=ComposeSendResult,
+               data_model=ComposeSentResult,
                description="Panel compose form submit — sends from the UI compose panel (mode: new/reply/forward). From LLM chat use send(), reply(), or forward() instead.")
 async def fn_compose_send(ctx, params: ComposeSendParams) -> ActionResult:
     try:
         r = await impl_compose_send(ctx, mode=params.mode, message_id=params.message_id,
                                     to=params.to, subject=params.subject, body=params.body,
                                     cc=params.cc, bcc=params.bcc, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Email sent to {params.to}.",
-                                    refresh_panels=["inbox"])
+        return ActionResult.success(
+            data=build_compose_sent(r, to=params.to),
+            summary=f"Email sent to {params.to}.",
+            refresh_panels=["inbox"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)

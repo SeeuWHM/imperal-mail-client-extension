@@ -1,4 +1,4 @@
-"""Mail Client · Connect & account handlers."""
+"""Mail Client · Connect & account handlers (SDK 5.2.0 / SDL)."""
 from __future__ import annotations
 
 import asyncio
@@ -27,9 +27,15 @@ from providers.imap import _sync_imap_test
 from cache_model_defs import UnreadSummary
 
 from schemas import (
+    AccountParam, ConnectImapParams, EmptyParams,
     AccountDisconnected, AccountSwitched, AccountsStatus, ConnectImapResult,
     ConnectOAuthResult, MailAccount,
-    AccountParam, ConnectImapParams, EmptyParams,
+)
+from schemas_sdl_builders import (
+    OAuthConnectResult, ImapConnectResult, AccountsPage,
+    AccountSwitchedResult, AccountDisconnectedResult,
+    build_oauth_connect, build_imap_connect,
+    build_accounts_page, build_account_switched, build_account_disconnected,
 )
 
 log = logging.getLogger("mail")
@@ -155,92 +161,106 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
 
 
 @chat.function("connect", action_type="read",
-               data_model=ConnectOAuthResult,
+               data_model=OAuthConnectResult,
                description="Start Google/Gmail OAuth — returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.")
 async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect(ctx)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary="Already connected." if r.already_connected else "OAuth URL ready.")
+        return ActionResult.success(
+            data=build_oauth_connect(r),
+            summary="Already connected." if r.already_connected else "OAuth URL ready.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("connect_microsoft", action_type="read",
-               data_model=ConnectOAuthResult,
+               data_model=OAuthConnectResult,
                description="Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.")
 async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect_microsoft(ctx)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary="Already connected." if r.already_connected else "OAuth URL ready.")
+        return ActionResult.success(
+            data=build_oauth_connect(r),
+            summary="Already connected." if r.already_connected else "OAuth URL ready.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("connect_yahoo", action_type="read",
-               data_model=ConnectOAuthResult,
+               data_model=OAuthConnectResult,
                description="Start Yahoo or AOL OAuth — returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.")
 async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_connect_yahoo(ctx)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary="Already connected." if r.already_connected else "OAuth URL ready.")
+        return ActionResult.success(
+            data=build_oauth_connect(r),
+            summary="Already connected." if r.already_connected else "OAuth URL ready.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("connect_imap", action_type="write", event="account.connected",
                effects=["create:account"],
-               data_model=ConnectImapResult,
+               data_model=ImapConnectResult,
                description="Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.")
 async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
     try:
         r = await impl_connect_imap(ctx, email_addr=params.email_addr, password=params.password,
                                     imap_host=params.imap_host, smtp_host=params.smtp_host,
                                     imap_port=params.imap_port, smtp_port=params.smtp_port)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Connected {r.email} via IMAP ({r.imap_server}).",
-                                    refresh_panels=["accounts", "inbox"])
+        return ActionResult.success(
+            data=build_imap_connect(r),
+            summary=f"Connected {r.email} via IMAP ({r.imap_server}).",
+            refresh_panels=["accounts", "inbox"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("status", action_type="read",
-               data_model=AccountsStatus,
+               data_model=AccountsPage,
                description="List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and current unread count for each.")
 async def fn_status(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await impl_status(ctx)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"{r.total} account(s) connected." if r.connected else "No accounts connected.")
+        return ActionResult.success(
+            data=build_accounts_page(r),
+            summary=f"{r.total} account(s) connected." if r.connected else "No accounts connected.",
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("switch_account", action_type="write", event="account.switched",
                effects=["update:account"],
-               data_model=AccountSwitched,
+               data_model=AccountSwitchedResult,
                description="Change the active email account. All subsequent inbox, send, and manage operations will use this account until switched again.")
 async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_switch_account(ctx, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Switched to {r.active_account}.",
-                                    refresh_panels=["inbox", "accounts"])
+        return ActionResult.success(
+            data=build_account_switched(r),
+            summary=f"Switched to {r.active_account}.",
+            refresh_panels=["inbox", "accounts"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
 
 
 @chat.function("disconnect", action_type="destructive", event="account.disconnected",
                effects=["delete:account"],
-               data_model=AccountDisconnected,
+               data_model=AccountDisconnectedResult,
                description="Remove a connected email account and permanently delete its stored credentials and access tokens.")
 async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
     try:
         r = await impl_disconnect(ctx, account=params.account)
-        return ActionResult.success(data=r.model_dump(),
-                                    summary=f"Disconnected {r.email}. {r.remaining} account(s) remaining.",
-                                    refresh_panels=["accounts", "inbox"])
+        return ActionResult.success(
+            data=build_account_disconnected(r),
+            summary=f"Disconnected {r.email}. {r.remaining} account(s) remaining.",
+            refresh_panels=["accounts", "inbox"],
+        )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
