@@ -22,6 +22,7 @@ from schemas_sdl_builders import (
                data_model=InboxPage,
                description="PRIMARY function to list emails. Use this when user asks for recent/latest/new emails, wants to see their inbox, or check mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, read state. Do NOT use search() for listing recent emails — use inbox().")
 async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
+    """PRIMARY function to list emails."""
     try:
         r = await impl_inbox(ctx, folder=params.folder, cursor=params.cursor,
                              limit=params.limit, account=params.account)
@@ -39,6 +40,7 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
                id_projection="message_id",
                description="Open and read the full content of an email by message_id. Returns body (HTML + plain text), sender, all recipients, date, attachments. Also marks it as read. ALWAYS call this after inbox() or search() before replying, forwarding, archiving, or doing anything that requires knowing what the email says.")
 async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
+    """Open and read the full content of an email by message_id."""
     try:
         r = await impl_read_email(ctx, message_id=params.message_id, account=params.account)
         subj = r.subject or "(no subject)"
@@ -55,6 +57,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
                data_model=SearchPage,
                description="Find specific emails by content, sender, or subject. Use free-text or provider syntax (Gmail: from:sender, subject:topic, label:name; Outlook/IMAP: free-text). Only use when searching for something specific. For listing recent/latest emails use inbox() instead.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
+    """Find specific emails by content, sender, or subject."""
     try:
         r = await impl_search(ctx, query=params.query, max_results=params.max_results,
                               account=params.account)
@@ -71,6 +74,7 @@ async def fn_search(ctx, params: SearchParams) -> ActionResult:
                data_model=InboxPage,
                description="Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive). Functionally identical to inbox() with folder= — prefer inbox() unless explicit folder routing is needed.")
 async def fn_folder(ctx, params: InboxParams) -> ActionResult:
+    """Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive)."""
     try:
         r = await impl_folder(ctx, folder=params.folder, cursor=params.cursor,
                               limit=params.limit, account=params.account)
@@ -87,6 +91,7 @@ async def fn_folder(ctx, params: InboxParams) -> ActionResult:
                id_projection="thread_id",
                description="Load a complete email conversation by thread_id — all messages in chronological order. Works on Google and Microsoft; IMAP returns a single-message fallback.")
 async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
+    """Load a complete email conversation by thread_id — all messages in chronological order."""
     try:
         r = await impl_get_thread(ctx, thread_id=params.thread_id, account=params.account)
         return ActionResult.success(
@@ -102,6 +107,7 @@ async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
                data_model=SentEmailResult,
                description="Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Use reply() or forward() when responding to an existing message.")
 async def fn_send(ctx, params: SendParams) -> ActionResult:
+    """Send a brand-new email."""
     try:
         r = await impl_send(ctx, to=params.to, subject=params.subject, body=params.body,
                             cc=params.cc, bcc=params.bcc, account=params.account)
@@ -120,6 +126,7 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
                id_projection="message_id",
                description="Reply to an email. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to read its content, 3) reply(message_id, body=<your response>). NEVER skip read_email() — you must know what you are replying to. Only omit message_id if read_email() was already called in this same session. Use send() for new emails, not replies.")
 async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
+    """Reply to an email."""
     try:
         r = await impl_reply(ctx, body=params.body, message_id=params.message_id,
                              to=params.to, cc=params.cc, bcc=params.bcc, account=params.account)
@@ -138,6 +145,7 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
                id_projection="message_id",
                description="Forward an existing email to a new address. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to load its content, 3) forward(message_id, to=<address>). NEVER skip read_email() — the original body must be loaded before forwarding. Requires message_id and to address.")
 async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
+    """Forward an existing email to a new address."""
     try:
         r = await impl_forward(ctx, message_id=params.message_id, to=params.to,
                                comment=params.comment, account=params.account)

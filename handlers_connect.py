@@ -164,6 +164,7 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
                data_model=OAuthConnectResult,
                description="Start Google/Gmail OAuth — returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.")
 async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
+    """Start Google/Gmail OAuth — returns an authorisation URL to open in the browser."""
     try:
         r = await impl_connect(ctx)
         return ActionResult.success(
@@ -178,6 +179,7 @@ async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
                data_model=OAuthConnectResult,
                description="Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.")
 async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
+    """Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL."""
     try:
         r = await impl_connect_microsoft(ctx)
         return ActionResult.success(
@@ -192,6 +194,7 @@ async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
                data_model=OAuthConnectResult,
                description="Start Yahoo or AOL OAuth — returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.")
 async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
+    """Start Yahoo or AOL OAuth — returns an authorisation URL."""
     try:
         r = await impl_connect_yahoo(ctx)
         return ActionResult.success(
@@ -207,6 +210,7 @@ async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
                data_model=ImapConnectResult,
                description="Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.")
 async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
+    """Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain."""
     try:
         r = await impl_connect_imap(ctx, email_addr=params.email_addr, password=params.password,
                                     imap_host=params.imap_host, smtp_host=params.smtp_host,
@@ -224,6 +228,7 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
                data_model=AccountsPage,
                description="List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and current unread count for each.")
 async def fn_status(ctx, params: EmptyParams) -> ActionResult:
+    """List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and curren..."""
     try:
         r = await impl_status(ctx)
         return ActionResult.success(
@@ -239,6 +244,7 @@ async def fn_status(ctx, params: EmptyParams) -> ActionResult:
                data_model=AccountSwitchedResult,
                description="Change the active email account. All subsequent inbox, send, and manage operations will use this account until switched again.")
 async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
+    """Change the active email account."""
     try:
         r = await impl_switch_account(ctx, account=params.account)
         return ActionResult.success(
@@ -255,6 +261,7 @@ async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
                data_model=AccountDisconnectedResult,
                description="Remove a connected email account and permanently delete its stored credentials and access tokens.")
 async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
+    """Remove a connected email account and permanently delete its stored credentials and access tokens."""
     try:
         r = await impl_disconnect(ctx, account=params.account)
         return ActionResult.success(

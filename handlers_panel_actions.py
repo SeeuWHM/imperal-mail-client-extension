@@ -154,6 +154,7 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
                data_model=MailActionOpResult,
                description="Panel UI action dispatcher — called by inbox row buttons, not LLM chat. From chat use archive(), delete(), mark_read(), star() etc. individually.")
 async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
+    """Panel UI action dispatcher — called by inbox row buttons, not LLM chat."""
     try:
         r = await impl_mail_action(ctx, action=params.action, message_id=params.message_id,
                                    message_ids=params.message_ids, account=params.account)
@@ -170,6 +171,7 @@ async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
                data_model=FolderCountsEntity,
                description="Get current unread message count for all 7 folders simultaneously — INBOX, sent, drafts, spam, trash, starred, archive.")
 async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
+    """Get current unread message count for all 7 folders simultaneously — INBOX, sent, drafts, spam, trash, starred, archive."""
     try:
         r = await impl_folder_counts(ctx, account=params.account)
         return ActionResult.success(
@@ -184,6 +186,7 @@ async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
                data_model=MailOAuthUrlResult,
                description="Panel add-account wizard helper — returns OAuth URL for Google or Microsoft. From LLM chat use connect() or connect_microsoft() instead.")
 async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
+    """Panel add-account wizard helper — returns OAuth URL for Google or Microsoft."""
     try:
         r = await impl_get_oauth_url(ctx, provider=params.provider)
         return ActionResult.success(
@@ -199,6 +202,7 @@ async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
                data_model=ImapConnectResult,
                description="Panel add-account wizard helper — connects an IMAP account from the UI form. From LLM chat use connect_imap() instead.")
 async def fn_add_imap(ctx, params: AddImapParams) -> ActionResult:
+    """Panel add-account wizard helper — connects an IMAP account from the UI form."""
     try:
         r = await impl_add_imap(ctx, email=params.email, password=params.password,
                                 imap_host=params.imap_host, smtp_host=params.smtp_host,

@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.2.0",
+  "sdk_version": "5.2.1",
   "app_id": "mail",
   "version": "5.5.0",
   "name": "Mail Client",
@@ -39,7 +39,118 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "OAuth authorisation result — returned by connect/connect_microsoft/connect_yahoo.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "oauth_connect",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "auth_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Auth Url",
+            "x-sdl-role": "mail.auth_url"
+          },
+          "instruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Instruction",
+            "x-sdl-role": "mail.instruction"
+          },
+          "already_connected": {
+            "default": false,
+            "title": "Already Connected",
+            "type": "boolean",
+            "x-sdl-role": "mail.already_connected"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "OAuthConnectResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -59,7 +170,118 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "OAuth authorisation result — returned by connect/connect_microsoft/connect_yahoo.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "oauth_connect",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "auth_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Auth Url",
+            "x-sdl-role": "mail.auth_url"
+          },
+          "instruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Instruction",
+            "x-sdl-role": "mail.instruction"
+          },
+          "already_connected": {
+            "default": false,
+            "title": "Already Connected",
+            "type": "boolean",
+            "x-sdl-role": "mail.already_connected"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "OAuthConnectResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -79,7 +301,118 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "OAuth authorisation result — returned by connect/connect_microsoft/connect_yahoo.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "oauth_connect",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "auth_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Auth Url",
+            "x-sdl-role": "mail.auth_url"
+          },
+          "instruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Instruction",
+            "x-sdl-role": "mail.instruction"
+          },
+          "already_connected": {
+            "default": false,
+            "title": "Already Connected",
+            "type": "boolean",
+            "x-sdl-role": "mail.already_connected"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "OAuthConnectResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -139,7 +472,104 @@
         "title": "ConnectImapParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "IMAP/SMTP connection result — returned by connect_imap/add_imap.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "imap_connect",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "imap_server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Imap Server",
+            "x-sdl-role": "mail.imap_server"
+          },
+          "connected": {
+            "default": true,
+            "title": "Connected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ImapConnectResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "account.connected",
       "background": false,
       "long_running": false,
@@ -159,7 +589,179 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "MailAccountEntity": {
+            "description": "Connected email account — item in AccountsPage.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "mail_account",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "provider": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Provider",
+                "x-sdl-role": "mail.provider"
+              },
+              "is_active": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Active",
+                "x-sdl-role": "mail.is_active"
+              },
+              "unread_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unread Count",
+                "x-sdl-role": "mail.unread_count"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MailAccountEntity",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "All connected accounts — returned by status().",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/MailAccountEntity"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "connected": {
+            "default": true,
+            "title": "Connected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AccountsPage",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -188,7 +790,104 @@
         "title": "AccountParam",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Active account change confirmation — returned by switch_account().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "account_switched",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "switched": {
+            "default": true,
+            "title": "Switched",
+            "type": "boolean"
+          },
+          "active_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Active Account",
+            "x-sdl-role": "mail.active_account"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "AccountSwitchedResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "account.switched",
       "background": false,
       "long_running": false,
@@ -217,7 +916,117 @@
         "title": "AccountParam",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Account removal confirmation — returned by disconnect().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "account_disconnected",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "disconnected": {
+            "default": true,
+            "title": "Disconnected",
+            "type": "boolean"
+          },
+          "account_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Account Email",
+            "x-sdl-role": "mail.email"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Remaining",
+            "x-sdl-role": "mail.remaining"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "AccountDisconnectedResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "account.disconnected",
       "background": false,
       "long_running": false,
@@ -261,7 +1070,542 @@
         "title": "InboxParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "EmailPreview": {
+            "description": "Email preview row — item in inbox/folder/search list results.",
+            "properties": {
+              "is_archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Archived",
+                "x-sdl-role": "core.is_archived"
+              },
+              "is_pinned": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Pinned",
+                "x-sdl-role": "core.is_pinned"
+              },
+              "is_favorite": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Favorite",
+                "x-sdl-role": "core.is_favorite"
+              },
+              "is_deleted": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Deleted",
+                "x-sdl-role": "core.is_deleted"
+              },
+              "visibility": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "private",
+                      "team",
+                      "organization",
+                      "public"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Visibility",
+                "x-sdl-role": "core.visibility"
+              },
+              "excerpt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Excerpt",
+                "x-sdl-role": "content.excerpt"
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Summary",
+                "x-sdl-role": "content.summary"
+              },
+              "word_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Word Count",
+                "x-sdl-role": "content.word_count"
+              },
+              "reading_time_s": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reading Time S",
+                "x-sdl-role": "content.reading_time_s"
+              },
+              "direction": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "incoming",
+                      "outgoing"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Direction",
+                "x-sdl-role": "comm.direction"
+              },
+              "is_read": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Read",
+                "x-sdl-role": "comm.is_read"
+              },
+              "delivery_state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "sending",
+                      "sent",
+                      "delivered",
+                      "read",
+                      "failed"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Delivery State",
+                "x-sdl-role": "comm.delivery_state"
+              },
+              "sent_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sent At",
+                "x-sdl-role": "comm.sent_at"
+              },
+              "edited_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Edited At",
+                "x-sdl-role": "comm.edited_at"
+              },
+              "is_from_me": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is From Me",
+                "x-sdl-role": "comm.is_from_me"
+              },
+              "sender": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Ref"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "x-sdl-role": "people.sender"
+              },
+              "recipients_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients To",
+                "x-sdl-role": "people.recipients_to"
+              },
+              "recipients_cc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Cc",
+                "x-sdl-role": "people.recipients_cc"
+              },
+              "recipients_bcc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Bcc",
+                "x-sdl-role": "people.recipients_bcc"
+              },
+              "reply_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reply To",
+                "x-sdl-role": "people.reply_to"
+              },
+              "recipient_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipient Count",
+                "x-sdl-role": "people.recipient_count"
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "email",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "thread_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Thread Id",
+                "x-sdl-role": "mail.thread_id"
+              },
+              "folder": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Folder",
+                "x-sdl-role": "mail.folder"
+              },
+              "account": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Account",
+                "x-sdl-role": "mail.account"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "EmailPreview",
+            "type": "object",
+            "x-sdl": "entity"
+          },
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Paginated inbox/folder result — returned by inbox() and folder().",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/EmailPreview"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "unread_count": {
+            "default": 0,
+            "title": "Unread Count",
+            "type": "integer"
+          },
+          "folder": {
+            "default": "",
+            "title": "Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "InboxPage",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -270,7 +1614,7 @@
     },
     {
       "name": "read_email",
-      "description": "Open a specific email by message_id — returns full body (HTML + plain text), sender, all recipients, date, and attachment list. Also marks the message as read.",
+      "description": "Open and read the full content of an email by message_id. Returns body (HTML + plain text), sender, all recipients, date, attachments. Also marks it as read. ALWAYS call this after inbox() or search() before replying, forwarding, archiving, or doing anything that requires knowing what the email says.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -295,7 +1639,718 @@
         "title": "MessageIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Full email message — returned by read_email().",
+        "properties": {
+          "excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Excerpt",
+            "x-sdl-role": "content.excerpt"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Summary",
+            "x-sdl-role": "content.summary"
+          },
+          "word_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Word Count",
+            "x-sdl-role": "content.word_count"
+          },
+          "reading_time_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reading Time S",
+            "x-sdl-role": "content.reading_time_s"
+          },
+          "is_archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Archived",
+            "x-sdl-role": "core.is_archived"
+          },
+          "is_pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Pinned",
+            "x-sdl-role": "core.is_pinned"
+          },
+          "is_favorite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Favorite",
+            "x-sdl-role": "core.is_favorite"
+          },
+          "is_deleted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Deleted",
+            "x-sdl-role": "core.is_deleted"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "private",
+                  "team",
+                  "organization",
+                  "public"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Visibility",
+            "x-sdl-role": "core.visibility"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tags",
+            "x-sdl-role": "content.tags"
+          },
+          "categories": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Categories",
+            "x-sdl-role": "content.categories"
+          },
+          "topics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Topics",
+            "x-sdl-role": "content.topics"
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Keywords",
+            "x-sdl-role": "content.keywords"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Labels",
+            "x-sdl-role": "content.labels"
+          },
+          "attachments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Attachments",
+            "x-sdl-role": "content.attachments"
+          },
+          "attachment_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Attachment Count",
+            "x-sdl-role": "content.attachment_count"
+          },
+          "has_attachments": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has Attachments",
+            "x-sdl-role": "content.has_attachments"
+          },
+          "inline_images": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Inline Images",
+            "x-sdl-role": "content.inline_images"
+          },
+          "thread_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "comm.thread_ref"
+          },
+          "reply_to_message": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "comm.reply_to_message"
+          },
+          "root": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "comm.root"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depth",
+            "x-sdl-role": "comm.depth"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "incoming",
+                  "outgoing"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Direction",
+            "x-sdl-role": "comm.direction"
+          },
+          "is_read": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Read",
+            "x-sdl-role": "comm.is_read"
+          },
+          "delivery_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "sending",
+                  "sent",
+                  "delivered",
+                  "read",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Delivery State",
+            "x-sdl-role": "comm.delivery_state"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sent At",
+            "x-sdl-role": "comm.sent_at"
+          },
+          "edited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Edited At",
+            "x-sdl-role": "comm.edited_at"
+          },
+          "is_from_me": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is From Me",
+            "x-sdl-role": "comm.is_from_me"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Body",
+            "x-sdl-role": "content.body"
+          },
+          "body_format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "md",
+                  "html",
+                  "plain",
+                  "rich"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Body Format",
+            "x-sdl-role": "content.body_format"
+          },
+          "raw_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Raw Body",
+            "x-sdl-role": "content.raw_body"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "people.sender"
+          },
+          "recipients_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients To",
+            "x-sdl-role": "people.recipients_to"
+          },
+          "recipients_cc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Cc",
+            "x-sdl-role": "people.recipients_cc"
+          },
+          "recipients_bcc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Bcc",
+            "x-sdl-role": "people.recipients_bcc"
+          },
+          "reply_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reply To",
+            "x-sdl-role": "people.reply_to"
+          },
+          "recipient_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipient Count",
+            "x-sdl-role": "people.recipient_count"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "email",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Thread Id",
+            "x-sdl-role": "mail.thread_id"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Folder",
+            "x-sdl-role": "mail.folder"
+          },
+          "replied": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Replied",
+            "x-sdl-role": "mail.replied"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Account",
+            "x-sdl-role": "mail.account"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "EmailMessage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -335,7 +2390,525 @@
         "title": "SearchParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "EmailPreview": {
+            "description": "Email preview row — item in inbox/folder/search list results.",
+            "properties": {
+              "is_archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Archived",
+                "x-sdl-role": "core.is_archived"
+              },
+              "is_pinned": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Pinned",
+                "x-sdl-role": "core.is_pinned"
+              },
+              "is_favorite": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Favorite",
+                "x-sdl-role": "core.is_favorite"
+              },
+              "is_deleted": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Deleted",
+                "x-sdl-role": "core.is_deleted"
+              },
+              "visibility": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "private",
+                      "team",
+                      "organization",
+                      "public"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Visibility",
+                "x-sdl-role": "core.visibility"
+              },
+              "excerpt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Excerpt",
+                "x-sdl-role": "content.excerpt"
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Summary",
+                "x-sdl-role": "content.summary"
+              },
+              "word_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Word Count",
+                "x-sdl-role": "content.word_count"
+              },
+              "reading_time_s": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reading Time S",
+                "x-sdl-role": "content.reading_time_s"
+              },
+              "direction": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "incoming",
+                      "outgoing"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Direction",
+                "x-sdl-role": "comm.direction"
+              },
+              "is_read": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Read",
+                "x-sdl-role": "comm.is_read"
+              },
+              "delivery_state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "sending",
+                      "sent",
+                      "delivered",
+                      "read",
+                      "failed"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Delivery State",
+                "x-sdl-role": "comm.delivery_state"
+              },
+              "sent_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sent At",
+                "x-sdl-role": "comm.sent_at"
+              },
+              "edited_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Edited At",
+                "x-sdl-role": "comm.edited_at"
+              },
+              "is_from_me": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is From Me",
+                "x-sdl-role": "comm.is_from_me"
+              },
+              "sender": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Ref"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "x-sdl-role": "people.sender"
+              },
+              "recipients_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients To",
+                "x-sdl-role": "people.recipients_to"
+              },
+              "recipients_cc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Cc",
+                "x-sdl-role": "people.recipients_cc"
+              },
+              "recipients_bcc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Bcc",
+                "x-sdl-role": "people.recipients_bcc"
+              },
+              "reply_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reply To",
+                "x-sdl-role": "people.reply_to"
+              },
+              "recipient_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipient Count",
+                "x-sdl-role": "people.recipient_count"
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "email",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "thread_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Thread Id",
+                "x-sdl-role": "mail.thread_id"
+              },
+              "folder": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Folder",
+                "x-sdl-role": "mail.folder"
+              },
+              "account": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Account",
+                "x-sdl-role": "mail.account"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "EmailPreview",
+            "type": "object",
+            "x-sdl": "entity"
+          },
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Email search results — returned by search().",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/EmailPreview"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "SearchPage",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -379,7 +2952,542 @@
         "title": "InboxParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "EmailPreview": {
+            "description": "Email preview row — item in inbox/folder/search list results.",
+            "properties": {
+              "is_archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Archived",
+                "x-sdl-role": "core.is_archived"
+              },
+              "is_pinned": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Pinned",
+                "x-sdl-role": "core.is_pinned"
+              },
+              "is_favorite": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Favorite",
+                "x-sdl-role": "core.is_favorite"
+              },
+              "is_deleted": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Deleted",
+                "x-sdl-role": "core.is_deleted"
+              },
+              "visibility": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "private",
+                      "team",
+                      "organization",
+                      "public"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Visibility",
+                "x-sdl-role": "core.visibility"
+              },
+              "excerpt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Excerpt",
+                "x-sdl-role": "content.excerpt"
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Summary",
+                "x-sdl-role": "content.summary"
+              },
+              "word_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Word Count",
+                "x-sdl-role": "content.word_count"
+              },
+              "reading_time_s": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reading Time S",
+                "x-sdl-role": "content.reading_time_s"
+              },
+              "direction": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "incoming",
+                      "outgoing"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Direction",
+                "x-sdl-role": "comm.direction"
+              },
+              "is_read": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Read",
+                "x-sdl-role": "comm.is_read"
+              },
+              "delivery_state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "sending",
+                      "sent",
+                      "delivered",
+                      "read",
+                      "failed"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Delivery State",
+                "x-sdl-role": "comm.delivery_state"
+              },
+              "sent_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sent At",
+                "x-sdl-role": "comm.sent_at"
+              },
+              "edited_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Edited At",
+                "x-sdl-role": "comm.edited_at"
+              },
+              "is_from_me": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is From Me",
+                "x-sdl-role": "comm.is_from_me"
+              },
+              "sender": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Ref"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "x-sdl-role": "people.sender"
+              },
+              "recipients_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients To",
+                "x-sdl-role": "people.recipients_to"
+              },
+              "recipients_cc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Cc",
+                "x-sdl-role": "people.recipients_cc"
+              },
+              "recipients_bcc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Bcc",
+                "x-sdl-role": "people.recipients_bcc"
+              },
+              "reply_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reply To",
+                "x-sdl-role": "people.reply_to"
+              },
+              "recipient_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipient Count",
+                "x-sdl-role": "people.recipient_count"
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "email",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "thread_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Thread Id",
+                "x-sdl-role": "mail.thread_id"
+              },
+              "folder": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Folder",
+                "x-sdl-role": "mail.folder"
+              },
+              "account": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Account",
+                "x-sdl-role": "mail.account"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "EmailPreview",
+            "type": "object",
+            "x-sdl": "entity"
+          },
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Paginated inbox/folder result — returned by inbox() and folder().",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/EmailPreview"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "unread_count": {
+            "default": 0,
+            "title": "Unread Count",
+            "type": "integer"
+          },
+          "folder": {
+            "default": "",
+            "title": "Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "InboxPage",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -413,7 +3521,609 @@
         "title": "ThreadParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "EmailPreview": {
+            "description": "Email preview row — item in inbox/folder/search list results.",
+            "properties": {
+              "is_archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Archived",
+                "x-sdl-role": "core.is_archived"
+              },
+              "is_pinned": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Pinned",
+                "x-sdl-role": "core.is_pinned"
+              },
+              "is_favorite": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Favorite",
+                "x-sdl-role": "core.is_favorite"
+              },
+              "is_deleted": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Deleted",
+                "x-sdl-role": "core.is_deleted"
+              },
+              "visibility": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "private",
+                      "team",
+                      "organization",
+                      "public"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Visibility",
+                "x-sdl-role": "core.visibility"
+              },
+              "excerpt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Excerpt",
+                "x-sdl-role": "content.excerpt"
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Summary",
+                "x-sdl-role": "content.summary"
+              },
+              "word_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Word Count",
+                "x-sdl-role": "content.word_count"
+              },
+              "reading_time_s": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reading Time S",
+                "x-sdl-role": "content.reading_time_s"
+              },
+              "direction": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "incoming",
+                      "outgoing"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Direction",
+                "x-sdl-role": "comm.direction"
+              },
+              "is_read": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Read",
+                "x-sdl-role": "comm.is_read"
+              },
+              "delivery_state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "sending",
+                      "sent",
+                      "delivered",
+                      "read",
+                      "failed"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Delivery State",
+                "x-sdl-role": "comm.delivery_state"
+              },
+              "sent_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sent At",
+                "x-sdl-role": "comm.sent_at"
+              },
+              "edited_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Edited At",
+                "x-sdl-role": "comm.edited_at"
+              },
+              "is_from_me": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is From Me",
+                "x-sdl-role": "comm.is_from_me"
+              },
+              "sender": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Ref"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "x-sdl-role": "people.sender"
+              },
+              "recipients_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients To",
+                "x-sdl-role": "people.recipients_to"
+              },
+              "recipients_cc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Cc",
+                "x-sdl-role": "people.recipients_cc"
+              },
+              "recipients_bcc": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipients Bcc",
+                "x-sdl-role": "people.recipients_bcc"
+              },
+              "reply_to": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/Ref"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reply To",
+                "x-sdl-role": "people.reply_to"
+              },
+              "recipient_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Recipient Count",
+                "x-sdl-role": "people.recipient_count"
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "email",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "thread_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Thread Id",
+                "x-sdl-role": "mail.thread_id"
+              },
+              "folder": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Folder",
+                "x-sdl-role": "mail.folder"
+              },
+              "account": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Account",
+                "x-sdl-role": "mail.account"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "EmailPreview",
+            "type": "object",
+            "x-sdl": "entity"
+          },
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Full email conversation — returned by get_thread().",
+        "properties": {
+          "thread_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "comm.thread_ref"
+          },
+          "reply_to_message": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "comm.reply_to_message"
+          },
+          "root": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "comm.root"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depth",
+            "x-sdl-role": "comm.depth"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "thread",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/$defs/EmailPreview"
+            },
+            "title": "Messages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "EmailThread",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -473,7 +4183,238 @@
         "title": "SendParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Sent/replied/forwarded confirmation — returned by send/reply/forward.",
+        "properties": {
+          "sender": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "people.sender"
+          },
+          "recipients_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients To",
+            "x-sdl-role": "people.recipients_to"
+          },
+          "recipients_cc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Cc",
+            "x-sdl-role": "people.recipients_cc"
+          },
+          "recipients_bcc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Bcc",
+            "x-sdl-role": "people.recipients_bcc"
+          },
+          "reply_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reply To",
+            "x-sdl-role": "people.reply_to"
+          },
+          "recipient_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipient Count",
+            "x-sdl-role": "people.recipient_count"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "sent_email",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "sent": {
+            "default": true,
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "mail_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mail Subject",
+            "x-sdl-role": "mail.subject"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SentEmailResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "sent",
       "background": false,
       "long_running": false,
@@ -482,7 +4423,7 @@
     },
     {
       "name": "reply",
-      "description": "Reply to an email by message_id. In a multi-step chain always call inbox() or search() first to get the message_id, then pass it here. Omit message_id only if the email was already opened with read_email() in this session. Use send() for new emails.",
+      "description": "Reply to an email. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to read its content, 3) reply(message_id, body=<your response>). NEVER skip read_email() — you must know what you are replying to. Only omit message_id if read_email() was already called in this same session. Use send() for new emails, not replies.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -531,7 +4472,238 @@
         "title": "ReplyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Sent/replied/forwarded confirmation — returned by send/reply/forward.",
+        "properties": {
+          "sender": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "people.sender"
+          },
+          "recipients_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients To",
+            "x-sdl-role": "people.recipients_to"
+          },
+          "recipients_cc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Cc",
+            "x-sdl-role": "people.recipients_cc"
+          },
+          "recipients_bcc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Bcc",
+            "x-sdl-role": "people.recipients_bcc"
+          },
+          "reply_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reply To",
+            "x-sdl-role": "people.reply_to"
+          },
+          "recipient_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipient Count",
+            "x-sdl-role": "people.recipient_count"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "sent_email",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "sent": {
+            "default": true,
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "mail_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mail Subject",
+            "x-sdl-role": "mail.subject"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SentEmailResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "sent",
       "background": false,
       "long_running": false,
@@ -540,7 +4712,7 @@
     },
     {
       "name": "forward",
-      "description": "Forward an existing email by message_id to a new address. In a multi-step chain call inbox() or search() first to get the message_id. Requires message_id and to address.",
+      "description": "Forward an existing email to a new address. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to load its content, 3) forward(message_id, to=<address>). NEVER skip read_email() — the original body must be loaded before forwarding. Requires message_id and to address.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -579,7 +4751,238 @@
         "title": "ForwardParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "Ref": {
+            "description": "Lightweight reference to another entity (parent/related/list-item/cross-app).\n\nCarries ``title`` so the kernel can render/resolve without a second lookup.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title"
+            ],
+            "title": "Ref",
+            "type": "object"
+          }
+        },
+        "description": "Sent/replied/forwarded confirmation — returned by send/reply/forward.",
+        "properties": {
+          "sender": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "x-sdl-role": "people.sender"
+          },
+          "recipients_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients To",
+            "x-sdl-role": "people.recipients_to"
+          },
+          "recipients_cc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Cc",
+            "x-sdl-role": "people.recipients_cc"
+          },
+          "recipients_bcc": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipients Bcc",
+            "x-sdl-role": "people.recipients_bcc"
+          },
+          "reply_to": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Ref"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reply To",
+            "x-sdl-role": "people.reply_to"
+          },
+          "recipient_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipient Count",
+            "x-sdl-role": "people.recipient_count"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "sent_email",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "sent": {
+            "default": true,
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "mail_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mail Subject",
+            "x-sdl-role": "mail.subject"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SentEmailResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "sent",
       "background": false,
       "long_running": false,
@@ -588,7 +4991,7 @@
     },
     {
       "name": "archive",
-      "description": "Archive a single email — removes it from INBOX into the archive folder. Remains searchable and recoverable. Not the same as delete().",
+      "description": "Archive a single email — removes it from INBOX, stays searchable and recoverable. Requires message_id: call inbox() or search() first if you don't have it yet. Not the same as delete().",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -615,7 +5018,118 @@
         "title": "MessageIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Single-message operation confirmation — archive/delete/mark/star/move/purge.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "op_ok": {
+            "default": true,
+            "title": "Op Ok",
+            "type": "boolean",
+            "x-sdl-role": "mail.ok"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail",
+            "x-sdl-role": "mail.detail"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "archived",
       "background": false,
       "long_running": false,
@@ -624,7 +5138,7 @@
     },
     {
       "name": "delete",
-      "description": "Move a single email to Trash — recoverable until trash is emptied. Use purge() for permanent unrecoverable deletion.",
+      "description": "Move a single email to Trash — recoverable until emptied. Requires message_id: call inbox() or search() first if you don't have it yet. Use purge() for permanent deletion.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -651,7 +5165,118 @@
         "title": "MessageIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Single-message operation confirmation — archive/delete/mark/star/move/purge.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "op_ok": {
+            "default": true,
+            "title": "Op Ok",
+            "type": "boolean",
+            "x-sdl-role": "mail.ok"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail",
+            "x-sdl-role": "mail.detail"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "deleted",
       "background": false,
       "long_running": false,
@@ -687,7 +5312,118 @@
         "title": "MessageIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Single-message operation confirmation — archive/delete/mark/star/move/purge.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "op_ok": {
+            "default": true,
+            "title": "Op Ok",
+            "type": "boolean",
+            "x-sdl-role": "mail.ok"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail",
+            "x-sdl-role": "mail.detail"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "marked_read",
       "background": false,
       "long_running": false,
@@ -723,7 +5459,118 @@
         "title": "MessageIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Single-message operation confirmation — archive/delete/mark/star/move/purge.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "op_ok": {
+            "default": true,
+            "title": "Op Ok",
+            "type": "boolean",
+            "x-sdl-role": "mail.ok"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail",
+            "x-sdl-role": "mail.detail"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "marked_unread",
       "background": false,
       "long_running": false,
@@ -732,7 +5579,7 @@
     },
     {
       "name": "star",
-      "description": "Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle.",
+      "description": "Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle. Requires message_id: call inbox() or search() first if you don't have it yet.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -765,7 +5612,118 @@
         "title": "StarParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Single-message operation confirmation — archive/delete/mark/star/move/purge.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "op_ok": {
+            "default": true,
+            "title": "Op Ok",
+            "type": "boolean",
+            "x-sdl-role": "mail.ok"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail",
+            "x-sdl-role": "mail.detail"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "starred",
       "background": false,
       "long_running": false,
@@ -813,7 +5771,118 @@
         "title": "MoveParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Single-message operation confirmation — archive/delete/mark/star/move/purge.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "op_ok": {
+            "default": true,
+            "title": "Op Ok",
+            "type": "boolean",
+            "x-sdl-role": "mail.ok"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail",
+            "x-sdl-role": "mail.detail"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "moved",
       "background": false,
       "long_running": false,
@@ -822,7 +5891,7 @@
     },
     {
       "name": "purge",
-      "description": "Permanently delete an email from a folder (default: Trash) — cannot be recovered. Use delete() to move to Trash first if unsure.",
+      "description": "Permanently delete an email — cannot be recovered. Requires message_id: call inbox() or search() first if you don't have it. Use delete() to move to Trash first if unsure.",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [
@@ -855,7 +5924,118 @@
         "title": "PurgeParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Single-message operation confirmation — archive/delete/mark/star/move/purge.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "op_ok": {
+            "default": true,
+            "title": "Op Ok",
+            "type": "boolean",
+            "x-sdl-role": "mail.ok"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail",
+            "x-sdl-role": "mail.detail"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "purged",
       "background": false,
       "long_running": false,
@@ -891,7 +6071,147 @@
         "title": "BulkParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "bulk_mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer",
+            "x-sdl-role": "mail.succeeded"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed Count",
+            "x-sdl-role": "mail.failed_count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total",
+            "x-sdl-role": "mail.total"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors",
+            "x-sdl-role": "mail.errors"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BulkMailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "bulk_archived",
       "background": false,
       "long_running": false,
@@ -927,7 +6247,147 @@
         "title": "BulkParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "bulk_mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer",
+            "x-sdl-role": "mail.succeeded"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed Count",
+            "x-sdl-role": "mail.failed_count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total",
+            "x-sdl-role": "mail.total"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors",
+            "x-sdl-role": "mail.errors"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BulkMailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "bulk_deleted",
       "background": false,
       "long_running": false,
@@ -963,7 +6423,147 @@
         "title": "BulkParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "bulk_mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer",
+            "x-sdl-role": "mail.succeeded"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed Count",
+            "x-sdl-role": "mail.failed_count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total",
+            "x-sdl-role": "mail.total"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors",
+            "x-sdl-role": "mail.errors"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BulkMailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "bulk_marked_read",
       "background": false,
       "long_running": false,
@@ -999,7 +6599,147 @@
         "title": "BulkParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "bulk_mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer",
+            "x-sdl-role": "mail.succeeded"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed Count",
+            "x-sdl-role": "mail.failed_count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total",
+            "x-sdl-role": "mail.total"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors",
+            "x-sdl-role": "mail.errors"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BulkMailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "bulk_marked_unread",
       "background": false,
       "long_running": false,
@@ -1031,7 +6771,241 @@
         "title": "ContactsParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "ContactEntity": {
+            "description": "Address book contact — item in contact lists and operation results.",
+            "properties": {
+              "emails": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Emails",
+                "x-sdl-role": "people.emails"
+              },
+              "phones": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Phones",
+                "x-sdl-role": "people.phones"
+              },
+              "social_handles": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Social Handles",
+                "x-sdl-role": "people.social_handles"
+              },
+              "website_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Website Url",
+                "x-sdl-role": "people.website_url"
+              },
+              "preferred_channel": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "email",
+                      "phone",
+                      "sms",
+                      "chat"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Preferred Channel",
+                "x-sdl-role": "people.preferred_channel"
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "contact",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source",
+                "x-sdl-role": "mail.source"
+              },
+              "account": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Account",
+                "x-sdl-role": "mail.account"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "ContactEntity",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "Paginated contact list — returned by contacts().",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ContactEntity"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ContactPage",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -1067,7 +7041,112 @@
         "title": "AddContactParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Contact add or delete confirmation — returned by add_contact/delete_contact.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "contact_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contact Email",
+            "x-sdl-role": "mail.email"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contact Name",
+            "x-sdl-role": "mail.name"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ContactOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "contact.added",
       "background": false,
       "long_running": false,
@@ -1097,7 +7176,127 @@
         "title": "AccountParam",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Contact sync summary — returned by sync_contacts().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "contact_sync",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "found": {
+            "default": 0,
+            "title": "Found",
+            "type": "integer",
+            "x-sdl-role": "mail.found"
+          },
+          "added": {
+            "default": 0,
+            "title": "Added",
+            "type": "integer",
+            "x-sdl-role": "mail.added"
+          },
+          "total_contacts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Contacts",
+            "x-sdl-role": "mail.total"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes",
+            "x-sdl-role": "mail.notes"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ContactSyncResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "contacts.synced",
       "background": false,
       "long_running": false,
@@ -1127,7 +7326,112 @@
         "title": "DeleteContactParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Contact add or delete confirmation — returned by add_contact/delete_contact.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "contact_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contact Email",
+            "x-sdl-role": "mail.email"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contact Name",
+            "x-sdl-role": "mail.name"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ContactOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "contact.deleted",
       "background": false,
       "long_running": false,
@@ -1197,7 +7501,117 @@
         "title": "ComposeSendParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Panel compose-send confirmation — returned by compose_send().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "compose_sent",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "sent": {
+            "default": true,
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mode",
+            "x-sdl-role": "mail.mode"
+          },
+          "recipient": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipient",
+            "x-sdl-role": "mail.recipient"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ComposeSentResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "sent",
       "background": false,
       "long_running": false,
@@ -1247,7 +7661,98 @@
         "title": "MailActionParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Panel row-action confirmation — returned by mail_action().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_action_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string",
+            "x-sdl-role": "mail.action"
+          },
+          "count": {
+            "default": 0,
+            "title": "Count",
+            "type": "integer",
+            "x-sdl-role": "mail.count"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailActionOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "mail.action",
       "background": false,
       "long_running": false,
@@ -1274,7 +7779,102 @@
         "title": "AccountParam",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "Unread counts for all 7 mail folders — returned by folder_counts().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "folder_counts",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Counts",
+            "x-sdl-role": "mail.folder_counts"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "FolderCountsEntity",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -1302,7 +7902,105 @@
         "title": "OAuthParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "OAuth URL for the add-account panel wizard — returned by get_oauth_url().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "oauth_url",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "auth_url": {
+            "default": "",
+            "title": "Auth Url",
+            "type": "string",
+            "x-sdl-role": "mail.auth_url"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider",
+            "x-sdl-role": "mail.provider"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailOAuthUrlResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -1362,7 +8060,104 @@
         "title": "AddImapParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "IMAP/SMTP connection result — returned by connect_imap/add_imap.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "imap_connect",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "imap_server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Imap Server",
+            "x-sdl-role": "mail.imap_server"
+          },
+          "connected": {
+            "default": true,
+            "title": "Connected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ImapConnectResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
       "event": "account.connected",
       "background": false,
       "long_running": false,

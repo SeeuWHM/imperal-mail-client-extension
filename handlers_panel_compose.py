@@ -61,6 +61,7 @@ async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: st
                data_model=ComposeSentResult,
                description="Panel compose form submit — sends from the UI compose panel (mode: new/reply/forward). From LLM chat use send(), reply(), or forward() instead.")
 async def fn_compose_send(ctx, params: ComposeSendParams) -> ActionResult:
+    """Panel compose form submit — sends from the UI compose panel (mode: new/reply/forward)."""
     try:
         r = await impl_compose_send(ctx, mode=params.mode, message_id=params.message_id,
                                     to=params.to, subject=params.subject, body=params.body,
