@@ -27,7 +27,6 @@ from schemas_sdl import (
     AccountSwitchedResult, AccountDisconnectedResult,
     MailActionOpResult, FolderCountsEntity, MailOAuthUrlResult, ComposeSentResult,
 )
-
 # Re-export entity classes — handlers use a single import from this module.
 __all__ = [
     "EmailPreview", "EmailMessage", "InboxPage", "SearchPage",

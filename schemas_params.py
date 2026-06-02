@@ -36,7 +36,8 @@ class MessageIdParams(BaseModel):
 
 class SearchParams(BaseModel):
     query: str = Field(description="Search query — Gmail syntax supported")
-    max_results: int = Field(default=10, description="Max results to return")
+    max_results: int = Field(default=20, description="Max results (1-200). Gmail/Microsoft search full mailbox. IMAP: increase for deeper results.")
+    folder: str = Field(default="", description="IMAP only: folder to search (default: INBOX). Gmail/Microsoft always search all folders.")
     account: str = Field(default="", description="Account email or ID")
 
 
@@ -172,3 +173,78 @@ class ComposeSendParams(BaseModel):
         if isinstance(v, list):
             return ", ".join(str(x) for x in v if x)
         return str(v or "")
+
+
+# ── Smart filters ─────────────────────────────────────────────────────────────
+
+class CreateFilterParams(BaseModel):
+    """Create a smart mailbox filter (virtual folder based on search criteria)."""
+    name: str = Field(description="Filter name shown as smart folder label")
+    from_contains: str = Field(default="", description="Match emails where sender contains this string (e.g. 'linkedin.com')")
+    subject_contains: str = Field(default="", description="Match emails where subject contains this string")
+    folder: str = Field(default="", description="Restrict to this folder (default: search all)")
+    color: str = Field(default="blue", description="Badge color: blue/green/red/yellow/purple/orange")
+
+
+class UpdateFilterParams(BaseModel):
+    """Update an existing smart filter."""
+    filter_id: str = Field(description="Filter ID from list_filters()")
+    name: str = Field(default="", description="New name (empty = keep current)")
+    from_contains: str = Field(default="__keep__", description="New from filter (omit = keep current)")
+    subject_contains: str = Field(default="__keep__", description="New subject filter (omit = keep current)")
+    color: str = Field(default="", description="New color (empty = keep current)")
+
+
+class FilterIdParam(BaseModel):
+    """Single filter ID selector."""
+    filter_id: str = Field(description="Filter ID from list_filters()")
+    max_results: int = Field(default=20, description="Max emails to return when applying filter")
+
+
+# ── Automation rules ──────────────────────────────────────────────────────────
+
+class CreateForwardRuleParams(BaseModel):
+    """Create a forwarding rule — auto-forward matching emails to an address."""
+    name: str = Field(description="Rule name")
+    to_address: str = Field(description="Forward destination email address")
+    from_contains: str = Field(default="", description="Only forward emails from senders matching this (empty = all)")
+    subject_contains: str = Field(default="", description="Only forward emails with subject matching this (empty = all)")
+    comment: str = Field(default="", description="Prepended note on the forwarded email")
+
+
+class CreateAutoreplyParams(BaseModel):
+    """Create an auto-reply rule — send automated responses to incoming emails."""
+    name: str = Field(description="Rule name (e.g. 'Out of office')")
+    template: str = Field(description="Auto-reply message body")
+    subject_prefix: str = Field(default="Auto: ", description="Prefix added to reply subject")
+    schedule_type: str = Field(default="time_window",
+                               description="'always' = reply to all, 'time_window' = only outside business hours")
+    days: list[int] = Field(default=[0, 1, 2, 3, 4],
+                            description="Business days (0=Mon..6=Sun). Auto-reply fires OUTSIDE these days when type=time_window")
+    start_time: str = Field(default="09:00",
+                            description="Business hours start HH:MM — auto-reply fires OUTSIDE this window")
+    end_time: str = Field(default="18:00",
+                          description="Business hours end HH:MM")
+    timezone: str = Field(default="UTC", description="Timezone for schedule (e.g. 'Europe/Chisinau', 'UTC')")
+    from_contains: str = Field(default="", description="Only reply to emails from senders matching this (empty = all)")
+
+
+class RuleIdParam(BaseModel):
+    """Single rule ID selector."""
+    rule_id: str = Field(description="Rule ID from list_rules()")
+
+
+class ToggleRuleParams(BaseModel):
+    """Enable or disable a rule."""
+    rule_id: str = Field(description="Rule ID from list_rules()")
+    enabled: bool = Field(description="True to enable, False to disable")
+
+
+# ── Folder preferences ────────────────────────────────────────────────────────
+
+class SetFolderPrefsParams(BaseModel):
+    """Set which mail folders are visible in the inbox panel."""
+    visible_folders: list[str] = Field(
+        default_factory=list,
+        description="Ordered list of folder names to show (e.g. ['INBOX','Starred','Work','Receipts']). Empty list = show all."
+    )

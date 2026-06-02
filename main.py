@@ -1,4 +1,4 @@
-"""Mail Client v5.5.0 — Multi-provider email for Imperal Cloud (SDK v5.2.0 / SDL)."""
+"""Mail Client v5.6.0 — Multi-provider email for Imperal Cloud (SDK v5.2.0 / SDL)."""
 from __future__ import annotations
 
 import os
@@ -12,11 +12,13 @@ if _dir not in sys.path:
 _MODULES = (
     "app", "ctx_helpers", "schemas", "schemas_params",
     "schemas_sdl", "schemas_sdl_builders",
+    "schemas_sdl_rules", "schemas_sdl_builders_rules",
     "handlers_ui",
     "handlers_connect",
     "handlers_inbox_impl", "handlers_inbox",
     "handlers_manage_impl", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
+    "handlers_filters", "handlers_rules", "handlers_rule_runner",
     "skeleton", "panels", "panels_inbox", "panels_inbox_panel",
     "panels_email_viewer", "panels_compose",
     "panels_accounts", "panels_add_account",
@@ -29,8 +31,10 @@ for _m in [k for k in sys.modules if k in _MODULES]:
 from app import ext, chat  # noqa: E402, F401
 
 # SDL entity classes must load before any handler that uses them.
-import schemas_sdl          # noqa: E402, F401
-import schemas_sdl_builders  # noqa: E402, F401
+import schemas_sdl                # noqa: E402, F401
+import schemas_sdl_rules          # noqa: E402, F401
+import schemas_sdl_builders       # noqa: E402, F401
+import schemas_sdl_builders_rules  # noqa: E402, F401
 
 # Register cache models BEFORE modules that use ctx.cache.get_or_fetch.
 import cache_models  # noqa: E402, F401
@@ -43,6 +47,9 @@ import handlers_manage            # noqa: E402, F401
 import handlers_contacts          # noqa: E402, F401
 import handlers_panel_compose     # noqa: E402, F401
 import handlers_panel_actions     # noqa: E402, F401
+import handlers_filters           # noqa: E402, F401
+import handlers_rules             # noqa: E402, F401
+import handlers_rule_runner       # noqa: E402, F401
 import skeleton                   # noqa: E402, F401
 import panels_email_viewer        # noqa: E402, F401
 import panels_compose             # noqa: E402, F401
