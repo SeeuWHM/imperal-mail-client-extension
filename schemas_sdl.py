@@ -12,6 +12,21 @@ from pydantic import Field
 from imperal_sdk import sdl
 from imperal_sdk.sdl import field as sdl_field
 
+# ── HTML stripping ───────────────────────────────────────────────────────────
+
+_HTML_TAGS_RE = re.compile(r'<[^>]+>')
+_HTML_ENTITIES = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&nbsp;": " "}
+_WHITESPACE_RE = re.compile(r'\s+')
+
+
+def _strip_html(html: str) -> str:
+    """Strip HTML tags and decode common entities → plain text for LLM readability."""
+    text = _HTML_TAGS_RE.sub(' ', html)
+    for entity, char in _HTML_ENTITIES.items():
+        text = text.replace(entity, char)
+    return _WHITESPACE_RE.sub(' ', text).strip()
+
+
 # ── Address / date parse helpers ──────────────────────────────────────────────
 
 _ADDR_RE = re.compile(r'\s*(.+?)\s*<([^>]+)>\s*')

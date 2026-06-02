@@ -18,7 +18,7 @@ from schemas import (
     FolderCountsResult, OAuthUrlResult, ComposeSendResult,
 )
 from schemas_sdl import (
-    _cref, _crefs, _pdate, _bfmt, _arefs,
+    _strip_html, _cref, _crefs, _pdate, _bfmt, _arefs,
     EmailPreview, EmailMessage, InboxPage, SearchPage,
     EmailThread, SentEmailResult, MailOpResult, BulkMailOpResult,
     ContactEntity, ContactPage, ContactOpResult, ContactSyncResult,
@@ -56,6 +56,14 @@ def build_email_message(body: EmailBody, account: str = "") -> EmailMessage:
     labels = raw.get("labels")
     tags = labels if isinstance(labels, list) else None
     subject = body.subject or "(no subject)"
+    # Provide plain-text version and excerpt so LLM reads content cleanly
+    # (ActionResult.data is passed verbatim to chain steps — body IS visible to LLM)
+    fmt = _bfmt(body.body_type)
+    raw_text: str | None = None
+    if body.body:
+        raw_text = _strip_html(body.body) if fmt == "html" else body.body
+    excerpt = (raw_text[:800] + "…") if raw_text and len(raw_text) > 800 else raw_text
+
     return EmailMessage(
         id=body.message_id or "",
         title=subject,
@@ -64,7 +72,9 @@ def build_email_message(body: EmailBody, account: str = "") -> EmailMessage:
         recipients_to=_crefs(body.to),
         recipients_cc=_crefs(body.cc),
         body=body.body,
-        body_format=_bfmt(body.body_type),
+        body_format=fmt,
+        raw_body=raw_text,
+        excerpt=excerpt,
         is_read=not bool(body.unread),
         sent_at=_pdate(body.date),
         thread_ref=sdl.Ref(id=thread_id, kind="thread", title=subject) if thread_id else None,

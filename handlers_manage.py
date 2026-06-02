@@ -7,8 +7,12 @@ from handlers_manage_impl import (
     impl_archive, impl_delete, impl_mark_read, impl_mark_unread, impl_star,
     impl_move, impl_purge,
     impl_bulk_archive, impl_bulk_delete, impl_bulk_mark_read, impl_bulk_mark_unread,
+    impl_bulk_move, impl_bulk_star, impl_bulk_purge,
 )
-from schemas import MessageIdParams, StarParams, MoveParams, PurgeParams, BulkParams
+from schemas import (
+    MessageIdParams, StarParams, MoveParams, PurgeParams, BulkParams,
+    BulkMoveParams, BulkStarParams, BulkPurgeParams,
+)
 from schemas_sdl_builders import (
     MailOpResult, BulkMailOpResult,
     build_mail_op, build_bulk_mail_op,
@@ -211,3 +215,59 @@ async def fn_bulk_mark_unread(ctx, params: BulkParams) -> ActionResult:
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("bulk_move", action_type="write", event="bulk_moved",
+               effects=["update:email"],
+               data_model=BulkMailOpResult,
+               description="Move multiple emails from one folder to another in one batch. Pass message_ids as comma-separated string. Examples: move spam to INBOX, move selected to archive, move trash items back to INBOX.")
+async def fn_bulk_move(ctx, params: BulkMoveParams) -> ActionResult:
+    """Move multiple emails from one folder to another in one batch."""
+    try:
+        r = await impl_bulk_move(ctx, message_ids=params.message_ids,
+                                 from_folder=params.from_folder, to_folder=params.to_folder,
+                                 account=params.account)
+        return ActionResult.success(
+            data=build_bulk_mail_op(r),
+            summary=f"Moved {r.succeeded} email(s) to {params.to_folder}.",
+            refresh_panels=["inbox"],
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("bulk_star", action_type="write", event="bulk_starred",
+               effects=["update:email"],
+               data_model=BulkMailOpResult,
+               description="Star or unstar multiple emails in one batch. Pass message_ids as comma-separated string. Use starred=true to star, starred=false to unstar.")
+async def fn_bulk_star(ctx, params: BulkStarParams) -> ActionResult:
+    """Star or unstar multiple emails in one batch."""
+    try:
+        r = await impl_bulk_star(ctx, message_ids=params.message_ids,
+                                 starred=params.starred, account=params.account)
+        action = "Starred" if params.starred else "Unstarred"
+        return ActionResult.success(
+            data=build_bulk_mail_op(r),
+            summary=f"{action} {r.succeeded} email(s).",
+            refresh_panels=["inbox"],
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("bulk_purge", action_type="destructive", event="bulk_purged",
+               effects=["delete:email"],
+               data_model=BulkMailOpResult,
+               description="Permanently delete multiple emails in one batch — cannot be recovered. Use delete() or bulk_delete() first if unsure. Pass message_ids as comma-separated string.")
+async def fn_bulk_purge(ctx, params: BulkPurgeParams) -> ActionResult:
+    """Permanently delete multiple emails in one batch — irreversible."""
+    try:
+        r = await impl_bulk_purge(ctx, message_ids=params.message_ids,
+                                  from_folder=params.from_folder, account=params.account)
+        return ActionResult.success(
+            data=build_bulk_mail_op(r),
+            summary=f"Permanently deleted {r.succeeded} email(s).",
+            refresh_panels=["inbox"],
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=False)

@@ -6747,6 +6747,558 @@
       "owner_chat_tool": "tool_mail_client_chat"
     },
     {
+      "name": "bulk_move",
+      "description": "Move multiple emails from one folder to another in one batch. Pass message_ids as comma-separated string. Examples: move spam to INBOX, move selected to archive, move trash items back to INBOX.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_ids": {
+            "description": "Comma-separated list of message IDs",
+            "title": "Message Ids",
+            "type": "string"
+          },
+          "from_folder": {
+            "description": "Source folder (e.g. INBOX, spam, trash)",
+            "title": "From Folder",
+            "type": "string"
+          },
+          "to_folder": {
+            "description": "Destination folder (e.g. spam, INBOX, archive)",
+            "title": "To Folder",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_ids",
+          "from_folder",
+          "to_folder"
+        ],
+        "title": "BulkMoveParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "bulk_mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer",
+            "x-sdl-role": "mail.succeeded"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed Count",
+            "x-sdl-role": "mail.failed_count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total",
+            "x-sdl-role": "mail.total"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors",
+            "x-sdl-role": "mail.errors"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BulkMailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "bulk_moved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "bulk_star",
+      "description": "Star or unstar multiple emails in one batch. Pass message_ids as comma-separated string. Use starred=true to star, starred=false to unstar.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_ids": {
+            "description": "Comma-separated list of message IDs",
+            "title": "Message Ids",
+            "type": "string"
+          },
+          "starred": {
+            "default": true,
+            "description": "True to star, False to unstar",
+            "title": "Starred",
+            "type": "boolean"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "title": "BulkStarParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "bulk_mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer",
+            "x-sdl-role": "mail.succeeded"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed Count",
+            "x-sdl-role": "mail.failed_count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total",
+            "x-sdl-role": "mail.total"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors",
+            "x-sdl-role": "mail.errors"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BulkMailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "bulk_starred",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "bulk_purge",
+      "description": "Permanently delete multiple emails in one batch — cannot be recovered. Use delete() or bulk_delete() first if unsure. Pass message_ids as comma-separated string.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_ids": {
+            "description": "Comma-separated list of message IDs",
+            "title": "Message Ids",
+            "type": "string"
+          },
+          "from_folder": {
+            "default": "Trash",
+            "description": "Folder to purge from (default: Trash)",
+            "title": "From Folder",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "title": "BulkPurgeParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "bulk_mail_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Operation",
+            "x-sdl-role": "mail.operation"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer",
+            "x-sdl-role": "mail.succeeded"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed Count",
+            "x-sdl-role": "mail.failed_count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total",
+            "x-sdl-role": "mail.total"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors",
+            "x-sdl-role": "mail.errors"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BulkMailOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "bulk_purged",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
       "name": "contacts",
       "description": "List address book contacts, optionally filtered by name or email fragment. Results sorted by name.",
       "action_type": "read",

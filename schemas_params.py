@@ -102,6 +102,25 @@ class BulkParams(BaseModel):
     account: str = Field(default="", description="Account email or ID")
 
 
+class BulkMoveParams(BaseModel):
+    message_ids: str = Field(description="Comma-separated list of message IDs")
+    from_folder: str = Field(description="Source folder (e.g. INBOX, spam, trash)")
+    to_folder: str = Field(description="Destination folder (e.g. spam, INBOX, archive)")
+    account: str = Field(default="", description="Account email or ID")
+
+
+class BulkStarParams(BaseModel):
+    message_ids: str = Field(description="Comma-separated list of message IDs")
+    starred: bool = Field(default=True, description="True to star, False to unstar")
+    account: str = Field(default="", description="Account email or ID")
+
+
+class BulkPurgeParams(BaseModel):
+    message_ids: str = Field(description="Comma-separated list of message IDs")
+    from_folder: str = Field(default="Trash", description="Folder to purge from (default: Trash)")
+    account: str = Field(default="", description="Account email or ID")
+
+
 class ContactsParams(BaseModel):
     search: str = Field(default="", description="Filter by name or email")
     limit: int = Field(default=50, description="Max contacts to return")

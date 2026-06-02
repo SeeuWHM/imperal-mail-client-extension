@@ -149,16 +149,90 @@ async def _run_bulk(ctx, message_ids: str, operation: str, account: str = "") ->
 
 
 async def impl_bulk_archive(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
+    """Archive multiple emails in one batch."""
     return await _run_bulk(ctx, message_ids, "archive", account=account)
 
 
 async def impl_bulk_delete(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
+    """Move multiple emails to Trash in one batch."""
     return await _run_bulk(ctx, message_ids, "delete", account=account)
 
 
 async def impl_bulk_mark_read(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
+    """Mark multiple emails as read in one batch."""
     return await _run_bulk(ctx, message_ids, "read", account=account)
 
 
 async def impl_bulk_mark_unread(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
+    """Mark multiple emails as unread in one batch."""
     return await _run_bulk(ctx, message_ids, "unread", account=account)
+
+
+async def impl_bulk_move(ctx, message_ids: str, from_folder: str, to_folder: str,
+                         account: str = "") -> BulkOperationResult:
+    """Move multiple emails from one folder to another in one batch (minimum API calls)."""
+    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+    if not ids:
+        raise RuntimeError("No message IDs provided.")
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected. Connect one first.")
+    success, failed = 0, []
+    for mid in ids:
+        try:
+            r = await provider.move(ctx, acc, mid, from_folder=from_folder, to_folder=to_folder)
+            if r.get("RESULT") == "SUCCESS":
+                success += 1
+            else:
+                failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
+        except Exception as e:
+            failed.append(f"{mid[:16]}: {e}")
+    return BulkOperationResult(operation="move", succeeded=success,
+                               total=len(ids), failed=len(failed) or None, errors=failed[:3])
+
+
+async def impl_bulk_star(ctx, message_ids: str, starred: bool = True,
+                         account: str = "") -> BulkOperationResult:
+    """Star or unstar multiple emails in one batch."""
+    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+    if not ids:
+        raise RuntimeError("No message IDs provided.")
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected. Connect one first.")
+    success, failed = 0, []
+    for mid in ids:
+        try:
+            r = await provider.star(ctx, acc, mid, starred=starred)
+            if r.get("RESULT") == "SUCCESS":
+                success += 1
+            else:
+                failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
+        except Exception as e:
+            failed.append(f"{mid[:16]}: {e}")
+    op = "star" if starred else "unstar"
+    return BulkOperationResult(operation=op, succeeded=success,
+                               total=len(ids), failed=len(failed) or None, errors=failed[:3])
+
+
+async def impl_bulk_purge(ctx, message_ids: str, from_folder: str = "Trash",
+                          account: str = "") -> BulkOperationResult:
+    """Permanently delete multiple emails in one batch (irreversible)."""
+    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+    if not ids:
+        raise RuntimeError("No message IDs provided.")
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected. Connect one first.")
+    success, failed = 0, []
+    for mid in ids:
+        try:
+            r = await provider.purge(ctx, acc, mid, from_folder=from_folder)
+            if r.get("RESULT") == "SUCCESS":
+                success += 1
+            else:
+                failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
+        except Exception as e:
+            failed.append(f"{mid[:16]}: {e}")
+    return BulkOperationResult(operation="purge", succeeded=success,
+                               total=len(ids), failed=len(failed) or None, errors=failed[:3])
