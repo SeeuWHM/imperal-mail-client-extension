@@ -24,6 +24,23 @@ RULES_COLLECTION = "mail_rules"
 log = logging.getLogger("mail")
 
 
+async def _resolve_rule(ctx, rule_id: str) -> tuple:
+    """Resolve a rule by store ID or by name. Returns (doc_id, doc_data) or (None, None)."""
+    uid = ctx.user.imperal_id
+    if rule_id:
+        try:
+            doc = await ctx.store.get(RULES_COLLECTION, rule_id)
+            if doc and doc.data.get("owner_id") == uid:
+                return doc.id, doc.data
+        except Exception:
+            pass
+    page = await ctx.store.query(RULES_COLLECTION, where={"owner_id": uid}, limit=20)
+    for d in page.data:
+        if d.data.get("name", "").lower() == rule_id.lower():
+            return d.id, d.data
+    return None, None
+
+
 # ── Forwarding rules ──────────────────────────────────────────────────────────
 
 @chat.function("create_forward_rule", action_type="write", event="rule.created",
@@ -120,19 +137,20 @@ async def fn_list_rules(ctx, params: EmptyParams) -> ActionResult:
                effects=["update:mail_rule"],
                data_model=RuleOpResult,
                id_projection="rule_id",
-               description="Enable or disable an automation rule (forwarding or auto-reply) without deleting it. Use list_rules() to get rule_id.")
+               description="Enable or disable an automation rule without deleting it. Pass rule_id OR rule name — both work.")
 async def fn_toggle_rule(ctx, params: ToggleRuleParams) -> ActionResult:
-    """Enable or disable an automation rule."""
+    """Enable or disable an automation rule by ID or name."""
     try:
-        doc = await ctx.store.get(RULES_COLLECTION, params.rule_id)
-        if not doc or doc.data.get("owner_id") != ctx.user.imperal_id:
-            return ActionResult.error("Rule not found. Use list_rules() to see your rules.", retryable=False)
-        await ctx.store.update(RULES_COLLECTION, params.rule_id,
-                               {**doc.data, "enabled": params.enabled})
-        name = doc.data.get("name", "rule")
+        doc_id, doc_data = await _resolve_rule(ctx, params.rule_id)
+        if not doc_id:
+            return ActionResult.error(
+                f"Rule '{params.rule_id}' not found. Use list_rules() to see your rules.",
+                retryable=False)
+        await ctx.store.update(RULES_COLLECTION, doc_id, {**doc_data, "enabled": params.enabled})
+        name = doc_data.get("name", "rule")
         state = "enabled" if params.enabled else "disabled"
         return ActionResult.success(
-            data=build_rule_op(params.rule_id, f"Rule '{name}' {state}", enabled=params.enabled),
+            data=build_rule_op(doc_id, f"Rule '{name}' {state}", enabled=params.enabled),
             summary=f"Rule '{name}' {state}.",
         )
     except Exception as e:
@@ -143,17 +161,19 @@ async def fn_toggle_rule(ctx, params: ToggleRuleParams) -> ActionResult:
                effects=["delete:mail_rule"],
                data_model=RuleOpResult,
                id_projection="rule_id",
-               description="Permanently delete an automation rule (forwarding or auto-reply). Use list_rules() to get rule_id.")
+               description="Permanently delete an automation rule. Pass rule_id OR rule name — both work.")
 async def fn_delete_rule(ctx, params: RuleIdParam) -> ActionResult:
-    """Permanently delete an automation rule."""
+    """Permanently delete an automation rule by ID or name."""
     try:
-        doc = await ctx.store.get(RULES_COLLECTION, params.rule_id)
-        if not doc or doc.data.get("owner_id") != ctx.user.imperal_id:
-            return ActionResult.error("Rule not found.", retryable=False)
-        name = doc.data.get("name", "rule")
-        await ctx.store.delete(RULES_COLLECTION, params.rule_id)
+        doc_id, doc_data = await _resolve_rule(ctx, params.rule_id)
+        if not doc_id:
+            return ActionResult.error(
+                f"Rule '{params.rule_id}' not found. Use list_rules() to see your rules.",
+                retryable=False)
+        name = doc_data.get("name", "rule")
+        await ctx.store.delete(RULES_COLLECTION, doc_id)
         return ActionResult.success(
-            data=build_rule_op(params.rule_id, f"Deleted rule '{name}'"),
+            data=build_rule_op(doc_id, f"Deleted rule '{name}'"),
             summary=f"Automation rule '{name}' deleted.",
         )
     except Exception as e:

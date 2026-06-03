@@ -21,6 +21,14 @@ FOLDERS = [
     {"key": "archive", "label": "Archive"},
 ]
 
+# Map user-facing names (from set_folder_prefs) to canonical folder keys
+FOLDER_KEY_MAP = {
+    "inbox": "INBOX", "INBOX": "INBOX",
+    "sent": "sent",   "drafts": "drafts",
+    "spam": "spam",   "trash": "trash",
+    "starred": "starred", "archive": "archive",
+}
+
 
 def _format_msg_date(date_str: str) -> str:
     """Today → HH:MM, yesterday → Yesterday, this year → Jan 05, older → Jan 05 2025."""
@@ -98,11 +106,18 @@ async def _switch_active_account(ctx, target_email: str) -> None:
 
 
 def _build_folder_tabs(folder: str, active_email: str,
-                       folder_unread: dict | None = None) -> ui.UINode:
-    """Folder tab buttons. folder_unread maps folder key → unread count."""
+                       folder_unread: dict | None = None,
+                       visible_folders: list | None = None) -> ui.UINode:
+    """Folder tab buttons. Filtered by visible_folders prefs if set."""
     counts = folder_unread or {}
+    # Filter FOLDERS by user prefs; if no prefs → show all
+    if visible_folders:
+        canonical = {FOLDER_KEY_MAP.get(v, v) for v in visible_folders}
+        active_folders = [f for f in FOLDERS if f["key"] in canonical]
+    else:
+        active_folders = FOLDERS
     buttons = []
-    for f in FOLDERS:
+    for f in active_folders:
         key   = f["key"]
         label = f["label"]
         n     = counts.get(key, 0)

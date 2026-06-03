@@ -75,7 +75,8 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder,
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",
     refresh="on_event:archived,deleted,bulk_archived,bulk_deleted,marked_read,"
-            "marked_unread,sent,mail.action,account.switched,account.connected,account.disconnected",
+            "marked_unread,sent,mail.action,account.switched,account.connected,"
+            "account.disconnected,prefs.updated",
 )
 async def inbox_panel(
     ctx,
@@ -193,10 +194,22 @@ async def inbox_panel(
         except Exception:
             pass
 
+    # Read folder visibility preferences
+    visible_folders: list | None = None
+    try:
+        prefs_page = await ctx.store.query("mail_prefs",
+                                           where={"owner_id": ctx.user.imperal_id}, limit=1)
+        if prefs_page.data:
+            vf = prefs_page.data[0].data.get("visible_folders")
+            visible_folders = vf if vf else None
+    except Exception:
+        pass
+
     effective_unread = inbox_msgs.unread_in_folder or (folder_stats_unread if page_num > 1 else 0)
     folder_tabs = _build_folder_tabs(
         folder, active_email,
         folder_unread={folder: effective_unread} if effective_unread else None,
+        visible_folders=visible_folders,
     )
 
     q = search_query.strip()

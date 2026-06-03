@@ -2359,7 +2359,7 @@
     },
     {
       "name": "search",
-      "description": "Find specific emails by content, sender, or subject. Use free-text or provider syntax (Gmail: from:sender, subject:topic, label:name; Outlook/IMAP: free-text). Only use when searching for something specific. For listing recent/latest emails use inbox() instead.",
+      "description": "Find emails by content, sender or subject — searches the FULL mailbox (all pages, not just first). Gmail syntax: from:sender@domain.com, subject:keyword, after:2026/01/01. Increase max_results (default 20, up to 200) to get more results. After finding emails, pass their message_id values directly to bulk_star/bulk_archive/bulk_mark_read to act on them without searching again.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -9512,7 +9512,7 @@
     },
     {
       "name": "apply_filter",
-      "description": "Apply a smart filter and return matching emails. Runs a live search against the provider using the filter's criteria. Pass filter_id from list_filters(). Optionally increase max_results for deeper search.",
+      "description": "Apply a smart filter and return matching emails. Pass filter_id OR filter name — both work. Optionally increase max_results (default 20, max 200) for deeper full-mailbox search.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -10065,7 +10065,7 @@
     },
     {
       "name": "update_filter",
-      "description": "Update a smart filter — rename it or change its search criteria. Use list_filters() to get filter_id.",
+      "description": "Update a smart filter — rename it or change its search criteria. Pass filter_id OR filter name — both work.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -10453,7 +10453,7 @@
     },
     {
       "name": "delete_filter",
-      "description": "Permanently delete a smart filter. The emails themselves are not affected — only the filter definition is removed.",
+      "description": "Delete a smart filter. Pass filter_id OR filter name — both work. The emails are NOT deleted, only the filter definition.",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [
@@ -11812,7 +11812,7 @@
     },
     {
       "name": "toggle_rule",
-      "description": "Enable or disable an automation rule (forwarding or auto-reply) without deleting it. Use list_rules() to get rule_id.",
+      "description": "Enable or disable an automation rule without deleting it. Pass rule_id OR rule name — both work.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -11954,7 +11954,7 @@
     },
     {
       "name": "delete_rule",
-      "description": "Permanently delete an automation rule (forwarding or auto-reply). Use list_rules() to get rule_id.",
+      "description": "Permanently delete an automation rule. Pass rule_id OR rule name — both work.",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [

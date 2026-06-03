@@ -76,12 +76,18 @@ async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
     raise RuntimeError(last_err)
 
 
-async def impl_search(ctx, query: str, max_results: int = 10, account: str = "") -> SearchResult:
+async def impl_search(ctx, query: str, max_results: int = 20,
+                      folder: str = "", account: str = "") -> SearchResult:
+    """Search FULL mailbox (all pages). Gmail/Microsoft search all mail; IMAP uses folder param."""
+    clamped = max(1, min(max_results, 200))
     if account:
         acc, provider = await _get_acc(ctx, account)
         if not acc:
             raise RuntimeError("Account not found.")
-        result = await provider.search(ctx, acc, query=query, max_results=max_results)
+        kw = {"query": query, "max_results": clamped}
+        if folder and acc.get("provider") == "imap":
+            kw["folder"] = folder
+        result = await provider.search(ctx, acc, **kw)
         if result.get("RESULT") == "ERROR":
             raise RuntimeError(result.get("error") or "Unknown provider error")
         results = result.get("results", []) or []
@@ -98,7 +104,10 @@ async def impl_search(ctx, query: str, max_results: int = 10, account: str = "")
     for acc in accounts:
         try:
             provider = get_provider(acc)
-            result = await provider.search(ctx, acc, query=query, max_results=max_results)
+            kw = {"query": query, "max_results": clamped}
+            if folder and acc.get("provider") == "imap":
+                kw["folder"] = folder
+            result = await provider.search(ctx, acc, **kw)
             for msg in result.get("results", []) or []:
                 mid = msg.get("message_id") or msg.get("id") or ""
                 key = f"{acc.get('email','')}/{mid}" if mid else ""
@@ -113,7 +122,7 @@ async def impl_search(ctx, query: str, max_results: int = 10, account: str = "")
         except Exception as e:
             log.warning("search failed for %s: %s", acc.get("email", "?"), e)
 
-    return SearchResult(query=query, results=all_results[:max_results],
+    return SearchResult(query=query, results=all_results[:clamped],
                         total=len(all_results))
 
 

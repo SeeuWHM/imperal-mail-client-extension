@@ -28,6 +28,30 @@ PREFS_COLLECTION = "mail_prefs"
 log = logging.getLogger("mail")
 
 
+async def _resolve_filter(ctx, filter_id: str) -> tuple:
+    """Resolve a filter by ID or by name. Returns (doc_id, doc_data) or (None, None).
+
+    Accepts both the raw store ID and the human-readable filter name so the LLM
+    can pass either — e.g. delete_filter(filter_id='WebHostMost Tickets') works
+    even without calling list_filters() first.
+    """
+    uid = ctx.user.imperal_id
+    # Try as direct store ID first
+    if filter_id:
+        try:
+            doc = await ctx.store.get(FILTERS_COLLECTION, filter_id)
+            if doc and doc.data.get("owner_id") == uid:
+                return doc.id, doc.data
+        except Exception:
+            pass
+    # Fall back to name lookup
+    page = await ctx.store.query(FILTERS_COLLECTION, where={"owner_id": uid}, limit=20)
+    for d in page.data:
+        if d.data.get("name", "").lower() == filter_id.lower():
+            return d.id, d.data
+    return None, None
+
+
 # ── Smart filters ─────────────────────────────────────────────────────────────
 
 @chat.function("create_filter", action_type="write", event="filter.created",
@@ -75,23 +99,25 @@ async def fn_list_filters(ctx, params: EmptyParams) -> ActionResult:
 @chat.function("apply_filter", action_type="read",
                data_model=SearchPage,
                id_projection="filter_id",
-               description="Apply a smart filter and return matching emails. Runs a live search against the provider using the filter's criteria. Pass filter_id from list_filters(). Optionally increase max_results for deeper search.")
+               description="Apply a smart filter and return matching emails. Pass filter_id OR filter name — both work. Optionally increase max_results (default 20, max 200) for deeper full-mailbox search.")
 async def fn_apply_filter(ctx, params: FilterIdParam) -> ActionResult:
-    """Apply a smart filter — runs live search with stored criteria, returns matching emails."""
+    """Apply a smart filter — runs live full-mailbox search with stored criteria."""
     try:
-        doc = await ctx.store.get(FILTERS_COLLECTION, params.filter_id)
-        if not doc or doc.data.get("owner_id") != ctx.user.imperal_id:
-            return ActionResult.error("Filter not found. Use list_filters() to see your filters.", retryable=False)
+        doc_id, doc_data = await _resolve_filter(ctx, params.filter_id)
+        if not doc_id:
+            return ActionResult.error(
+                f"Filter '{params.filter_id}' not found. Use list_filters() to see your filters.",
+                retryable=False)
 
         parts = []
-        if doc.data.get("criteria_from"):
-            parts.append(f"from:{doc.data['criteria_from']}")
-        if doc.data.get("criteria_subject"):
-            parts.append(f"subject:{doc.data['criteria_subject']}")
-        query = " ".join(parts) if parts else doc.data.get("name", "")
+        if doc_data.get("criteria_from"):
+            parts.append(f"from:{doc_data['criteria_from']}")
+        if doc_data.get("criteria_subject"):
+            parts.append(doc_data['criteria_subject'])
+        query = " ".join(parts) if parts else doc_data.get("name", "")
 
         result = await impl_search(ctx, query=query, max_results=params.max_results)
-        name = doc.data.get("name", "filter")
+        name = doc_data.get("name", "filter")
         return ActionResult.success(
             data=build_search_page(result),
             summary=f"Filter '{name}': {result.total} matching email(s).",
@@ -104,14 +130,14 @@ async def fn_apply_filter(ctx, params: FilterIdParam) -> ActionResult:
                effects=["update:mail_filter"],
                data_model=MailFilter,
                id_projection="filter_id",
-               description="Update a smart filter — rename it or change its search criteria. Use list_filters() to get filter_id.")
+               description="Update a smart filter — rename it or change its search criteria. Pass filter_id OR filter name — both work.")
 async def fn_update_filter(ctx, params: UpdateFilterParams) -> ActionResult:
     """Update a smart filter's name or criteria."""
     try:
-        doc = await ctx.store.get(FILTERS_COLLECTION, params.filter_id)
-        if not doc or doc.data.get("owner_id") != ctx.user.imperal_id:
-            return ActionResult.error("Filter not found.", retryable=False)
-        patch = dict(doc.data)
+        doc_id, doc_data = await _resolve_filter(ctx, params.filter_id)
+        if not doc_id:
+            return ActionResult.error(f"Filter '{params.filter_id}' not found.", retryable=False)
+        patch = dict(doc_data)
         if params.name:
             patch["name"] = params.name.strip()[:60]
         if params.from_contains != "__keep__":
@@ -120,9 +146,9 @@ async def fn_update_filter(ctx, params: UpdateFilterParams) -> ActionResult:
             patch["criteria_subject"] = params.subject_contains.strip()
         if params.color:
             patch["color"] = params.color
-        updated = await ctx.store.update(FILTERS_COLLECTION, params.filter_id, patch)
+        updated = await ctx.store.update(FILTERS_COLLECTION, doc_id, patch)
         return ActionResult.success(
-            data=build_mail_filter(params.filter_id, updated.data),
+            data=build_mail_filter(doc_id, updated.data),
             summary=f"Filter '{updated.data['name']}' updated.",
         )
     except Exception as e:
@@ -133,17 +159,19 @@ async def fn_update_filter(ctx, params: UpdateFilterParams) -> ActionResult:
                effects=["delete:mail_filter"],
                data_model=RuleOpResult,
                id_projection="filter_id",
-               description="Permanently delete a smart filter. The emails themselves are not affected — only the filter definition is removed.")
+               description="Delete a smart filter. Pass filter_id OR filter name — both work. The emails are NOT deleted, only the filter definition.")
 async def fn_delete_filter(ctx, params: FilterIdParam) -> ActionResult:
-    """Delete a smart mailbox filter."""
+    """Delete a smart mailbox filter by ID or name."""
     try:
-        doc = await ctx.store.get(FILTERS_COLLECTION, params.filter_id)
-        if not doc or doc.data.get("owner_id") != ctx.user.imperal_id:
-            return ActionResult.error("Filter not found.", retryable=False)
-        name = doc.data.get("name", "filter")
-        await ctx.store.delete(FILTERS_COLLECTION, params.filter_id)
+        doc_id, doc_data = await _resolve_filter(ctx, params.filter_id)
+        if not doc_id:
+            return ActionResult.error(
+                f"Filter '{params.filter_id}' not found. Use list_filters() to see available filters.",
+                retryable=False)
+        name = doc_data.get("name", "filter")
+        await ctx.store.delete(FILTERS_COLLECTION, doc_id)
         return ActionResult.success(
-            data=build_rule_op(params.filter_id, f"Deleted filter '{name}'"),
+            data=build_rule_op(doc_id, f"Deleted filter '{name}'"),
             summary=f"Smart filter '{name}' deleted.",
         )
     except Exception as e:
