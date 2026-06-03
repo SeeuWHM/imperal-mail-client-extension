@@ -261,25 +261,32 @@ class ContactsSyncResult(BaseModel):
 
 
 class PerAccountUnread(BaseModel):
-    """Compact per-account unread entry for classifier envelope."""
+    """Compact per-account entry for classifier envelope.
+
+    Docs rule: skeleton lists >5 items collapse to list[N].
+    Since most users have ≤3 accounts, per_account IS fully visible to classifier.
+    total_messages: real mailbox total from provider Labels API (not page size).
+    """
 
     email: str = ""
     unread_count: int = 0
-    message_count: int = 0
-    error: Optional[str] = None
+    total_messages: int = 0
 
 
 class InboxSummary(BaseModel):
-    """skeleton_refresh_mail_inbox_summary — roster + per-account unread
-    counts for the classifier envelope + recent message previews for Webbee."""
+    """skeleton_refresh_mail_inbox_summary — classifier envelope for mail.
 
-    accounts_connected: int = 0
+    Docs rule: only first 6 top-level fields visible. Ordered by importance:
+    1. unread_total  — total unread across all accounts (most important for routing)
+    2. accounts_connected — how many accounts
+    3. per_account  — list[≤3] → fully visible; each has email+unread_count+total_messages
+    Fields 4-6 reserved for future use.
+    recent_messages REMOVED: list[25] collapses to list[25] hint — LLM never sees content.
+    """
+
     unread_total: int = 0
+    accounts_connected: int = 0
     per_account: list[PerAccountUnread] = Field(default_factory=list)
-    recent_messages: list[dict] = Field(
-        default_factory=list,
-        description="Recent inbox previews (subject/from/date/snippet only — no body).",
-    )
 
 
 class SkeletonAlertMessage(BaseModel):

@@ -41,9 +41,6 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
 
     per_account: list[dict] = []
     unread_total = 0
-    # Preview fields only — no body, no html. LLM sees these via classifier envelope.
-    _PREVIEW_KEYS = {"message_id", "subject", "from", "date", "snippet", "unread", "starred"}
-    recent_messages: list[dict] = []
 
     for acc in accounts:
         email = acc.get("email", "")
@@ -80,19 +77,14 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                 unread = sum(1 for m in messages if m.get("unread"))
 
             unread_total += unread
+            # Use total from get_folder_stats (real mailbox total, e.g. 18624+).
+            # Falls back to len(messages) only if stats unavailable.
+            real_total = total if total > 0 else len(messages)
             per_account.append({
                 "email": email,
                 "unread_count": unread,
-                "message_count": len(messages),
+                "total_messages": real_total,
             })
-
-            # Collect previews from the first account that succeeds.
-            # One page worth (INBOX_FETCH_SIZE) — subject/from/date/snippet only.
-            if not recent_messages and messages:
-                recent_messages = [
-                    {k: m.get(k) for k in _PREVIEW_KEYS if m.get(k) is not None}
-                    for m in messages
-                ]
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {
@@ -150,19 +142,33 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
             per_account.append({
                 "email": email,
                 "unread_count": int(acc.get("unread_count", 0)),
-                "message_count": 0,
-                "error": str(e)[:120],
+                "total_messages": 0,
             })
             unread_total += int(acc.get("unread_count", 0))
 
+    # Build per_account as PerAccountUnread instances for proper schema validation
+    from schemas import PerAccountUnread
+    pa_models = [
+        PerAccountUnread(
+            email=p["email"],
+            unread_count=p.get("unread_count", 0),
+            total_messages=p.get("total_messages", 0),
+        )
+        for p in per_account
+    ]
+    # Format summary using accounts; scalar per_account fields (≤3 accounts) are
+    # fully visible to classifier since list[≤5] expands inline per docs rules.
+    acct_summary = ", ".join(
+        f"{p.email}: {p.unread_count} unread / {p.total_messages} total"
+        for p in pa_models
+    )
     return ActionResult.success(
         data=InboxSummary(
-            accounts_connected=len(accounts),
             unread_total=unread_total,
-            per_account=per_account,
-            recent_messages=recent_messages,
+            accounts_connected=len(accounts),
+            per_account=pa_models,
         ).model_dump(),
-        summary=f"{unread_total} unread across {len(accounts)} account(s)",
+        summary=f"{unread_total} unread | {acct_summary}",
     )
 
 
