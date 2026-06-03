@@ -38,15 +38,15 @@ async def build_filters_bar(ctx, active_query: str = "") -> ui.UINode | None:
         if not page.data:
             return None
 
-        buttons = []
+        filter_rows = []
         for f in page.data:
             d = f.data
             name  = d.get("name", "filter")
             query = _build_search_query(d)
             is_active = bool(active_query and active_query == query)
 
-            # Clicking sets search_query on __panel__inbox — shows results in panel
-            buttons.append(ui.Button(
+            # Left: filter name button — switches panel to search mode
+            name_btn = ui.Button(
                 f"⊙ {name}",
                 variant="primary" if is_active else "ghost",
                 size="sm",
@@ -56,13 +56,21 @@ async def build_filters_bar(ctx, active_query: str = "") -> ui.UINode | None:
                                  page_cursor="",
                                  prev_cursor="",
                                  page_num=1),
-            ))
+            )
+            # Right: delete button — removes filter without changing panel view
+            del_btn = ui.Button(
+                "✕",
+                variant="ghost",
+                size="sm",
+                on_click=ui.Call("delete_filter", filter_id=f.id),
+            )
+            filter_rows.append(ui.Stack([name_btn, del_btn], direction="h", gap=0))
 
-        # "Clear filter" button appears when a filter is active
+        # "Clear filter" button when a filter is active
         clear_btn = None
         if active_query:
             clear_btn = ui.Button(
-                "✕",
+                "✕ Clear",
                 variant="ghost",
                 size="sm",
                 on_click=ui.Call("__panel__inbox",
@@ -73,15 +81,12 @@ async def build_filters_bar(ctx, active_query: str = "") -> ui.UINode | None:
                                  page_num=1),
             )
 
-        row_children = list(buttons)
+        children = [ui.Divider(), ui.Text("Smart Filters", variant="caption")]
+        children += filter_rows
         if clear_btn:
-            row_children.append(clear_btn)
+            children.append(clear_btn)
 
-        return ui.Stack([
-            ui.Divider(),
-            ui.Text("Smart Filters", variant="caption"),
-            ui.Stack(row_children, direction="h", wrap=True, gap=1),
-        ], gap=1)
+        return ui.Stack(children, gap=1)
 
     except Exception as e:
         log.debug(f"filters_bar load failed: {e}")

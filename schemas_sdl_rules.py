@@ -69,3 +69,12 @@ class MailPrefsResult(sdl.Entity):
     kind: str = "mail_prefs"
     visible_folders: list[str] | None = sdl_field(role="mail.visible_folders")
     hidden_folders: list[str] | None = sdl_field(role="mail.hidden_folders")
+
+
+class MailFoldersResult(sdl.Entity):
+    """All available mail folders + visibility — returned by list_mail_folders()."""
+
+    kind: str = "mail_folders"
+    all_folders: list[str] | None = sdl_field(role="mail.all_folders")
+    visible_folders: list[str] | None = sdl_field(role="mail.visible_folders")
+    hidden_folders: list[str] | None = sdl_field(role="mail.hidden_folders")

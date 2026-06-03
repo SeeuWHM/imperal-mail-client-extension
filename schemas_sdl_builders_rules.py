@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from schemas_sdl_rules import (
     MailFilter, MailFilterPage, MailRule, MailRulePage, RuleOpResult, MailPrefsResult,
+    MailFoldersResult,
 )
 
 
@@ -74,4 +75,18 @@ def build_mail_prefs(visible_folders: list[str], hidden_folders: list[str]) -> M
         kind="mail_prefs",
         visible_folders=visible_folders or None,
         hidden_folders=hidden_folders or None,
+    )
+
+
+def build_mail_folders(all_keys: list[str], visible: list[str], hidden: list[str]) -> MailFoldersResult:
+    """Build MailFoldersResult SDL entity for list_mail_folders()."""
+    shown = [k for k in all_keys if k not in hidden]
+    summary_title = f"Visible: {', '.join(shown) or 'all'}"
+    return MailFoldersResult(
+        id="mail_folders",
+        title=summary_title,
+        kind="mail_folders",
+        all_folders=all_keys or None,
+        visible_folders=shown or None,
+        hidden_folders=hidden or None,
     )

@@ -18,8 +18,9 @@ from schemas_params import (
 )
 from schemas_sdl_builders import SearchPage, build_search_page
 from schemas_sdl_builders_rules import (
-    MailFilter, MailFilterPage, RuleOpResult, MailPrefsResult,
+    MailFilter, MailFilterPage, RuleOpResult, MailPrefsResult, MailFoldersResult,
     build_mail_filter, build_mail_filter_page, build_rule_op, build_mail_prefs,
+    build_mail_folders,
 )
 
 FILTERS_COLLECTION = "mail_filters"
@@ -232,6 +233,31 @@ async def fn_get_folder_prefs(ctx, params: EmptyParams) -> ActionResult:
         return ActionResult.success(
             data=build_mail_prefs(d.get("visible_folders", []), d.get("hidden_folders", [])),
             summary=f"Visible: {', '.join(d.get('visible_folders', []) or ['all'])}.",
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("list_mail_folders", action_type="read",
+               data_model=MailFoldersResult,
+               description="List all available mail folders (INBOX/sent/drafts/spam/trash/starred/archive) and show which are currently visible or hidden in the panel. Use when user asks 'what folders do I have', 'какие папки в почте', 'what sections are hidden'.")
+async def fn_list_mail_folders(ctx, params: EmptyParams) -> ActionResult:
+    """List available mail folders + current visibility preferences as SDL entity."""
+    try:
+        from panels_inbox import FOLDERS
+        prefs_page = await ctx.store.query(PREFS_COLLECTION,
+                                           where={"owner_id": ctx.user.imperal_id}, limit=1)
+        hidden_keys: list[str] = []
+        if prefs_page.data:
+            hidden_keys = prefs_page.data[0].data.get("hidden_folders", [])
+        all_keys = [f["key"] for f in FOLDERS]
+        visible  = [k for k in all_keys if k not in hidden_keys]
+        summary  = f"Visible: {', '.join(visible) or 'all'}"
+        if hidden_keys:
+            summary += f". Hidden: {', '.join(hidden_keys)}"
+        return ActionResult.success(
+            data=build_mail_folders(all_keys, visible, hidden_keys),
+            summary=summary + ".",
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)

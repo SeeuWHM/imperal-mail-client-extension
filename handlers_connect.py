@@ -273,32 +273,4 @@ async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
         return ActionResult.error(str(e), retryable=False)
 
 
-@chat.function("list_mail_folders", action_type="read",
-               data_model=AccountsPage,
-               description="List available mail folders — INBOX, sent, drafts, spam, trash, starred, archive. Also shows current visibility (which folders shown in panel). Use when user asks 'what folders', 'какие папки', 'what sections in mail'.")
-async def fn_list_mail_folders(ctx, params: EmptyParams) -> ActionResult:
-    """List available mail folders and current visibility preferences."""
-    try:
-        from panels_inbox import FOLDERS
-        prefs_page = await ctx.store.query("mail_prefs",
-                                           where={"owner_id": ctx.user.imperal_id}, limit=1)
-        hidden_keys: list = []
-        if prefs_page.data:
-            hidden_keys = prefs_page.data[0].data.get("hidden_folders", [])
 
-        folder_info = [
-            {"folder": f["key"], "label": f["label"],
-             "visible": f["key"] not in hidden_keys}
-            for f in FOLDERS
-        ]
-        shown     = [f["label"] for f in folder_info if f["visible"]]
-        not_shown = [f["label"] for f in folder_info if not f["visible"]]
-        summary   = f"Visible: {', '.join(shown)}."
-        if not_shown:
-            summary += f" Hidden: {', '.join(not_shown)}."
-        return ActionResult.success(
-            data={"folders": folder_info, "visible": shown, "hidden": not_shown},
-            summary=summary,
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=False)

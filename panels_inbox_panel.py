@@ -27,7 +27,6 @@ log = logging.getLogger(__name__)
 INBOX_INLINE_LIMIT = 25
 INBOX_CACHE_TTL    = 60
 
-
 async def _fetch_inbox_messages(ctx, provider, acc, folder,
                                 cursor_data: dict | None = None) -> InboxMessages:
     """Fetch one page of messages. cursor_data=None → page 1; dict → next page."""
@@ -71,7 +70,6 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder,
         total_in_folder=total_in_folder, unread_in_folder=unread_in_folder,
         next_cursor=next_cursor_encoded, fetched_at=datetime.now(timezone.utc),
     )
-
 
 @ext.panel(
     "inbox", slot="left", title="Mail", icon="Mail",

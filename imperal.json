@@ -1034,198 +1034,6 @@
       "owner_chat_tool": "tool_mail_client_chat"
     },
     {
-      "name": "list_mail_folders",
-      "description": "List available mail folders — INBOX, sent, drafts, spam, trash, starred, archive. Also shows current visibility (which folders shown in panel). Use when user asks 'what folders', 'какие папки', 'what sections in mail'.",
-      "action_type": "read",
-      "chain_callable": true,
-      "effects": [],
-      "id_projection": "",
-      "params_schema": {
-        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
-        "properties": {},
-        "title": "EmptyParams",
-        "type": "object"
-      },
-      "return_schema": {
-        "$defs": {
-          "MailAccountEntity": {
-            "description": "Connected email account — item in AccountsPage.",
-            "properties": {
-              "id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "integer"
-                  }
-                ],
-                "title": "Id"
-              },
-              "title": {
-                "title": "Title",
-                "type": "string"
-              },
-              "kind": {
-                "default": "mail_account",
-                "title": "Kind",
-                "type": "string"
-              },
-              "subtitle": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "default": null,
-                "title": "Subtitle"
-              },
-              "description": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "default": null,
-                "title": "Description"
-              },
-              "status": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "default": null,
-                "title": "Status"
-              },
-              "url": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "default": null,
-                "title": "Url"
-              },
-              "provider": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "default": null,
-                "title": "Provider",
-                "x-sdl-role": "mail.provider"
-              },
-              "is_active": {
-                "anyOf": [
-                  {
-                    "type": "boolean"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "default": null,
-                "title": "Is Active",
-                "x-sdl-role": "mail.is_active"
-              },
-              "unread_count": {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "default": null,
-                "title": "Unread Count",
-                "x-sdl-role": "mail.unread_count"
-              }
-            },
-            "required": [
-              "id",
-              "title"
-            ],
-            "title": "MailAccountEntity",
-            "type": "object",
-            "x-sdl": "entity"
-          }
-        },
-        "description": "All connected accounts — returned by status().",
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/$defs/MailAccountEntity"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "total": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Total"
-          },
-          "page": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Page"
-          },
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "connected": {
-            "default": true,
-            "title": "Connected",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "AccountsPage",
-        "type": "object",
-        "x-sdl": "entity-list"
-      },
-      "event": "",
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_mail_client_chat"
-    },
-    {
       "name": "inbox",
       "description": "PRIMARY function to list emails. Use this when user asks for recent/latest/new emails, wants to see their inbox, or check mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, read state. Do NOT use search() for listing recent emails — use inbox().",
       "action_type": "read",
@@ -11055,6 +10863,153 @@
           "title"
         ],
         "title": "MailPrefsResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "list_mail_folders",
+      "description": "List all available mail folders (INBOX/sent/drafts/spam/trash/starred/archive) and show which are currently visible or hidden in the panel. Use when user asks 'what folders do I have', 'какие папки в почте', 'what sections are hidden'.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "All available mail folders + visibility — returned by list_mail_folders().",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "mail_folders",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "all_folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "All Folders",
+            "x-sdl-role": "mail.all_folders"
+          },
+          "visible_folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Visible Folders",
+            "x-sdl-role": "mail.visible_folders"
+          },
+          "hidden_folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Hidden Folders",
+            "x-sdl-role": "mail.hidden_folders"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MailFoldersResult",
         "type": "object",
         "x-sdl": "entity"
       },

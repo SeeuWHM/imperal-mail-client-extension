@@ -1,6 +1,7 @@
 """Mail Client · Inbox business logic — impl_* functions."""
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 
 from ctx_helpers import _get_acc
@@ -126,6 +127,9 @@ async def impl_search(ctx, query: str, max_results: int = 20,
 
     # Sort by date for oldest_first support (parse dates, sort ascending)
     if oldest_first and all_results:
+        _UTC = _dt.timezone.utc
+        _EPOCH = _dt.datetime.min.replace(tzinfo=_UTC)
+
         def _sort_key(m):
             from email.utils import parsedate_to_datetime
             d = m.get("date") or ""
@@ -133,10 +137,9 @@ async def impl_search(ctx, query: str, max_results: int = 20,
                 return parsedate_to_datetime(d)
             except Exception:
                 try:
-                    return __import__("datetime").datetime.fromisoformat(d.replace("Z", "+00:00"))
+                    return _dt.datetime.fromisoformat(d.replace("Z", "+00:00"))
                 except Exception:
-                    return __import__("datetime").datetime.min.replace(
-                        tzinfo=__import__("datetime").timezone.utc)
+                    return _EPOCH
         all_results.sort(key=_sort_key)
 
     return SearchResult(query=query, results=all_results[:clamped],
