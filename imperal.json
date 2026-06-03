@@ -8747,12 +8747,12 @@
           },
           "from_contains": {
             "default": "",
-            "description": "Match emails where sender contains this string or domain (e.g. 'linkedin.com', 'migrations@webhostmost.org')",
+            "description": "Match emails where sender contains this string or domain (e.g. 'linkedin.com')",
             "title": "From Contains",
             "type": "string"
           },
           "from_emails": {
-            "description": "List of specific sender email addresses — all emails from these addresses match. E.g. ['alice@example.com', 'bob@example.com']",
+            "description": "List of specific sender email addresses (e.g. ['alice@example.com', 'bob@example.com'])",
             "items": {
               "type": "string"
             },
@@ -8775,6 +8775,12 @@
             "default": "blue",
             "description": "Badge color: blue/green/red/yellow/purple/orange",
             "title": "Color",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Email account this filter belongs to (default: current active account)",
+            "title": "Account",
             "type": "string"
           }
         },

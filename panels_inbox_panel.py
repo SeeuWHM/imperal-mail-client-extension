@@ -102,7 +102,8 @@ async def inbox_panel(
         from panels_inbox import _build_email_list
         filters_bar = await build_filters_bar(ctx, active_filter_id=filter_id)
         return await render_filter_panel(ctx, filter_id, filters_bar,
-                                         _build_email_list, INBOX_INLINE_LIMIT)
+                                         _build_email_list, INBOX_INLINE_LIMIT,
+                                         page_num=page_num)
 
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)

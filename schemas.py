@@ -5,9 +5,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-
 # ── Accounts ──────────────────────────────────────────────────────────────────
-
 
 class MailAccount(BaseModel):
     """One connected email account summary row for the status panel."""
@@ -17,14 +15,12 @@ class MailAccount(BaseModel):
     is_active: bool = False
     unread_count: int = 0
 
-
 class AccountsStatus(BaseModel):
     """status — all connected email accounts with provider + unread counts."""
 
     connected: bool = False
     accounts: list[MailAccount] = Field(default_factory=list)
     total: int = 0
-
 
 class ConnectOAuthResult(BaseModel):
     """connect / connect_microsoft / connect_yahoo — OAuth authorisation result.
@@ -39,7 +35,6 @@ class ConnectOAuthResult(BaseModel):
     email: Optional[str] = None
     total: Optional[int] = None
 
-
 class ConnectImapResult(BaseModel):
     """connect_imap / add_imap — direct IMAP/SMTP connection confirmation."""
 
@@ -47,13 +42,11 @@ class ConnectImapResult(BaseModel):
     email: str
     imap_server: str = ""
 
-
 class AccountSwitched(BaseModel):
     """switch_account — confirmation the active account moved."""
 
     switched: bool = True
     active_account: str
-
 
 class AccountDisconnected(BaseModel):
     """disconnect — removal confirmation."""
@@ -62,16 +55,13 @@ class AccountDisconnected(BaseModel):
     email: str
     remaining: int = 0
 
-
 class OAuthUrlResult(BaseModel):
     """get_oauth_url — OAuth URL for panel wizard redirect."""
 
     auth_url: str
     provider: str
 
-
 # ── Inbox / Folder / Read ─────────────────────────────────────────────────────
-
 
 class MessagePreview(BaseModel):
     """One message row shown in the inbox/folder list.
@@ -95,7 +85,6 @@ class MessagePreview(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-
 class InboxPageResult(BaseModel):
     """inbox / folder — paginated list of messages for the given folder."""
 
@@ -103,7 +92,6 @@ class InboxPageResult(BaseModel):
     cursor: Optional[str] = None
     has_more: bool = False
     unread_count: int = 0
-
 
 class EmailBody(BaseModel):
     """read_email — full message body + headers.
@@ -130,7 +118,6 @@ class EmailBody(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-
 class ThreadView(BaseModel):
     """get_thread — full conversation view for a message thread."""
 
@@ -139,7 +126,6 @@ class ThreadView(BaseModel):
     total: int = 0
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
-
 class SearchResult(BaseModel):
     """search — Gmail/Graph/IMAP query hits, heterogeneous rows allowed."""
 
@@ -147,9 +133,7 @@ class SearchResult(BaseModel):
     results: list[dict[str, Any]] = Field(default_factory=list)
     total: int = 0
 
-
 # ── Write / Manage ────────────────────────────────────────────────────────────
-
 
 class SendResult(BaseModel):
     """send / reply / forward — confirmation a message was dispatched."""
@@ -159,14 +143,12 @@ class SendResult(BaseModel):
     subject: Optional[str] = None
     message_id: Optional[str] = None
 
-
 class ComposeSendResult(BaseModel):
     """compose_send — panel-side send/reply/forward confirmation."""
 
     sent: bool = True
     to: str
     mode: str = "new"
-
 
 class OperationResult(BaseModel):
     """archive / delete / mark_read / mark_unread / star / move / purge —
@@ -176,7 +158,6 @@ class OperationResult(BaseModel):
     message_id: Optional[str] = None
     operation: Optional[str] = None
     detail: Optional[str] = None
-
 
 class BulkOperationResult(BaseModel):
     """bulk_archive / bulk_delete / bulk_mark_read / bulk_mark_unread —
@@ -197,9 +178,7 @@ class BulkOperationResult(BaseModel):
     failed: Optional[int] = None
     errors: list[str] = Field(default_factory=list)
 
-
 # ── Panel actions (batch from UI) ─────────────────────────────────────────────
-
 
 class MailActionResult(BaseModel):
     """mail_action — UI-triggered per-row or batch action confirmation."""
@@ -207,15 +186,12 @@ class MailActionResult(BaseModel):
     action: str
     count: int = 0
 
-
 class FolderCountsResult(BaseModel):
     """folder_counts — unread counts keyed by folder name for sidebar badges."""
 
     counts: dict[str, int] = Field(default_factory=dict)
 
-
 # ── Contacts ──────────────────────────────────────────────────────────────────
-
 
 class ContactEntry(BaseModel):
     """One contact row."""
@@ -224,13 +200,11 @@ class ContactEntry(BaseModel):
     name: str = ""
     source: str = "manual"
 
-
 class ContactsList(BaseModel):
     """contacts — filtered contact roster."""
 
     contacts: list[ContactEntry] = Field(default_factory=list)
     total: int = 0
-
 
 class ContactAdded(BaseModel):
     """add_contact — single contact creation result."""
@@ -239,13 +213,11 @@ class ContactAdded(BaseModel):
     email: str
     name: str = ""
 
-
 class ContactDeleted(BaseModel):
     """delete_contact — single contact deletion result."""
 
     deleted: bool = True
     email: str
-
 
 class ContactsSyncResult(BaseModel):
     """sync_contacts — counts + notes from Google People / Graph / header
@@ -256,45 +228,47 @@ class ContactsSyncResult(BaseModel):
     total: int = 0
     notes: list[str] = Field(default_factory=list)
 
-
 # ── Skeleton ──────────────────────────────────────────────────────────────────
-
 
 class PerAccountUnread(BaseModel):
     """Compact per-account entry for classifier envelope.
 
-    Docs rule: skeleton lists >5 items collapse to list[N].
-    Since most users have ≤3 accounts, per_account IS fully visible to classifier.
-    total_messages: real mailbox total from provider Labels API (not page size).
+    Docs rule: skeleton lists ≤5 items expand inline — each field visible to LLM.
+    Most users have ≤3 accounts so per_account is always fully expanded.
+    total_messages: real mailbox total from provider Labels API (e.g. 18624+).
     """
 
     email: str = ""
     unread_count: int = 0
     total_messages: int = 0
-
+    is_active: bool = False
 
 class InboxSummary(BaseModel):
-    """skeleton_refresh_mail_inbox_summary — classifier envelope for mail.
+    """skeleton_refresh_mail_inbox_summary — 6-field classifier envelope for mail.
 
-    Docs rule: only first 6 top-level fields visible. Ordered by importance:
-    1. unread_total  — total unread across all accounts (most important for routing)
-    2. accounts_connected — how many accounts
-    3. per_account  — list[≤3] → fully visible; each has email+unread_count+total_messages
-    Fields 4-6 reserved for future use.
-    recent_messages REMOVED: list[25] collapses to list[25] hint — LLM never sees content.
+    Docs rule: only first 6 top-level fields visible to classifier. Field order matters.
+    1. unread_total     — total unread across all accounts (primary routing signal)
+    2. accounts_connected — how many accounts linked
+    3. per_account      — list[≤3] expands inline: email+unread+total+is_active per account
+    4. active_account   — which account is currently active (default for operations)
+    5. filter_count     — number of saved smart filters (routes filter requests)
+    6. rule_count       — number of enabled automation rules (routes automation requests)
+    recent_messages NOT included: list[25] collapses to 'list[25]' hint (docs rule).
+    Cache warmup (25 messages → ctx.cache) happens separately inside the skeleton handler.
     """
 
     unread_total: int = 0
     accounts_connected: int = 0
     per_account: list[PerAccountUnread] = Field(default_factory=list)
-
+    active_account: str = ""
+    filter_count: int = 0
+    rule_count: int = 0
 
 class SkeletonAlertMessage(BaseModel):
     """skeleton_alert_mail_inbox_summary — lightweight unread count from store (no API calls)."""
 
     unread_total: int = 0
     per_account: list[dict] = Field(default_factory=list)
-
 
 # Re-export param models so handler imports (from schemas import FooParams) keep working.
 from schemas_params import *  # noqa: F401, F403

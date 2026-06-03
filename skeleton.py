@@ -84,6 +84,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                 "email": email,
                 "unread_count": unread,
                 "total_messages": real_total,
+                "is_active": bool(acc.get("is_active", False)),
             })
 
             try:
@@ -143,32 +144,55 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
                 "email": email,
                 "unread_count": int(acc.get("unread_count", 0)),
                 "total_messages": 0,
+                "is_active": bool(acc.get("is_active", False)),
             })
             unread_total += int(acc.get("unread_count", 0))
 
-    # Build per_account as PerAccountUnread instances for proper schema validation
+    # Build per_account with is_active flag
     from schemas import PerAccountUnread
     pa_models = [
         PerAccountUnread(
             email=p["email"],
             unread_count=p.get("unread_count", 0),
             total_messages=p.get("total_messages", 0),
+            is_active=p.get("is_active", False),
         )
         for p in per_account
     ]
-    # Format summary using accounts; scalar per_account fields (≤3 accounts) are
-    # fully visible to classifier since list[≤5] expands inline per docs rules.
-    acct_summary = ", ".join(
-        f"{p.email}: {p.unread_count} unread / {p.total_messages} total"
-        for p in pa_models
+
+    # active account — for classifier routing (which account to use by default)
+    active_account = next(
+        (p.email for p in pa_models if p.is_active), pa_models[0].email if pa_models else ""
     )
+
+    # counts of configured filters and rules (free via ctx.store.count per SDK docs)
+    filter_count = 0
+    rule_count = 0
+    try:
+        filter_count = int(await ctx.store.count("mail_filters",
+                                                  where={"owner_id": ctx.user.imperal_id}) or 0)
+    except Exception:
+        pass
+    try:
+        rule_count = int(await ctx.store.count("mail_rules",
+                                                where={"owner_id": ctx.user.imperal_id,
+                                                       "enabled": True}) or 0)
+    except Exception:
+        pass
+
+    # Summary string — informative for classifier (strings ≤60 chars survive compression)
+    summary = (f"{unread_total} unread | active:{active_account[:30]} "
+               f"| {filter_count}filt {rule_count}rules")
     return ActionResult.success(
         data=InboxSummary(
             unread_total=unread_total,
             accounts_connected=len(accounts),
             per_account=pa_models,
+            active_account=active_account,
+            filter_count=filter_count,
+            rule_count=rule_count,
         ).model_dump(),
-        summary=f"{unread_total} unread | {acct_summary}",
+        summary=summary,
     )
 
 

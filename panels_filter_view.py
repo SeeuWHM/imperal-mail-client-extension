@@ -31,7 +31,7 @@ def _build_filter_query(doc_data: dict) -> str:
     return " ".join(parts) if parts else ""
 
 
-async def get_filter_messages(ctx, filter_id: str, max_results: int = 50) -> tuple[list[dict], str]:
+async def get_filter_messages(ctx, filter_id: str, max_results: int = 100) -> tuple[list[dict], str]:
     """Load filter and run cross-account search. Returns (messages, filter_name)."""
     try:
         uid = ctx.user.imperal_id
@@ -71,17 +71,20 @@ async def get_filter_messages(ctx, filter_id: str, max_results: int = 50) -> tup
 
 async def render_filter_panel(ctx, filter_id: str,
                                filters_bar, build_email_list_fn,
-                               inbox_limit: int = 25):
-    """Render the full filter view for the inbox left panel.
-
-    Called from inbox_panel when filter_id is set.
-    Returns a ui.Stack with header + filter bar + email list.
-    """
+                               inbox_limit: int = 25, page_num: int = 1):
+    """Render filter view with pagination. page_num controls which page of results to show."""
     from imperal_sdk import ui
 
-    filter_msgs, filter_name = await get_filter_messages(ctx, filter_id)
+    max_res = inbox_limit * page_num  # fetch enough for current page
+    filter_msgs, filter_name = await get_filter_messages(ctx, filter_id, max_results=max_res)
+    total = len(filter_msgs)
+
+    # Show current page slice
+    start = inbox_limit * (page_num - 1)
+    page_msgs = filter_msgs[start:start + inbox_limit]
+
     header = ui.Stack([
-        ui.Text(f"Filter: {filter_name}", variant="caption"),
+        ui.Text(f"◉ {filter_name} ({total} emails)", variant="caption"),
         ui.Button("", icon="X", variant="ghost", size="sm",
                   on_click=ui.Call("__panel__inbox", filter_id="",
                                    page_cursor="", page_num=1)),
@@ -90,14 +93,30 @@ async def render_filter_panel(ctx, filter_id: str,
     from providers.helpers import _active_account
     acc = await _active_account(ctx, "")
     active_email = acc.get("email", "") if acc else ""
-    email_list = build_email_list_fn(filter_msgs[:inbox_limit], active_email, "INBOX")
 
     children = [header]
     if filters_bar:
         children.append(filters_bar)
-    if filter_msgs:
-        children.append(email_list)
-    else:
-        children.append(ui.Empty(
-            message=f"No emails match filter '{filter_name}'", icon="Filter"))
+
+    if not filter_msgs:
+        children.append(ui.Empty(message=f"No emails match '{filter_name}'", icon="Filter"))
+        return ui.Stack(children, gap=1)
+
+    email_list = build_email_list_fn(page_msgs, active_email, "INBOX")
+    children.append(email_list)
+
+    # Pagination — show if there are more results
+    nav = []
+    if page_num > 1:
+        nav.append(ui.Button("←", variant="ghost", size="sm",
+                             on_click=ui.Call("__panel__inbox", filter_id=filter_id,
+                                             page_num=page_num - 1)))
+    nav.append(ui.Text(str(page_num), variant="caption"))
+    if len(filter_msgs) >= max_res:  # might be more on server
+        nav.append(ui.Button("→", variant="ghost", size="sm",
+                             on_click=ui.Call("__panel__inbox", filter_id=filter_id,
+                                             page_num=page_num + 1)))
+    if nav:
+        children.append(ui.Stack(nav, direction="h", gap=2))
+
     return ui.Stack(children, gap=1)

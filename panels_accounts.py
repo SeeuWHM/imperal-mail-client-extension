@@ -85,9 +85,16 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
 # ── Filters tab ───────────────────────────────────────────────────────────────
 
 async def _build_filters_tab(ctx) -> ui.UINode:
+    from providers.helpers import _active_account
+    acc = await _active_account(ctx, "")
+    active_email = acc.get("email", "") if acc else ""
     page = await ctx.store.query("mail_filters",
                                  where={"owner_id": ctx.user.imperal_id}, limit=20)
-    if not page.data:
+    # Show only filters for current active account (or legacy filters without account)
+    page_data = [f for f in page.data
+                 if not f.data.get("account_email") or
+                 f.data.get("account_email") == active_email]
+    if not page_data:
         return ui.Stack([
             ui.Empty(message="No smart filters yet", icon="Filter"),
             ui.Alert(message="Tell Webbee: 'create a filter for LinkedIn emails' or 'show emails from shop.com'",
@@ -97,7 +104,7 @@ async def _build_filters_tab(ctx) -> ui.UINode:
     COLOR_MAP = {"blue": "blue", "green": "green", "red": "red",
                  "yellow": "yellow", "purple": "purple", "orange": "orange"}
     items = []
-    for f in page.data:
+    for f in page_data:
         d = f.data
         parts = []
         emails = d.get("criteria_from_emails") or []
@@ -117,7 +124,7 @@ async def _build_filters_tab(ctx) -> ui.UINode:
         ))
 
     return ui.Stack([
-        ui.Text(f"{len(page.data)} smart filter(s)", variant="caption"),
+        ui.Text(f"{len(page_data)} smart filter(s) for {active_email[:30]}", variant="caption"),
         ui.List(items=items),
     ], gap=2)
 

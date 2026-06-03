@@ -13,15 +13,22 @@ log = logging.getLogger("mail")
 
 
 async def build_filters_bar(ctx, active_filter_id: str = "") -> ui.UINode | None:
-    """Build the Smart Filters row. Returns None when no filters saved."""
+    """Build the Smart Filters row for the current active account. Returns None if none saved."""
     try:
+        from providers.helpers import _active_account
+        acc = await _active_account(ctx, "")
+        active_email = acc.get("email", "") if acc else ""
         page = await ctx.store.query(FILTERS_COLLECTION,
-                                     where={"owner_id": ctx.user.imperal_id}, limit=10)
-        if not page.data:
+                                     where={"owner_id": ctx.user.imperal_id}, limit=20)
+        # Show only filters for this account (or legacy filters with no account)
+        page_data = [f for f in page.data
+                     if not f.data.get("account_email") or
+                     f.data.get("account_email") == active_email]
+        if not page_data:
             return None
 
         buttons = []
-        for f in page.data:
+        for f in page_data:
             name = f.data.get("name", "filter")
             is_active = f.id == active_filter_id
 

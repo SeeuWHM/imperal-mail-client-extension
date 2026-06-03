@@ -62,11 +62,19 @@ async def _resolve_filter(ctx, filter_id: str) -> tuple:
 async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
     """Create a named smart mailbox filter with search criteria."""
     try:
+        from providers.helpers import _active_account
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        # Resolve which account this filter belongs to
+        if params.account:
+            account_email = params.account.strip().lower()
+        else:
+            acc = await _active_account(ctx, "")
+            account_email = acc.get("email", "") if acc else ""
         # Normalise specific emails list
         from_emails = [e.strip().lower() for e in (params.from_emails or []) if e.strip()]
         doc = await ctx.store.create(FILTERS_COLLECTION, {
             "owner_id": ctx.user.imperal_id,
+            "account_email": account_email,
             "name": params.name.strip()[:60],
             "criteria_from": params.from_contains.strip(),
             "criteria_from_emails": from_emails,
@@ -91,13 +99,21 @@ async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
                data_model=MailFilterPage,
                description="List all saved smart mailbox filters (virtual folders). Shows criteria for each. Use filter_id with apply_filter() to view matching emails.")
 async def fn_list_filters(ctx, params: EmptyParams) -> ActionResult:
-    """List all saved smart mailbox filters."""
+    """List smart mailbox filters for the current active account."""
     try:
+        from providers.helpers import _active_account
+        acc = await _active_account(ctx, "")
+        active_email = acc.get("email", "") if acc else ""
+        # Show filters for active account, plus filters with no account (legacy)
         page = await ctx.store.query(FILTERS_COLLECTION,
                                      where={"owner_id": ctx.user.imperal_id}, limit=20)
+        # Filter client-side by account_email (empty = matches all)
+        relevant = [d for d in page.data
+                    if not d.data.get("account_email") or
+                    d.data.get("account_email") == active_email]
         return ActionResult.success(
-            data=build_mail_filter_page(page.data),
-            summary=f"{len(page.data)} smart filter(s) saved.",
+            data=build_mail_filter_page(relevant),
+            summary=f"{len(relevant)} smart filter(s) for {active_email}.",
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
@@ -118,8 +134,11 @@ async def fn_apply_filter(ctx, params: FilterIdParam) -> ActionResult:
 
         from panels_filter_view import _build_filter_query
         query = _build_filter_query(doc_data) or doc_data.get("name", "")
+        # Search the filter's specific account if set, else all accounts
+        search_account = doc_data.get("account_email", "")
 
-        result = await impl_search(ctx, query=query, max_results=params.max_results)
+        result = await impl_search(ctx, query=query, max_results=params.max_results,
+                                   account=search_account)
         name = doc_data.get("name", "filter")
         return ActionResult.success(
             data=build_search_page(result),
