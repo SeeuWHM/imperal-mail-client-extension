@@ -46,7 +46,7 @@ async def _resolve_rule(ctx, rule_id: str) -> tuple:
 @chat.function("create_forward_rule", action_type="write", event="rule.created",
                effects=["create:mail_rule"],
                data_model=MailRule,
-               description="Create a forwarding rule — automatically forward matching incoming emails to another address. Runs every 5 minutes via background scheduler. Example: 'forward emails from migrations@webhostmost.com to denis@webhostmost.com'.")
+               description="Create a FORWARDING rule — silently forward matching emails to another address with NO reply sent. Use this when user says 'forward', 'пересылай', 'переслать'. Do NOT create an autoreply rule at the same time unless explicitly asked. Example: 'forward emails from migrations@webhostmost.com to denis@webhostmost.com'.")
 async def fn_create_forward_rule(ctx, params: CreateForwardRuleParams) -> ActionResult:
     """Create a forwarding automation rule."""
     try:
@@ -78,7 +78,7 @@ async def fn_create_forward_rule(ctx, params: CreateForwardRuleParams) -> Action
 @chat.function("create_autoreply", action_type="write", event="rule.created",
                effects=["create:mail_rule"],
                data_model=MailRule,
-               description="Create an auto-reply rule — automatically send a reply to incoming emails. Supports 'always' mode or 'time_window' mode (fires OUTSIDE business hours, e.g. evenings/weekends). Tracks replied IDs to avoid duplicate responses.")
+               description="Create an AUTO-REPLY rule — send an automatic text response to matching emails. Use when user says 'автоответчик', 'отвечай автоматически', 'auto-reply', 'out-of-office'. This does NOT forward the email — for forwarding use create_forward_rule instead. Supports 'always' or 'time_window' (OUTSIDE business hours) modes.")
 async def fn_create_autoreply(ctx, params: CreateAutoreplyParams) -> ActionResult:
     """Create an auto-reply automation rule with optional business-hours schedule."""
     try:

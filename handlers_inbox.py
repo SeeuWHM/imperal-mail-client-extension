@@ -55,12 +55,13 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("search", action_type="read",
                data_model=SearchPage,
-               description="Find emails by content, sender or subject — searches the FULL mailbox (all pages, not just first). Gmail syntax: from:sender@domain.com, subject:keyword, after:2026/01/01. Increase max_results (default 20, up to 200) to get more results. After finding emails, pass their message_id values directly to bulk_star/bulk_archive/bulk_mark_read to act on them without searching again.")
+               description="Find emails — searches the FULL mailbox across all time. Gmail syntax: from:x@domain.com subject:keyword after:2024/01/01 before:2025/01/01. To find THE FIRST/OLDEST ever email from someone: use oldest_first=true + max_results=1 + query like 'from:linkedin.com'. Increase max_results (up to 200) for deeper results. After finding, pass message_id values directly to bulk_star/bulk_archive/bulk_mark_read.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     """Find specific emails by content, sender, or subject."""
     try:
         r = await impl_search(ctx, query=params.query, max_results=params.max_results,
-                              folder=params.folder, account=params.account)
+                              folder=params.folder, account=params.account,
+                              oldest_first=params.oldest_first)
         return ActionResult.success(
             data=build_search_page(r),
             summary=f"{r.total} result(s) for '{params.query}'.",

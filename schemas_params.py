@@ -35,9 +35,10 @@ class MessageIdParams(BaseModel):
 
 
 class SearchParams(BaseModel):
-    query: str = Field(description="Search query — Gmail syntax supported")
-    max_results: int = Field(default=20, description="Max results (1-200). Gmail/Microsoft search full mailbox. IMAP: increase for deeper results.")
-    folder: str = Field(default="", description="IMAP only: folder to search (default: INBOX). Gmail/Microsoft always search all folders.")
+    query: str = Field(description="Search query. Gmail syntax: from:x@y.com, subject:keyword, after:2024/01/01, before:2025/01/01, label:name. Free-text for Outlook/IMAP.")
+    max_results: int = Field(default=20, description="Max results (1-200). For 'find first ever / oldest' use oldest_first=true + max_results=1.")
+    oldest_first: bool = Field(default=False, description="Sort oldest first — use to find the first/earliest email matching the query.")
+    folder: str = Field(default="", description="IMAP only: folder to search. Gmail/Microsoft always search all folders.")
     account: str = Field(default="", description="Account email or ID")
 
 
@@ -269,9 +270,30 @@ class ToggleRuleParams(BaseModel):
 
 # ── Folder preferences ────────────────────────────────────────────────────────
 
+_FOLDER_CANONICAL = {
+    "inbox": "INBOX", "INBOX": "INBOX",
+    "sent": "sent",   "drafts": "drafts",
+    "spam": "spam",   "trash": "trash",
+    "starred": "starred", "archive": "archive",
+    # Russian aliases
+    "входящие": "INBOX", "отправленные": "sent", "черновики": "drafts",
+    "спам": "spam", "корзина": "trash", "помеченные": "starred", "архив": "archive",
+}
+
+
 class SetFolderPrefsParams(BaseModel):
     """Set which mail folders are visible in the inbox panel."""
     visible_folders: list[str] = Field(
         default_factory=list,
-        description="Ordered list of folder names to show (e.g. ['INBOX','Starred','Work','Receipts']). Empty list = show all."
+        description="Ordered list of folders to show. Use: INBOX, sent, drafts, spam, trash, starred, archive. Empty list = show all."
     )
+
+    @field_validator("visible_folders", mode="before")
+    @classmethod
+    def _normalize(cls, v):
+        """Accept comma-separated string OR list, normalize to canonical folder keys."""
+        if isinstance(v, str):
+            v = [x.strip() for x in v.replace(",", " ").split() if x.strip()]
+        if not isinstance(v, list):
+            return []
+        return [_FOLDER_CANONICAL.get(x.strip().lower(), x.strip()) for x in v if x.strip()]

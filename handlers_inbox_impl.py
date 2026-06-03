@@ -77,8 +77,10 @@ async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
 
 
 async def impl_search(ctx, query: str, max_results: int = 20,
-                      folder: str = "", account: str = "") -> SearchResult:
-    """Search FULL mailbox (all pages). Gmail/Microsoft search all mail; IMAP uses folder param."""
+                      folder: str = "", account: str = "",
+                      oldest_first: bool = False) -> SearchResult:
+    """Search FULL mailbox. Gmail/Microsoft search all mail; IMAP uses folder param.
+    oldest_first=True reverses result order for finding earliest/first-ever emails."""
     clamped = max(1, min(max_results, 200))
     if account:
         acc, provider = await _get_acc(ctx, account)
@@ -121,6 +123,21 @@ async def impl_search(ctx, query: str, max_results: int = 20,
                 all_results.append(msg)
         except Exception as e:
             log.warning("search failed for %s: %s", acc.get("email", "?"), e)
+
+    # Sort by date for oldest_first support (parse dates, sort ascending)
+    if oldest_first and all_results:
+        def _sort_key(m):
+            from email.utils import parsedate_to_datetime
+            d = m.get("date") or ""
+            try:
+                return parsedate_to_datetime(d)
+            except Exception:
+                try:
+                    return __import__("datetime").datetime.fromisoformat(d.replace("Z", "+00:00"))
+                except Exception:
+                    return __import__("datetime").datetime.min.replace(
+                        tzinfo=__import__("datetime").timezone.utc)
+        all_results.sort(key=_sort_key)
 
     return SearchResult(query=query, results=all_results[:clamped],
                         total=len(all_results))

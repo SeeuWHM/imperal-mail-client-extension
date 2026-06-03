@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.2.1",
   "app_id": "mail",
-  "version": "5.6.0",
+  "version": "5.7.0",
   "name": "Mail Client",
   "description": "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. Inbox, send, reply, forward, search, archive, manage emails, contacts.",
   "icon": "mail.svg",
@@ -1028,6 +1028,198 @@
         "x-sdl": "entity"
       },
       "event": "account.disconnected",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "list_mail_folders",
+      "description": "List available mail folders — INBOX, sent, drafts, spam, trash, starred, archive. Also shows current visibility (which folders shown in panel). Use when user asks 'what folders', 'какие папки', 'what sections in mail'.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MailAccountEntity": {
+            "description": "Connected email account — item in AccountsPage.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "mail_account",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "provider": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Provider",
+                "x-sdl-role": "mail.provider"
+              },
+              "is_active": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Active",
+                "x-sdl-role": "mail.is_active"
+              },
+              "unread_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unread Count",
+                "x-sdl-role": "mail.unread_count"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MailAccountEntity",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "All connected accounts — returned by status().",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/MailAccountEntity"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "connected": {
+            "default": true,
+            "title": "Connected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AccountsPage",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -2359,7 +2551,7 @@
     },
     {
       "name": "search",
-      "description": "Find emails by content, sender or subject — searches the FULL mailbox (all pages, not just first). Gmail syntax: from:sender@domain.com, subject:keyword, after:2026/01/01. Increase max_results (default 20, up to 200) to get more results. After finding emails, pass their message_id values directly to bulk_star/bulk_archive/bulk_mark_read to act on them without searching again.",
+      "description": "Find emails — searches the FULL mailbox across all time. Gmail syntax: from:x@domain.com subject:keyword after:2024/01/01 before:2025/01/01. To find THE FIRST/OLDEST ever email from someone: use oldest_first=true + max_results=1 + query like 'from:linkedin.com'. Increase max_results (up to 200) for deeper results. After finding, pass message_id values directly to bulk_star/bulk_archive/bulk_mark_read.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -2367,19 +2559,25 @@
       "params_schema": {
         "properties": {
           "query": {
-            "description": "Search query — Gmail syntax supported",
+            "description": "Search query. Gmail syntax: from:x@y.com, subject:keyword, after:2024/01/01, before:2025/01/01, label:name. Free-text for Outlook/IMAP.",
             "title": "Query",
             "type": "string"
           },
           "max_results": {
             "default": 20,
-            "description": "Max results (1-200). Gmail/Microsoft search full mailbox. IMAP: increase for deeper results.",
+            "description": "Max results (1-200). For 'find first ever / oldest' use oldest_first=true + max_results=1.",
             "title": "Max Results",
             "type": "integer"
           },
+          "oldest_first": {
+            "default": false,
+            "description": "Sort oldest first — use to find the first/earliest email matching the query.",
+            "title": "Oldest First",
+            "type": "boolean"
+          },
           "folder": {
             "default": "",
-            "description": "IMAP only: folder to search (default: INBOX). Gmail/Microsoft always search all folders.",
+            "description": "IMAP only: folder to search. Gmail/Microsoft always search all folders.",
             "title": "Folder",
             "type": "string"
           },
@@ -10606,7 +10804,7 @@
         "description": "Set which mail folders are visible in the inbox panel.",
         "properties": {
           "visible_folders": {
-            "description": "Ordered list of folder names to show (e.g. ['INBOX','Starred','Work','Receipts']). Empty list = show all.",
+            "description": "Ordered list of folders to show. Use: INBOX, sent, drafts, spam, trash, starred, archive. Empty list = show all.",
             "items": {
               "type": "string"
             },
@@ -10868,7 +11066,7 @@
     },
     {
       "name": "create_forward_rule",
-      "description": "Create a forwarding rule — automatically forward matching incoming emails to another address. Runs every 5 minutes via background scheduler. Example: 'forward emails from migrations@webhostmost.com to denis@webhostmost.com'.",
+      "description": "Create a FORWARDING rule — silently forward matching emails to another address with NO reply sent. Use this when user says 'forward', 'пересылай', 'переслать'. Do NOT create an autoreply rule at the same time unless explicitly asked. Example: 'forward emails from migrations@webhostmost.com to denis@webhostmost.com'.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -11167,7 +11365,7 @@
     },
     {
       "name": "create_autoreply",
-      "description": "Create an auto-reply rule — automatically send a reply to incoming emails. Supports 'always' mode or 'time_window' mode (fires OUTSIDE business hours, e.g. evenings/weekends). Tracks replied IDs to avoid duplicate responses.",
+      "description": "Create an AUTO-REPLY rule — send an automatic text response to matching emails. Use when user says 'автоответчик', 'отвечай автоматически', 'auto-reply', 'out-of-office'. This does NOT forward the email — for forwarding use create_forward_rule instead. Supports 'always' or 'time_window' (OUTSIDE business hours) modes.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [

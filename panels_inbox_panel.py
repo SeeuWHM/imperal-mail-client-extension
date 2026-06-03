@@ -19,6 +19,7 @@ from panels_inbox import (
     _execute_panel_action, _switch_active_account,
     _build_folder_tabs, _build_email_list,
 )
+from panels_filters_bar import build_filters_bar
 from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
@@ -290,7 +291,11 @@ async def inbox_panel(
                                       folder_stats_unread=carried_unread),
                 ))
 
-    children = [header, folder_tabs, search_bar]
+    filters_bar = await build_filters_bar(ctx)
+    children = [header, folder_tabs]
+    if filters_bar:
+        children.append(filters_bar)
+    children.append(search_bar)
     if search_status:
         children.append(search_status)
     children.append(email_list)
