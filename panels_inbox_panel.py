@@ -99,7 +99,6 @@ async def inbox_panel(
 
     # ── Filter view mode: cross-account search for a smart filter ──────
     if filter_id:
-        from panels_inbox import _build_email_list
         filters_bar = await build_filters_bar(ctx, active_filter_id=filter_id)
         return await render_filter_panel(ctx, filter_id, filters_bar,
                                          _build_email_list, INBOX_INLINE_LIMIT,
