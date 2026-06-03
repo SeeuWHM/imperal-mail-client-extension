@@ -51,4 +51,18 @@ async def on_install(ctx):
 
 @ext.on_event("email.received")
 async def on_email_received(ctx, event):
-    log.info(f"Mail event handler: {event.get('event_type', '?')}")
+    """Real-time rule execution — fires on every incoming email.
+
+    @ext.schedule (*/5 * * * *) is registered as backup but this event-driven
+    handler is the primary path since email.received fires reliably in production.
+    ctx is already user-scoped — no fan-out needed.
+    """
+    uid = ctx.user.imperal_id if ctx and hasattr(ctx, "user") and ctx.user else ""
+    log.info(f"mail email.received: processing rules for user {uid}")
+    try:
+        from handlers_rule_runner import _process_user_rules
+        count = await _process_user_rules(ctx)
+        if count:
+            log.info(f"mail email.received: executed {count} rule action(s) for {uid}")
+    except Exception as e:
+        log.warning(f"mail email.received: rule processing failed for {uid}: {e}")
