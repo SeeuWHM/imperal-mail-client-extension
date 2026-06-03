@@ -19,7 +19,7 @@ _MODULES = (
     "handlers_manage_impl", "handlers_manage",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
     "handlers_filters", "handlers_rules", "handlers_rule_runner", "handlers_rule_event",
-    "panels_filters_bar",
+    "panels_filters_bar", "panels_filter_view",
     "skeleton", "panels", "panels_inbox", "panels_inbox_panel",
     "panels_email_viewer", "panels_compose",
     "panels_accounts", "panels_add_account",
@@ -52,6 +52,7 @@ import handlers_filters           # noqa: E402, F401
 import handlers_rules             # noqa: E402, F401
 import handlers_rule_runner       # noqa: E402, F401
 import handlers_rule_event        # noqa: E402, F401
+import panels_filter_view         # noqa: E402, F401
 import panels_filters_bar         # noqa: E402, F401
 import skeleton                   # noqa: E402, F401
 import panels_email_viewer        # noqa: E402, F401

@@ -116,22 +116,8 @@ async def fn_apply_filter(ctx, params: FilterIdParam) -> ActionResult:
                 f"Filter '{params.filter_id}' not found. Use list_filters() to see your filters.",
                 retryable=False)
 
-        # Build Gmail-compatible query from stored criteria
-        parts = []
-        # Specific email addresses → {from:a@x.com OR from:b@y.com}
-        from_emails = doc_data.get("criteria_from_emails") or []
-        if from_emails:
-            if len(from_emails) == 1:
-                parts.append(f"from:{from_emails[0]}")
-            else:
-                or_clause = " OR ".join(f"from:{e}" for e in from_emails)
-                parts.append(f"{{{or_clause}}}")
-        elif doc_data.get("criteria_from"):
-            parts.append(f"from:{doc_data['criteria_from']}")
-        if doc_data.get("criteria_subject"):
-            subj = doc_data["criteria_subject"]
-            parts.append(f'subject:"{subj}"' if " " in subj else f"subject:{subj}")
-        query = " ".join(parts) if parts else doc_data.get("name", "")
+        from panels_filter_view import _build_filter_query
+        query = _build_filter_query(doc_data) or doc_data.get("name", "")
 
         result = await impl_search(ctx, query=query, max_results=params.max_results)
         name = doc_data.get("name", "filter")

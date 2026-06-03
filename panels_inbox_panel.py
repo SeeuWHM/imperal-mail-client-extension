@@ -20,6 +20,7 @@ from panels_inbox import (
     _build_folder_tabs, _build_email_list,
 )
 from panels_filters_bar import build_filters_bar
+from panels_filter_view import render_filter_panel
 from cache_model_defs import InboxMessages
 
 log = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ async def _fetch_inbox_messages(ctx, provider, acc, folder,
 async def inbox_panel(
     ctx,
     folder: str = "INBOX",
+    filter_id: str = "",
     do_action: str = "",
     do_message_id: str = "",
     do_switch_account: str = "",
@@ -95,6 +97,13 @@ async def inbox_panel(
     if not accounts:
         return ui.Empty(message="No email accounts connected")
 
+    # ── Filter view mode: cross-account search for a smart filter ──────
+    if filter_id:
+        from panels_inbox import _build_email_list
+        filters_bar = await build_filters_bar(ctx, active_filter_id=filter_id)
+        return await render_filter_panel(ctx, filter_id, filters_bar,
+                                         _build_email_list, INBOX_INLINE_LIMIT)
+
     if do_switch_account:
         await _switch_active_account(ctx, do_switch_account)
         folder, search_query = "INBOX", ""
@@ -104,28 +113,19 @@ async def inbox_panel(
 
     from providers.helpers import _active_account as _resolve_active
     acc = await _resolve_active(ctx, "")
-    if not acc:
-        return ui.Empty(message="No email account available")
-
-    provider     = get_provider(acc)
-    active_email = acc.get("email", "")
+    if not acc: return ui.Empty(message="No email account available")
+    provider, active_email = get_provider(acc), acc.get("email", "")
 
     await _execute_panel_action(ctx, provider, acc, do_action, do_message_id, folder)
     if do_action in ("archive", "delete", "spam", "restore", "unarchive", "unspam"):
         page_cursor, prev_cursor, page_num, folder_stats_unread = "", "", 1, 0
-        base_key = _inbox_messages_key(active_email, folder)
-        for _p in range(2, 6):
-            try:
-                await ctx.cache.delete(f"{base_key}:p{_p}")
-            except Exception:
-                pass
-        if folder.upper() != "INBOX":
-            base_inbox = _inbox_messages_key(active_email, "INBOX")
+        async def _clear_pages(key):
             for _p in range(2, 6):
-                try:
-                    await ctx.cache.delete(f"{base_inbox}:p{_p}")
-                except Exception:
-                    pass
+                try: await ctx.cache.delete(f"{key}:p{_p}")
+                except Exception: pass
+        await _clear_pages(_inbox_messages_key(active_email, folder))
+        if folder.upper() != "INBOX":
+            await _clear_pages(_inbox_messages_key(active_email, "INBOX"))
 
     msgs_key = _inbox_messages_key(active_email, folder)
     current_page_key = msgs_key if page_num <= 1 else f"{msgs_key}:p{page_num}"
@@ -289,14 +289,11 @@ async def inbox_panel(
                                       folder_stats_unread=carried_unread),
                 ))
 
-    filters_bar = await build_filters_bar(ctx, active_query=search_query.strip())
-    children = [header, folder_tabs]
-    if filters_bar:
-        children.append(filters_bar)
-    children.append(search_bar)
-    if search_status:
-        children.append(search_status)
-    children.append(email_list)
-    if nav_buttons:
-        children.append(ui.Stack(nav_buttons, direction="h", gap=2))
-    return ui.Stack(children, gap=1)
+    filters_bar = await build_filters_bar(ctx, active_filter_id=filter_id)
+    parts = [header, folder_tabs]
+    if filters_bar: parts.append(filters_bar)
+    parts.append(search_bar)
+    if search_status: parts.append(search_status)
+    parts.append(email_list)
+    if nav_buttons: parts.append(ui.Stack(nav_buttons, direction="h", gap=2))
+    return ui.Stack(parts, gap=1)

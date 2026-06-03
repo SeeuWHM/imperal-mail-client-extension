@@ -1,7 +1,7 @@
-"""Mail Client · Smart Filters bar — shown in left inbox panel below folder tabs.
+"""Mail Client · Smart Filters bar — left inbox panel, below folder tabs.
 
-Clicking a filter name calls apply_filter in chat (results appear in chat).
-Each filter row has a ✕ delete button on the right.
+Clicking a filter loads filtered emails from ALL accounts directly in the left panel.
+No delete buttons here — filter management is in the RIGHT panel Filters tab.
 """
 from __future__ import annotations
 
@@ -9,11 +9,10 @@ import logging
 from imperal_sdk import ui
 
 FILTERS_COLLECTION = "mail_filters"
-
 log = logging.getLogger("mail")
 
 
-async def build_filters_bar(ctx, active_query: str = "") -> ui.UINode | None:
+async def build_filters_bar(ctx, active_filter_id: str = "") -> ui.UINode | None:
     """Build the Smart Filters row. Returns None when no filters saved."""
     try:
         page = await ctx.store.query(FILTERS_COLLECTION,
@@ -21,33 +20,42 @@ async def build_filters_bar(ctx, active_query: str = "") -> ui.UINode | None:
         if not page.data:
             return None
 
-        rows = []
+        buttons = []
         for f in page.data:
-            d = f.data
-            name = d.get("name", "filter")
+            name = f.data.get("name", "filter")
+            is_active = f.id == active_filter_id
 
-            # Filter name — calls apply_filter in chat (shows results there)
-            name_chip = ui.Button(
+            buttons.append(ui.Button(
                 f"◉ {name}",
+                variant="primary" if is_active else "ghost",
+                size="sm",
+                on_click=ui.Call("__panel__inbox",
+                                 filter_id=f.id,
+                                 search_query="",
+                                 page_cursor="",
+                                 prev_cursor="",
+                                 page_num=1),
+            ))
+
+        # Clear filter button — only shown when a filter is active
+        if active_filter_id:
+            buttons.append(ui.Button(
+                "✕ clear",
                 variant="ghost",
                 size="sm",
-                on_click=ui.Call("apply_filter", filter_id=f.id),
-            )
-            # ✕ — deletes the filter without affecting panel view
-            del_btn = ui.Button(
-                "✕",
-                variant="ghost",
-                size="sm",
-                on_click=ui.Call("delete_filter", filter_id=f.id),
-            )
-            rows.append(ui.Stack([name_chip, del_btn], direction="h", gap=0))
+                on_click=ui.Call("__panel__inbox",
+                                 filter_id="",
+                                 page_cursor="",
+                                 prev_cursor="",
+                                 page_num=1),
+            ))
 
         return ui.Stack([
             ui.Divider(),
             ui.Text("Smart Filters", variant="caption"),
-            *rows,
+            ui.Stack(buttons, direction="h", wrap=True, gap=1),
         ], gap=1)
 
     except Exception as e:
-        log.debug(f"filters_bar load failed: {e}")
+        log.debug(f"filters_bar: {e}")
         return None

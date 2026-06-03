@@ -54,11 +54,15 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
         provider  = acc.get("provider", "oauth")
         is_active = acc.get("is_active", False)
         unread    = int(acc.get("unread_count", 0) or 0)
+        # Active account: green border + checkmark badge + bold subtitle
+        subtitle_text = PROVIDER_LABELS.get(provider, "Unknown")
+        if is_active:
+            subtitle_text = f"✓ Active — {subtitle_text}"
         items.append(ui.ListItem(
             id=email, title=email,
-            subtitle=PROVIDER_LABELS.get(provider, "Unknown"),
+            subtitle=subtitle_text,
             avatar=ui.Avatar(fallback=email[0].upper(), size="sm"),
-            badge=ui.Badge("Active", color="green") if is_active else (
+            badge=ui.Badge(f"✓ {unread}" if unread > 0 else "✓ Active", color="green") if is_active else (
                 ui.Badge(str(unread), color="blue") if unread > 0 else None),
             on_click=ui.Call("switch_account", account=email),
             actions=[{"label": "Remove", "icon": "Trash2",
@@ -96,15 +100,18 @@ async def _build_filters_tab(ctx) -> ui.UINode:
     for f in page.data:
         d = f.data
         parts = []
-        if d.get("criteria_from"):    parts.append(f"from: {d['criteria_from']}")
+        emails = d.get("criteria_from_emails") or []
+        if emails:
+            parts.append(f"from: {', '.join(emails)}")
+        elif d.get("criteria_from"):
+            parts.append(f"from: {d['criteria_from']}")
         if d.get("criteria_subject"): parts.append(f"subj: {d['criteria_subject']}")
-        subtitle = " · ".join(parts) if parts else "match all"
+        subtitle = " · ".join(parts) if parts else "no criteria set"
         color = COLOR_MAP.get(d.get("color", "blue"), "blue")
         items.append(ui.ListItem(
             id=f.id, title=d.get("name", "filter"),
             subtitle=subtitle,
             badge=ui.Badge("●", color=color),
-            # NOT clickable — only delete action on the right
             actions=[{"label": "Delete", "icon": "Trash2",
                       "on_click": ui.Call("delete_filter", filter_id=f.id)}],
         ))

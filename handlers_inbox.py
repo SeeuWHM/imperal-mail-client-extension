@@ -55,7 +55,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("search", action_type="read",
                data_model=SearchPage,
-               description="Find emails — searches the FULL mailbox across all time. Gmail syntax: from:x@domain.com subject:keyword after:2024/01/01 before:2025/01/01. To find THE FIRST/OLDEST ever email from someone: use oldest_first=true + max_results=1 + query like 'from:linkedin.com'. Increase max_results (up to 200) for deeper results. After finding, pass message_id values directly to bulk_star/bulk_archive/bulk_mark_read.")
+               description="Find emails — searches ALL connected accounts by default (leave account= empty). Gmail syntax: from:x@domain.com, subject:keyword, after:2024/01/01. For 'find all from Google and mark read + archive': search → then pass ALL found message_id values as list to bulk_mark_read AND bulk_archive in separate calls. Use max_results=100+ for large operations. For oldest email ever: oldest_first=true + max_results=1.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     """Find specific emails by content, sender, or subject."""
     try:
