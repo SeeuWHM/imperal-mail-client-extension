@@ -1,5 +1,73 @@
 # Changelog
 
+## [5.7.0] — 2026-06-04 (current prod, commit `c15a81a`)
+
+### Smart Filters — panel integration + per-account + pagination
+- **`panels_filter_view.py`** — `render_filter_panel` fetches all results (up to 200) in one API call, client-side pagination N/M pages; no extra calls per page. 15s asyncio timeout prevents panel hang.
+- **`panels_filters_bar.py`** — filter bar is per-account (shows only filters for current active account). No duplicate ✕ clear button (header ✕ serves this).
+- **`panels_inbox.py`** — `_build_folder_tabs`: all folder tab buttons now explicitly pass `filter_id=""`. Fixes SDK param accumulation bug that caused every inbox render to trigger a Gmail search → infinite loading.
+- **`handlers_filters.py`** — `create_filter` stores `account_email`; `list_filters`/`apply_filter` filter by active account. `from_emails: list[str]` param for exact sender addresses. `apply_filter` uses filter's specific account.
+- **`schemas_params.py`** — `CreateFilterParams`: added `account`, `from_emails` fields.
+
+### Skeleton — properly optimized for docs 6-field classifier rule
+- `InboxSummary`: 6 fields in importance order: `unread_total`, `accounts_connected`, `per_account`, `active_account`, `filter_count`, `rule_count`
+- `PerAccountUnread`: `total_messages` = real API count (not page size 25), `is_active` flag
+- `filter_count` / `rule_count` from `ctx.store.count()` (docs-documented pattern)
+- `recent_messages` removed from classifier data: list[25] collapses to `list[25]` hint (useless). Cache warmup (25 msgs → ctx.cache for instant panel load) unchanged.
+- skeleton summary: `"18624 unread | active:ignat@webhostmost.com | 3filt 2rules"`
+
+### Automation rules — event-driven primary path
+- **`handlers_rule_event.py`** — `process_event_email()`: event-driven, user-scoped ctx, no fan-out needed. Falls back to `_process_user_rules` if no message_id in event.
+- **`app.py`** — `on_email_received`: logs event keys, calls `process_event_email`. Confirmed in prod logs.
+- **`handlers_rule_runner.py`** — `_parse_date()`: RFC2822 + ISO → datetime (fixes string comparison bug). `_do_autoreply`: uses `provider.send()` not `reply()` (reliable, no thread headers needed). `last_run_at` always updated. Loop protection expanded.
+- **Known issue**: `on_email_received` ctx.user.imperal_id="" in current platform → rules not found. Needs platform investigation.
+
+### Bug fixes
+- **UnboundLocalError** — `panels_inbox_panel.py`: removed duplicate `from panels_inbox import _build_email_list` inside `if filter_id:` block. Was causing `cannot access local variable` error → ALL inbox panel renders failing.
+- **`trigger_rules_now`** — new `@chat.function` for manual rule trigger from chat with debug output.
+- **`list_mail_folders`** — moved to `handlers_filters.py`, changed `data_model=MailFoldersResult` (was wrong `AccountsPage`). SDL violation fixed.
+- **Security** — replaced `__import__("datetime")` ×3 with `import datetime as _dt` at module level.
+- **`status()` description** — updated to explicitly return real email addresses, not generic types.
+- **`trigger_rules_now` description** — clear trigger phrases so LLM routes correctly.
+
+### SDL audit
+- `schemas_sdl_rules.py`: added `MailFoldersResult`, `MailFoldersResult` SDL entity
+- `schemas_sdl_builders_rules.py`: added `build_mail_folders()`, `build_mail_folders()`
+- All 60 `@chat.function` handlers: `data_model=` SDL entity + `imperal build` → x-sdl in manifest
+
+### Right panel — Accounts tab visual
+- Active account: `"✓ Active — Google"` subtitle, `"✓ 18624"` badge (checkmark + unread count)
+- Filters tab: shows `from: ignat@..., zalupa@...` (from_emails) instead of "match all"
+- Filters tab: NOT clickable, only Delete action on right (management only in right panel)
+
+---
+
+## [5.6.0] — 2026-06-01
+
+### Smart Filters (virtual mailboxes)
+- **`handlers_filters.py`** — `create_filter / list_filters / apply_filter / update_filter / delete_filter`. All accept filter_id OR filter_name (lookup by both).
+- **`set_folder_prefs / get_folder_prefs`** — choose visible folders in left panel.
+- **`panels_filters_bar.py`** — filter buttons in left panel (initial implementation with apply_filter in chat).
+
+### Automation Rules
+- **`create_forward_rule`** — silent forward only. Explicit NOT to create autoreply simultaneously.
+- **`create_autoreply`** — time_window or always mode. Dedup via `mail_autoreply_sent`. Loop protection.
+- **`list_rules / toggle_rule / delete_rule`** — ID or name lookup.
+- **`handlers_rule_runner.py`** — `@ext.schedule("mail_rule_runner", cron="*/5 * * * *")`. Fan-out with `list_users → as_user`.
+
+### Bulk operations (complete set)
+- `bulk_move / bulk_star / bulk_purge` — new bulk handlers.
+- All `BulkParams`: `@field_validator` coerces `list[str] → CSV` — LLM can pass list from previous search.
+
+### Other
+- `set_folder_prefs`: `@field_validator` normalizes "inbox"→"INBOX", Russian aliases.
+- `search`: `oldest_first` bool (for finding first-ever email), `folder` (IMAP), max_results 1-200.
+- `list_mail_folders`: lists available folders + visibility state.
+- Email body: `raw_body` (HTML stripped) + `excerpt` (800 chars) in `build_email_message`.
+- Right panel: 3-tab (Accounts / Filters / Rules) with accumulated `tab=` param.
+
+---
+
 ## [5.5.0] — 2026-06-01
 
 ### SDL migration (SDK 5.2.0 — Structured Data Layer)
