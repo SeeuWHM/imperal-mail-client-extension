@@ -291,7 +291,7 @@ async def inbox_panel(
                                       folder_stats_unread=carried_unread),
                 ))
 
-    filters_bar = await build_filters_bar(ctx)
+    filters_bar = await build_filters_bar(ctx, active_query=search_query.strip())
     children = [header, folder_tabs]
     if filters_bar:
         children.append(filters_bar)
