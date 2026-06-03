@@ -10,10 +10,13 @@ import logging
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
+import logging as _logging
 from schemas_params import (
     CreateForwardRuleParams, CreateAutoreplyParams,
     RuleIdParam, ToggleRuleParams, EmptyParams,
 )
+
+_log = _logging.getLogger("mail")
 from schemas_sdl_builders_rules import (
     MailRule, MailRulePage, RuleOpResult,
     build_mail_rule, build_mail_rule_page, build_rule_op,
@@ -178,3 +181,38 @@ async def fn_delete_rule(ctx, params: RuleIdParam) -> ActionResult:
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("trigger_rules_now", action_type="write", event="rules.triggered",
+               effects=["create:email"],
+               data_model=RuleOpResult,
+               description="Manually trigger all enabled mail automation rules NOW — checks last 30 inbox emails against all rules and executes matching forward/autoreply actions. Use to test rules or force immediate execution without waiting for the 5-minute schedule. Also shows debug info about what was found.")
+async def fn_trigger_rules_now(ctx, params: EmptyParams) -> ActionResult:
+    """Manually trigger rule processing and return detailed debug info."""
+    try:
+        from handlers_rule_runner import _process_user_rules, RULES_COLLECTION as RC
+        uid = ctx.user.imperal_id
+
+        # Show what rules exist
+        rules_page = await ctx.store.query(RC, where={"owner_id": uid, "enabled": True}, limit=20)
+        rule_count = len(rules_page.data)
+        _log.info(f"trigger_rules_now: user={uid} found {rule_count} enabled rule(s)")
+
+        if not rules_page.data:
+            return ActionResult.success(
+                data=build_rule_op("none", "No enabled rules found"),
+                summary=f"No enabled rules found for user {uid}. Create a rule first with create_forward_rule or create_autoreply.",
+            )
+
+        executed = await _process_user_rules(ctx)
+        _log.info(f"trigger_rules_now: executed {executed} action(s)")
+        rule_names = [r.data.get("name", r.id) for r in rules_page.data]
+        summary = (f"Triggered {rule_count} rule(s): {', '.join(rule_names)}. "
+                   f"Executed {executed} action(s).")
+        return ActionResult.success(
+            data=build_rule_op("triggered", summary, enabled=True),
+            summary=summary,
+        )
+    except Exception as e:
+        _log.error(f"trigger_rules_now failed: {e}")
+        return ActionResult.error(f"Rule trigger failed: {e}", retryable=True)

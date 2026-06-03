@@ -12240,6 +12240,133 @@
       "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "trigger_rules_now",
+      "description": "Manually trigger all enabled mail automation rules NOW — checks last 30 inbox emails against all rules and executes matching forward/autoreply actions. Use to test rules or force immediate execution without waiting for the 5-minute schedule. Also shows debug info about what was found.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:email"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Filter/rule create, update, toggle or delete confirmation.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "rule_op",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rule Id",
+            "x-sdl-role": "mail.rule_id"
+          },
+          "op_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Op Enabled",
+            "x-sdl-role": "mail.enabled"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "RuleOpResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "rules.triggered",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
     }
   ],
   "signals": [],
