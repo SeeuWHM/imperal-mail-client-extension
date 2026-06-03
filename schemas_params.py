@@ -98,28 +98,55 @@ class PurgeParams(BaseModel):
     account: str = Field(default="", description="Account email or ID")
 
 
+def _coerce_ids(v) -> str:
+    """Coerce list[str] or single str to comma-separated string of message IDs.
+
+    LLM often passes a list from a previous search/inbox result instead of
+    the raw CSV string. Both formats are accepted and normalised here.
+    """
+    if isinstance(v, list):
+        return ",".join(str(x).strip() for x in v if x)
+    return str(v or "")
+
+
 class BulkParams(BaseModel):
-    message_ids: str = Field(description="Comma-separated list of message IDs")
+    message_ids: str = Field(description="Comma-separated message IDs (or list from previous search/inbox result)")
     account: str = Field(default="", description="Account email or ID")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
 
 
 class BulkMoveParams(BaseModel):
-    message_ids: str = Field(description="Comma-separated list of message IDs")
+    message_ids: str = Field(description="Comma-separated message IDs (or list from previous search/inbox result)")
     from_folder: str = Field(description="Source folder (e.g. INBOX, spam, trash)")
     to_folder: str = Field(description="Destination folder (e.g. spam, INBOX, archive)")
     account: str = Field(default="", description="Account email or ID")
 
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
 
 class BulkStarParams(BaseModel):
-    message_ids: str = Field(description="Comma-separated list of message IDs")
+    message_ids: str = Field(description="Comma-separated message IDs (or list from previous search/inbox result)")
     starred: bool = Field(default=True, description="True to star, False to unstar")
     account: str = Field(default="", description="Account email or ID")
 
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
 
 class BulkPurgeParams(BaseModel):
-    message_ids: str = Field(description="Comma-separated list of message IDs")
+    message_ids: str = Field(description="Comma-separated message IDs (or list from previous search/inbox result)")
     from_folder: str = Field(default="Trash", description="Folder to purge from (default: Trash)")
     account: str = Field(default="", description="Account email or ID")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
 
 
 class ContactsParams(BaseModel):

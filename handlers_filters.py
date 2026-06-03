@@ -109,11 +109,17 @@ async def fn_apply_filter(ctx, params: FilterIdParam) -> ActionResult:
                 f"Filter '{params.filter_id}' not found. Use list_filters() to see your filters.",
                 retryable=False)
 
+        # Build Gmail-compatible query from stored criteria
         parts = []
         if doc_data.get("criteria_from"):
             parts.append(f"from:{doc_data['criteria_from']}")
         if doc_data.get("criteria_subject"):
-            parts.append(doc_data['criteria_subject'])
+            subj = doc_data["criteria_subject"]
+            # Wrap in quotes if multi-word, prefix with subject: for Gmail/Outlook accuracy
+            if " " in subj:
+                parts.append(f'subject:"{subj}"')
+            else:
+                parts.append(f"subject:{subj}")
         query = " ".join(parts) if parts else doc_data.get("name", "")
 
         result = await impl_search(ctx, query=query, max_results=params.max_results)

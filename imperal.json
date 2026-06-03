@@ -6060,7 +6060,7 @@
       "params_schema": {
         "properties": {
           "message_ids": {
-            "description": "Comma-separated list of message IDs",
+            "description": "Comma-separated message IDs (or list from previous search/inbox result)",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6236,7 +6236,7 @@
       "params_schema": {
         "properties": {
           "message_ids": {
-            "description": "Comma-separated list of message IDs",
+            "description": "Comma-separated message IDs (or list from previous search/inbox result)",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6412,7 +6412,7 @@
       "params_schema": {
         "properties": {
           "message_ids": {
-            "description": "Comma-separated list of message IDs",
+            "description": "Comma-separated message IDs (or list from previous search/inbox result)",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6588,7 +6588,7 @@
       "params_schema": {
         "properties": {
           "message_ids": {
-            "description": "Comma-separated list of message IDs",
+            "description": "Comma-separated message IDs (or list from previous search/inbox result)",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6764,7 +6764,7 @@
       "params_schema": {
         "properties": {
           "message_ids": {
-            "description": "Comma-separated list of message IDs",
+            "description": "Comma-separated message IDs (or list from previous search/inbox result)",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6952,7 +6952,7 @@
       "params_schema": {
         "properties": {
           "message_ids": {
-            "description": "Comma-separated list of message IDs",
+            "description": "Comma-separated message IDs (or list from previous search/inbox result)",
             "title": "Message Ids",
             "type": "string"
           },
@@ -7134,7 +7134,7 @@
       "params_schema": {
         "properties": {
           "message_ids": {
-            "description": "Comma-separated list of message IDs",
+            "description": "Comma-separated message IDs (or list from previous search/inbox result)",
             "title": "Message Ids",
             "type": "string"
           },
