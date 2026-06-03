@@ -127,6 +127,7 @@ def _build_folder_tabs(folder: str, active_email: str,
             variant="primary" if key == folder else "ghost",
             size="sm",
             on_click=ui.Call("__panel__inbox", folder=key,
+                              filter_id="",
                               page_cursor="", prev_cursor="", page_num=1,
                               folder_stats_unread=0),
         ))

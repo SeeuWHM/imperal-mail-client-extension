@@ -5,6 +5,7 @@ returns messages in the same format as inbox page messages.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from handlers_inbox_impl import impl_search
 
@@ -56,14 +57,20 @@ async def get_filter_messages(ctx, filter_id: str, max_results: int = 100) -> tu
         if not query:
             return [], doc.data.get("name", "")
 
-        # Search ALL connected accounts (account="" = all)
-        result = await impl_search(ctx, query=query, max_results=max_results, account="")
+        # Search with 15s timeout — prevents panel hanging if Gmail API is slow
+        result = await asyncio.wait_for(
+            impl_search(ctx, query=query, max_results=max_results, account=""),
+            timeout=15.0
+        )
         messages = result.results or []
         # Normalise message_id field
         for m in messages:
             if "id" in m and "message_id" not in m:
                 m["message_id"] = m["id"]
         return messages, doc.data.get("name", "filter")
+    except asyncio.TimeoutError:
+        log.warning(f"filter_view: search timed out for filter {filter_id}")
+        return [], "⏱ Search timeout — try again"
     except Exception as e:
         log.warning(f"filter_view: failed to load filter {filter_id}: {e}")
         return [], ""
