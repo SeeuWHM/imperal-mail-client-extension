@@ -79,19 +79,28 @@ async def get_filter_messages(ctx, filter_id: str, max_results: int = 100) -> tu
 async def render_filter_panel(ctx, filter_id: str,
                                filters_bar, build_email_list_fn,
                                inbox_limit: int = 25, page_num: int = 1):
-    """Render filter view with pagination. page_num controls which page of results to show."""
+    """Render filter view with client-side pagination.
+
+    Fetches ALL results once (up to 200), then slices per page_num.
+    No extra API call on page navigation — fast and correct.
+    """
     from imperal_sdk import ui
 
-    max_res = inbox_limit * page_num  # fetch enough for current page
-    filter_msgs, filter_name = await get_filter_messages(ctx, filter_id, max_results=max_res)
-    total = len(filter_msgs)
+    # Always fetch max — paginate client-side, no extra API calls per page
+    all_msgs, filter_name = await get_filter_messages(ctx, filter_id, max_results=200)
+    total = len(all_msgs)
+    has_more_on_server = total >= 200  # might be more on server beyond our fetch limit
 
-    # Show current page slice
+    # Client-side page slice
     start = inbox_limit * (page_num - 1)
-    page_msgs = filter_msgs[start:start + inbox_limit]
+    page_msgs = all_msgs[start:start + inbox_limit]
+    total_pages = max(1, (total + inbox_limit - 1) // inbox_limit)
+
+    # Count label — honest about server limit
+    count_label = f"{total}+ emails" if has_more_on_server else f"{total} emails"
 
     header = ui.Stack([
-        ui.Text(f"◉ {filter_name} ({total} emails)", variant="caption"),
+        ui.Text(f"◉ {filter_name} — {count_label}", variant="caption"),
         ui.Button("", icon="X", variant="ghost", size="sm",
                   on_click=ui.Call("__panel__inbox", filter_id="",
                                    page_cursor="", page_num=1)),
@@ -105,25 +114,25 @@ async def render_filter_panel(ctx, filter_id: str,
     if filters_bar:
         children.append(filters_bar)
 
-    if not filter_msgs:
+    if not all_msgs:
         children.append(ui.Empty(message=f"No emails match '{filter_name}'", icon="Filter"))
         return ui.Stack(children, gap=1)
 
     email_list = build_email_list_fn(page_msgs, active_email, "INBOX")
     children.append(email_list)
 
-    # Pagination — show if there are more results
-    nav = []
-    if page_num > 1:
-        nav.append(ui.Button("←", variant="ghost", size="sm",
-                             on_click=ui.Call("__panel__inbox", filter_id=filter_id,
-                                             page_num=page_num - 1)))
-    nav.append(ui.Text(str(page_num), variant="caption"))
-    if len(filter_msgs) >= max_res:  # might be more on server
-        nav.append(ui.Button("→", variant="ghost", size="sm",
-                             on_click=ui.Call("__panel__inbox", filter_id=filter_id,
-                                             page_num=page_num + 1)))
-    if nav:
+    # Pagination — only show when there are multiple pages
+    if total_pages > 1:
+        nav = []
+        if page_num > 1:
+            nav.append(ui.Button("←", variant="ghost", size="sm",
+                                 on_click=ui.Call("__panel__inbox", filter_id=filter_id,
+                                                  page_num=page_num - 1)))
+        nav.append(ui.Text(f"{page_num}/{total_pages}", variant="caption"))
+        if page_num < total_pages:
+            nav.append(ui.Button("→", variant="ghost", size="sm",
+                                 on_click=ui.Call("__panel__inbox", filter_id=filter_id,
+                                                  page_num=page_num + 1)))
         children.append(ui.Stack(nav, direction="h", gap=2))
 
     return ui.Stack(children, gap=1)

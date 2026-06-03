@@ -44,19 +44,6 @@ async def build_filters_bar(ctx, active_filter_id: str = "") -> ui.UINode | None
                                  page_num=1),
             ))
 
-        # Clear filter button — only shown when a filter is active
-        if active_filter_id:
-            buttons.append(ui.Button(
-                "✕ clear",
-                variant="ghost",
-                size="sm",
-                on_click=ui.Call("__panel__inbox",
-                                 filter_id="",
-                                 page_cursor="",
-                                 prev_cursor="",
-                                 page_num=1),
-            ))
-
         return ui.Stack([
             ui.Divider(),
             ui.Text("Smart Filters", variant="caption"),
