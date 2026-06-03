@@ -578,7 +578,7 @@
     },
     {
       "name": "status",
-      "description": "List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and current unread count for each.",
+      "description": "List all connected email accounts with their actual email addresses, provider (Google/Microsoft/Yahoo/IMAP), which is active, and unread count. Use when user asks 'what email addresses do I have', 'покажи мои ящики', 'какие имейлы подключены', 'show my accounts'. Returns exact addresses like ignat@webhostmost.com, NOT generic types.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -8730,7 +8730,7 @@
     },
     {
       "name": "create_filter",
-      "description": "Create a smart mailbox (virtual folder) — define search criteria once, apply anytime. Examples: 'LinkedIn emails', 'receipts from shop.com', 'emails about invoices'. After creating, use apply_filter(filter_id) to see matching emails.",
+      "description": "Create a smart mailbox (virtual folder). Can filter by domain (from_contains='linkedin.com'), by exact emails (from_emails=['alice@x.com','bob@y.com']), by subject keyword, or any combination. After creating, use apply_filter to see matching emails.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -8747,9 +8747,17 @@
           },
           "from_contains": {
             "default": "",
-            "description": "Match emails where sender contains this string (e.g. 'linkedin.com')",
+            "description": "Match emails where sender contains this string or domain (e.g. 'linkedin.com', 'migrations@webhostmost.org')",
             "title": "From Contains",
             "type": "string"
+          },
+          "from_emails": {
+            "description": "List of specific sender email addresses — all emails from these addresses match. E.g. ['alice@example.com', 'bob@example.com']",
+            "items": {
+              "type": "string"
+            },
+            "title": "From Emails",
+            "type": "array"
           },
           "subject_contains": {
             "default": "",
@@ -12243,7 +12251,7 @@
     },
     {
       "name": "trigger_rules_now",
-      "description": "Manually trigger all enabled mail automation rules NOW — checks last 30 inbox emails against all rules and executes matching forward/autoreply actions. Use to test rules or force immediate execution without waiting for the 5-minute schedule. Also shows debug info about what was found.",
+      "description": "Manually run ALL mail automation rules right now — use this exact phrase 'trigger_rules_now' to call it. No parameters needed. Scans last 30 inbox emails, applies forward and auto-reply rules, returns how many rules found and actions executed. Use when user says 'trigger rules', 'run rules now', 'запусти правила', 'проверь правила'.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [

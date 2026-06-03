@@ -186,7 +186,7 @@ async def fn_delete_rule(ctx, params: RuleIdParam) -> ActionResult:
 @chat.function("trigger_rules_now", action_type="write", event="rules.triggered",
                effects=["create:email"],
                data_model=RuleOpResult,
-               description="Manually trigger all enabled mail automation rules NOW — checks last 30 inbox emails against all rules and executes matching forward/autoreply actions. Use to test rules or force immediate execution without waiting for the 5-minute schedule. Also shows debug info about what was found.")
+               description="Manually run ALL mail automation rules right now — use this exact phrase 'trigger_rules_now' to call it. No parameters needed. Scans last 30 inbox emails, applies forward and auto-reply rules, returns how many rules found and actions executed. Use when user says 'trigger rules', 'run rules now', 'запусти правила', 'проверь правила'.")
 async def fn_trigger_rules_now(ctx, params: EmptyParams) -> ActionResult:
     """Manually trigger rule processing and return detailed debug info."""
     try:

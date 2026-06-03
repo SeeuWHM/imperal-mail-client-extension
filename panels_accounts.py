@@ -104,13 +104,13 @@ async def _build_filters_tab(ctx) -> ui.UINode:
             id=f.id, title=d.get("name", "filter"),
             subtitle=subtitle,
             badge=ui.Badge("●", color=color),
-            on_click=ui.Call("apply_filter", filter_id=f.id),
+            # NOT clickable — only delete action on the right
             actions=[{"label": "Delete", "icon": "Trash2",
                       "on_click": ui.Call("delete_filter", filter_id=f.id)}],
         ))
 
     return ui.Stack([
-        ui.Text(f"{len(page.data)} smart filter(s) — click to apply", variant="caption"),
+        ui.Text(f"{len(page.data)} smart filter(s)", variant="caption"),
         ui.List(items=items),
     ], gap=2)
 

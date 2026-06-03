@@ -58,24 +58,30 @@ async def _resolve_filter(ctx, filter_id: str) -> tuple:
 @chat.function("create_filter", action_type="write", event="filter.created",
                effects=["create:mail_filter"],
                data_model=MailFilter,
-               description="Create a smart mailbox (virtual folder) — define search criteria once, apply anytime. Examples: 'LinkedIn emails', 'receipts from shop.com', 'emails about invoices'. After creating, use apply_filter(filter_id) to see matching emails.")
+               description="Create a smart mailbox (virtual folder). Can filter by domain (from_contains='linkedin.com'), by exact emails (from_emails=['alice@x.com','bob@y.com']), by subject keyword, or any combination. After creating, use apply_filter to see matching emails.")
 async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
     """Create a named smart mailbox filter with search criteria."""
     try:
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        # Normalise specific emails list
+        from_emails = [e.strip().lower() for e in (params.from_emails or []) if e.strip()]
         doc = await ctx.store.create(FILTERS_COLLECTION, {
             "owner_id": ctx.user.imperal_id,
             "name": params.name.strip()[:60],
             "criteria_from": params.from_contains.strip(),
+            "criteria_from_emails": from_emails,
             "criteria_subject": params.subject_contains.strip(),
             "criteria_folder": params.folder.strip(),
             "color": params.color or "blue",
             "enabled": True,
             "created_at": now,
         })
+        summary = f"Smart filter '{params.name}' created"
+        if from_emails:
+            summary += f" — watching: {', '.join(from_emails)}"
         return ActionResult.success(
             data=build_mail_filter(doc.id, doc.data),
-            summary=f"Smart filter '{params.name}' created — use apply_filter to see matching emails.",
+            summary=summary + ". Use apply_filter to see matching emails.",
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
@@ -112,15 +118,19 @@ async def fn_apply_filter(ctx, params: FilterIdParam) -> ActionResult:
 
         # Build Gmail-compatible query from stored criteria
         parts = []
-        if doc_data.get("criteria_from"):
+        # Specific email addresses → {from:a@x.com OR from:b@y.com}
+        from_emails = doc_data.get("criteria_from_emails") or []
+        if from_emails:
+            if len(from_emails) == 1:
+                parts.append(f"from:{from_emails[0]}")
+            else:
+                or_clause = " OR ".join(f"from:{e}" for e in from_emails)
+                parts.append(f"{{{or_clause}}}")
+        elif doc_data.get("criteria_from"):
             parts.append(f"from:{doc_data['criteria_from']}")
         if doc_data.get("criteria_subject"):
             subj = doc_data["criteria_subject"]
-            # Wrap in quotes if multi-word, prefix with subject: for Gmail/Outlook accuracy
-            if " " in subj:
-                parts.append(f'subject:"{subj}"')
-            else:
-                parts.append(f"subject:{subj}")
+            parts.append(f'subject:"{subj}"' if " " in subj else f"subject:{subj}")
         query = " ".join(parts) if parts else doc_data.get("name", "")
 
         result = await impl_search(ctx, query=query, max_results=params.max_results)

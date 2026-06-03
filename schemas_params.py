@@ -208,7 +208,8 @@ class ComposeSendParams(BaseModel):
 class CreateFilterParams(BaseModel):
     """Create a smart mailbox filter (virtual folder based on search criteria)."""
     name: str = Field(description="Filter name shown as smart folder label")
-    from_contains: str = Field(default="", description="Match emails where sender contains this string (e.g. 'linkedin.com')")
+    from_contains: str = Field(default="", description="Match emails where sender contains this string or domain (e.g. 'linkedin.com', 'migrations@webhostmost.org')")
+    from_emails: list[str] = Field(default_factory=list, description="List of specific sender email addresses — all emails from these addresses match. E.g. ['alice@example.com', 'bob@example.com']")
     subject_contains: str = Field(default="", description="Match emails where subject contains this string")
     folder: str = Field(default="", description="Restrict to this folder (default: search all)")
     color: str = Field(default="blue", description="Badge color: blue/green/red/yellow/purple/orange")
