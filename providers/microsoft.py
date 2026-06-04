@@ -12,6 +12,7 @@ from .helpers import (
     _refresh_token_if_needed,
     _save_last_read, _update_read_in_cache,
     _strip_html, _norm_graph_msg,
+    MS_GRAPH_BASE,
 )
 
 log = logging.getLogger(__name__)
@@ -154,14 +155,24 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
 
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
-        resp = await _graph_get(ctx, "/me/messages", acc, params={
-            "$search": f'"{query}"', "$top": min(max_results, 250),
-            "$select": "id,subject,from,receivedDateTime,isRead",
-        })
+        acc = await _refresh_token_if_needed(ctx, acc)
+        # ConsistencyLevel: eventual is required for $count with $search in Graph API
+        resp = await ctx.http.get(
+            f"{MS_GRAPH_BASE}/me/messages",
+            headers={
+                "Authorization": f"Bearer {acc['access_token']}",
+                "ConsistencyLevel": "eventual",
+            },
+            params={
+                "$search": f'"{query}"',
+                "$top": min(max_results, 250),
+                "$count": "true",
+                "$select": "id,subject,from,receivedDateTime,isRead",
+            },
+        )
         resp.raise_for_status()
         data = resp.json()
         results = [_norm_graph_msg(m) for m in data.get("value", [])]
-        # @odata.count is present when $count=true; fall back to len(results)
         total = data.get("@odata.count", len(results))
         return self.ok(query=query, email=email_addr, results=results, total=total)
 

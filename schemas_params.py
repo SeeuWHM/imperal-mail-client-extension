@@ -36,7 +36,7 @@ class MessageIdParams(BaseModel):
 
 class SearchParams(BaseModel):
     query: str = Field(description="Search query. Gmail syntax: from:x@y.com, subject:keyword, after:2024/01/01, before:2025/01/01, label:name. Free-text for Outlook/IMAP.")
-    max_results: int = Field(default=20, description="Max results (1-200). For 'find first ever / oldest' use oldest_first=true + max_results=1.")
+    max_results: int = Field(default=50, description="Max results to fetch (1-200). Use 200 when counting all emails from a sender or doing bulk operations. Default 50 is enough for showing recent results.")
     oldest_first: bool = Field(default=False, description="Sort oldest first — use to find the first/earliest email matching the query.")
     folder: str = Field(default="", description="IMAP only: folder to search. Gmail/Microsoft always search all folders.")
     account: str = Field(default="", description="Account email or ID")
@@ -228,7 +228,7 @@ class UpdateFilterParams(BaseModel):
 class FilterIdParam(BaseModel):
     """Single filter ID selector."""
     filter_id: str = Field(description="Filter ID from list_filters()")
-    max_results: int = Field(default=20, description="Max emails to return when applying filter")
+    max_results: int = Field(default=100, description="Max emails to return when applying filter (1-200)")
 
 
 # ── Automation rules ──────────────────────────────────────────────────────────
