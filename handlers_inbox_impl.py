@@ -104,6 +104,7 @@ async def impl_search(ctx, query: str, max_results: int = 20,
 
     all_results: list[dict] = []
     seen_ids: set[str] = set()
+    total_across_providers = 0  # sum of provider-reported totals (includes resultSizeEstimate for Gmail)
     for acc in accounts:
         try:
             provider = get_provider(acc)
@@ -111,6 +112,8 @@ async def impl_search(ctx, query: str, max_results: int = 20,
             if folder and acc.get("provider") == "imap":
                 kw["folder"] = folder
             result = await provider.search(ctx, acc, **kw)
+            # Accumulate provider-reported total (Gmail: resultSizeEstimate, IMAP: real count)
+            total_across_providers += int(result.get("total", 0) or 0)
             for msg in result.get("results", []) or []:
                 mid = msg.get("message_id") or msg.get("id") or ""
                 key = f"{acc.get('email','')}/{mid}" if mid else ""
@@ -142,8 +145,11 @@ async def impl_search(ctx, query: str, max_results: int = 20,
                     return _EPOCH
         all_results.sort(key=_sort_key)
 
+    # Use provider totals (incl. Gmail resultSizeEstimate) as authoritative count.
+    # Fall back to len(all_results) only if providers returned 0.
+    final_total = max(total_across_providers, len(all_results))
     return SearchResult(query=query, results=all_results[:clamped],
-                        total=len(all_results))
+                        total=final_total)
 
 
 async def impl_folder(ctx, folder: str, cursor: str = "",
