@@ -109,30 +109,71 @@ def _sync_imap_search(email_addr: str, host: str, port: int, query: str, max_res
         if ql in ("is:unread", "unread"): return "UNSEEN"
         if ql in ("is:read",   "read"):   return "SEEN"
         return f'TEXT "{q.strip()}"'
+
+    # Search across INBOX + common Sent/Archive folders for full coverage
+    _SEARCH_FOLDERS = [
+        "INBOX",
+        "Sent", "Sent Items", "INBOX.Sent", "[Gmail]/Sent Mail",
+        "Archive", "[Gmail]/All Mail",
+    ]
+
     try:
-        imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
-        imap.select("INBOX")
-        _, uid_data = imap.uid("SEARCH", _map_query(query))
-        uid_list = uid_data[0].split() if uid_data and uid_data[0] else []
-        recent   = uid_list[-max_results:][::-1]
+        imap    = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        imap_q  = _map_query(query)
+        all_hits: list[tuple[str, bytes]] = []  # (folder, uid_bytes)
+        seen_subjects: set[str] = set()
+
+        for folder in _SEARCH_FOLDERS:
+            try:
+                r, _ = imap.select(f'"{folder}"', readonly=True)
+                if r != "OK":
+                    continue
+                _, uid_data = imap.uid("SEARCH", imap_q)
+                uids = uid_data[0].split() if uid_data and uid_data[0] else []
+                for uid in uids:
+                    all_hits.append((folder, uid))
+            except Exception:
+                continue
+
+        # Sort by UID desc (most recent first), take top max_results
+        # UIDs are per-folder so we fetch headers to sort by date properly
+        total_found = len(all_hits)
+        recent_hits = all_hits[-max_results:][::-1]
+
         messages = []
-        for uid in recent:
-            _, msg_data = imap.uid("FETCH", uid, "(RFC822.HEADER)")
-            if not msg_data or not msg_data[0]: continue
-            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
-            if not raw: continue
-            msg = email_lib.message_from_bytes(raw)
-            messages.append({
-                "id":      uid.decode(),
-                "subject": _decode_header(msg.get("Subject", "(no subject)")),
-                "from":    _decode_header(msg.get("From", "unknown")),
-                "date":    msg.get("Date", ""),
-            })
+        for folder, uid in recent_hits:
+            try:
+                imap.select(f'"{folder}"', readonly=True)
+                _, msg_data = imap.uid("FETCH", uid, "(RFC822.HEADER)")
+                if not msg_data or not msg_data[0]:
+                    continue
+                raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+                if not raw:
+                    continue
+                msg     = email_lib.message_from_bytes(raw)
+                subject = _decode_header(msg.get("Subject", "(no subject)"))
+                sender  = _decode_header(msg.get("From", "unknown"))
+                date    = msg.get("Date", "")
+                # Deduplicate by subject+sender (same message can appear in multiple folders)
+                dedup_key = f"{subject}|{sender}"
+                if dedup_key in seen_subjects:
+                    total_found -= 1
+                    continue
+                seen_subjects.add(dedup_key)
+                messages.append({
+                    "id":      uid.decode(),
+                    "subject": subject,
+                    "from":    sender,
+                    "date":    date,
+                })
+            except Exception:
+                continue
+
         imap.logout()
-        return messages
+        return messages, total_found
     except Exception as e:
         log.warning(f"IMAP search failed: {e}")
-        return None
+        return None, 0
 
 
 def _sync_imap_folder(email_addr: str, host: str, port: int, folder_name: str,

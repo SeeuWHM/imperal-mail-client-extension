@@ -155,12 +155,15 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         resp = await _graph_get(ctx, "/me/messages", acc, params={
-            "$search": f'"{query}"', "$top": min(max_results, 20),
+            "$search": f'"{query}"', "$top": min(max_results, 250),
             "$select": "id,subject,from,receivedDateTime,isRead",
         })
         resp.raise_for_status()
-        results = [_norm_graph_msg(m) for m in resp.json().get("value", [])]
-        return self.ok(query=query, email=email_addr, results=results, total=len(results))
+        data = resp.json()
+        results = [_norm_graph_msg(m) for m in data.get("value", [])]
+        # @odata.count is present when $count=true; fall back to len(results)
+        total = data.get("@odata.count", len(results))
+        return self.ok(query=query, email=email_addr, results=results, total=total)
 
     async def folder(self, ctx: Context, acc: dict, folder_name: str, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")

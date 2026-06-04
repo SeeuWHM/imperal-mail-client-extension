@@ -238,12 +238,14 @@ class ImapMailProvider(BaseMailProvider):
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
         args = self._imap_args(acc)
-        results = await asyncio.to_thread(
+        results, total_found = await asyncio.to_thread(
             _sync_imap_search, email_addr, args["host"], args["port"], query, max_results,
             password=args["password"], access_token=args["access_token"])
         if results is None:
             return self.err(f"IMAP search failed — could not connect to {args['host']}.")
-        return self.ok(query=query, email=email_addr, results=results, total=len(results))
+        # total_found = all matching UIDs across searched folders (before page-slice)
+        total = max(total_found, len(results))
+        return self.ok(query=query, email=email_addr, results=results, total=total)
 
     async def folder(self, ctx: Context, acc: dict, folder_name: str, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")

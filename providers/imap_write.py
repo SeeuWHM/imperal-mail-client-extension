@@ -151,19 +151,53 @@ def _sync_imap_flag_op(email_addr: str, host: str, port: int, message_id: str,
         return False, str(e)
 
 
+_SENT_FOLDER_CANDIDATES = (
+    "Sent", "Sent Items", "Sent Mail", "INBOX/Sent", "INBOX.Sent", "[Gmail]/Sent Mail",
+)
+
+
+def _discover_sent_folder(imap) -> str | None:
+    """List all IMAP folders and return the first one that looks like 'Sent'."""
+    try:
+        _, folder_list = imap.list()
+        for item in (folder_list or []):
+            if not item:
+                continue
+            raw = item.decode() if isinstance(item, bytes) else str(item)
+            # IMAP LIST response: (* (\HasNoChildren) "/" "Sent")
+            parts = raw.rsplit('"', 1)
+            name  = parts[-1].strip().strip('"') if len(parts) > 1 else ""
+            if not name:
+                # Fallback: last space-separated token
+                name = raw.split()[-1].strip('"')
+            if "sent" in name.lower():
+                return name
+    except Exception:
+        pass
+    return None
+
+
 def _save_to_imap_sent(email_addr: str, imap_host: str, imap_port: int, msg_bytes: bytes,
                        *, password: str = "", access_token: str = "") -> None:
     try:
-        import imaplib as _imap
         imap = _imap_connect_auth(email_addr, imap_host, imap_port, password=password, access_token=access_token)
-        for folder in ("Sent", "Sent Items", "[Gmail]/Sent Mail", "INBOX.Sent"):
+        # First try well-known names, then fall back to autodiscovery
+        candidates = list(_SENT_FOLDER_CANDIDATES)
+        discovered = _discover_sent_folder(imap)
+        if discovered and discovered not in candidates:
+            candidates.insert(0, discovered)
+        for folder in candidates:
             try:
                 result = imap.append(f'"{folder}"', "(\\Seen)",
                                      imaplib.Time2Internaldate(time.time()), msg_bytes)
-                if result[0] == "OK": break
-            except Exception: continue
-        try: imap.logout()
-        except Exception: pass
+                if result[0] == "OK":
+                    break
+            except Exception:
+                continue
+        try:
+            imap.logout()
+        except Exception:
+            pass
     except Exception as e:
         log.debug(f"_save_to_imap_sent non-critical: {e}")
 

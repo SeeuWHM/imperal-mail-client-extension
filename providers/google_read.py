@@ -150,9 +150,12 @@ class GoogleReadMixin:
 
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
-        resp = await _api_get(ctx, "messages", acc, params={"q": query, "maxResults": min(max_results, 20)})
+        resp = await _api_get(ctx, "messages", acc, params={"q": query, "maxResults": min(max_results, 500)})
         resp.raise_for_status()
-        refs = resp.json().get("messages", [])
+        body = resp.json()
+        refs = body.get("messages", [])
+        # resultSizeEstimate is Gmail's approximate total count for the query
+        estimate = body.get("resultSizeEstimate", 0)
         if not refs:
             return self.ok(query=query, email=email_addr, results=[], total=0)
         results = []
@@ -171,7 +174,9 @@ class GoogleReadMixin:
                 "date":    _header(headers, "Date") or "",
                 "unread":  "UNREAD" in data.get("labelIds", []),
             })
-        return self.ok(query=query, email=email_addr, results=results, total=len(results))
+        # Use the larger of estimate vs actual fetched count (estimate can be 0 on small results)
+        total = max(estimate, len(results))
+        return self.ok(query=query, email=email_addr, results=results, total=total)
 
     async def folder(self, ctx: Context, acc: dict, folder_name: str, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")
