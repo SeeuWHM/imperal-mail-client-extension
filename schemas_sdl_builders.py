@@ -125,7 +125,9 @@ def build_inbox_page(r: InboxPageResult, folder: str = "inbox") -> InboxPage:
 def build_search_page(r: SearchResult) -> SearchPage:
     """Convert SearchResult → SearchPage SDL entity list."""
     items = [build_email_preview(m) for m in (r.results or [])]
-    return SearchPage(items=items, total=r.total, has_more=False, query=r.query or "")
+    # has_more=True when total > fetched count (provider estimate says there are more)
+    has_more = r.total > len(items)
+    return SearchPage(items=items, total=r.total, has_more=has_more, query=r.query or "")
 
 
 def build_email_thread(r: "_ThreadView") -> EmailThread:

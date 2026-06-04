@@ -55,7 +55,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("search", action_type="read",
                data_model=SearchPage,
-               description="Find emails — searches ALL connected accounts by default (leave account= empty). Gmail syntax: from:x@domain.com, subject:keyword, after:2024/01/01. For 'find all from Google and mark read + archive': search → then pass ALL found message_id values as list to bulk_mark_read AND bulk_archive in separate calls. Use max_results=100+ for large operations. For oldest email ever: oldest_first=true + max_results=1.")
+               description="Find emails — searches ALL connected accounts by default (leave account= empty). Gmail syntax: from:sender@domain.com or from:\"Display Name\", subject:keyword, after:2024/01/01. IMPORTANT: For counting ('how many emails from X?') always use max_results=200 to get accurate total. Default max_results=50 is for showing recent results only. The total field in the response is the real count (uses Gmail resultSizeEstimate). For bulk operations (mark all read, archive all): use max_results=200 then pass ALL message_ids. For oldest email ever: oldest_first=true + max_results=1.")
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     """Find specific emails by content, sender, or subject."""
     try:

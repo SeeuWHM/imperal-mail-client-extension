@@ -77,7 +77,7 @@ async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
     raise RuntimeError(last_err)
 
 
-async def impl_search(ctx, query: str, max_results: int = 20,
+async def impl_search(ctx, query: str, max_results: int = 50,
                       folder: str = "", account: str = "",
                       oldest_first: bool = False) -> SearchResult:
     """Search FULL mailbox. Gmail/Microsoft search all mail; IMAP uses folder param.

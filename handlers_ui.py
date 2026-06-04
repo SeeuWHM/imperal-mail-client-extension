@@ -15,7 +15,7 @@ def _inbox_ui(messages: list, folder: str = "inbox") -> ui.UINode:
             "date":    (m.get("date") or "")[:10],
             "status":  "unread" if m.get("unread") else "read",
         }
-        for m in messages[:15]
+        for m in messages[:25]
     ]
     return ui.DataTable(
         columns=[
@@ -65,7 +65,7 @@ def _search_ui(results: list, query: str) -> ui.UINode:
             "subject": (m.get("subject") or "(no subject)")[:55],
             "date":    (m.get("date") or "")[:10],
         }
-        for m in results[:15]
+        for m in results[:25]
     ]
     return ui.DataTable(
         columns=[
