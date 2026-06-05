@@ -12,8 +12,6 @@ import logging
 import time as _time
 from datetime import datetime, timezone
 
-from imperal_sdk.chat.action_result import ActionResult
-
 from app import ext
 
 from cache_model_defs import InboxMessages
@@ -22,7 +20,6 @@ from providers.helpers import (
     _all_accounts, _inbox_messages_key, _refresh_token_if_needed,
     COLLECTION, INBOX_FETCH_SIZE, encode_cursor,
 )
-from schemas import PerAccountUnread
 
 log = logging.getLogger("mail")
 
@@ -146,64 +143,61 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
             })
             unread_total += int(acc.get("unread_count", 0) or 0)
 
-    # Build per_account models — only fields the kernel schema knows: email, unread_count, is_active
-    from schemas import PerAccountUnread
-    pa_models = [
-        PerAccountUnread(
-            email=p["email"],
-            unread_count=p.get("unread_count", 0),
-            is_active=p.get("is_active", False),
-        )
-        for p in per_account
-    ]
+    # Build per_account as plain dicts — no Pydantic objects, no model_dump()
+    active_account = ""
+    pa_list = []
+    for p in per_account:
+        email = str(p.get("email") or "")
+        unread_count = int(p.get("unread_count") or 0)
+        is_active = bool(p.get("is_active"))
+        if is_active and not active_account:
+            active_account = email
+        pa_list.append({"email": email, "unread_count": unread_count, "is_active": is_active})
+    if not active_account and pa_list:
+        active_account = pa_list[0]["email"]
 
-    # active account — for classifier routing (which account to use by default)
-    active_account = next(
-        (p.email for p in pa_models if p.is_active), pa_models[0].email if pa_models else ""
-    )
-
-    # counts of configured filters and rules (free via ctx.store.count per SDK docs)
+    # counts of configured filters and rules via ctx.store.query
     filter_count = 0
     rule_count = 0
     try:
-        filter_count = int(await ctx.store.count("mail_filters",
-                                                  where={"owner_id": ctx.user.imperal_id}) or 0)
+        fpage = await ctx.store.query("mail_filters",
+                                      where={"owner_id": ctx.user.imperal_id}, limit=1)
+        filter_count = int(getattr(fpage, "total", 0) or 0)
     except Exception:
         pass
     try:
-        rule_count = int(await ctx.store.count("mail_rules",
-                                                where={"owner_id": ctx.user.imperal_id,
-                                                       "enabled": True}) or 0)
+        rpage = await ctx.store.query("mail_rules",
+                                      where={"owner_id": ctx.user.imperal_id,
+                                             "enabled": True}, limit=1)
+        rule_count = int(getattr(rpage, "total", 0) or 0)
     except Exception:
         pass
 
     return {"response": {
-        "unread_total": unread_total,
-        "accounts_connected": len(accounts),
-        "per_account": [p.model_dump() for p in pa_models],
-        "active_account": active_account,
-        "filter_count": filter_count,
-        "rule_count": rule_count,
+        "unread_total": int(unread_total),
+        "accounts_connected": int(len(accounts)),
+        "per_account": pa_list,
+        "active_account": str(active_account),
+        "filter_count": int(filter_count),
+        "rule_count": int(rule_count),
     }}
 
 
 @ext.tool("skeleton_alert_mail_inbox_summary",
-          description="Alert check for new unread emails.")
-async def skeleton_alert_mail_inbox_summary(ctx) -> ActionResult:
-    """Lightweight alert check — reads last-known unread counts from store (no API calls).
-    The kernel uses the returned unread_total for badge display and push-notification gating."""
+          description="Alert check for new unread emails — fires when unread count changes.")
+async def skeleton_alert_mail_inbox_summary(ctx,
+                                             old: dict | None = None,
+                                             new: dict | None = None) -> dict:
+    """Compare old vs new skeleton snapshot — return notification string if unread changed."""
     try:
-        accounts = await _all_accounts(ctx)
-        unread_total = sum(int(a.get("unread_count", 0)) for a in accounts)
-        per_account  = [
-            {"email": a.get("email", ""), "unread_count": int(a.get("unread_count", 0))}
-            for a in accounts
-        ]
-        summary = f"{unread_total} unread" if unread_total else "0 unread"
-        return ActionResult.success(
-            data={"unread_total": unread_total, "per_account": per_account},
-            summary=summary,
-        )
+        if not new:
+            return {"response": ""}
+        new_unread = int(new.get("unread_total") or 0)
+        old_unread = int((old or {}).get("unread_total") or 0)
+        if new_unread > old_unread:
+            diff = new_unread - old_unread
+            return {"response": f"{diff} new unread email{'s' if diff != 1 else ''}"}
+        return {"response": ""}
     except Exception as e:
         log.debug("skeleton_alert failed: %s", e)
-        return ActionResult.success(data={"unread_total": 0, "per_account": []}, summary="")
+        return {"response": ""}

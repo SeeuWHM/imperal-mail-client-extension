@@ -244,20 +244,13 @@ class PerAccountUnread(BaseModel):
 class InboxSummary(BaseModel):
     """skeleton_refresh_mail_inbox_summary — 6-field classifier envelope for mail.
 
-    Docs rule: only first 6 top-level fields visible to classifier. Field order matters.
-    1. unread_total     — total unread across all accounts (primary routing signal)
-    2. accounts_connected — how many accounts linked
-    3. per_account      — list[≤3] expands inline: email+unread+total+is_active per account
-    4. active_account   — which account is currently active (default for operations)
-    5. filter_count     — number of saved smart filters (routes filter requests)
-    6. rule_count       — number of enabled automation rules (routes automation requests)
-    recent_messages NOT included: list[25] collapses to 'list[25]' hint (docs rule).
-    Cache warmup (25 messages → ctx.cache) happens separately inside the skeleton handler.
+    per_account uses list[dict] (not list[PerAccountUnread]) so the kernel never
+    runs nested Pydantic validation on per-account items — plain dicts only.
     """
 
     unread_total: int = 0
     accounts_connected: int = 0
-    per_account: list[PerAccountUnread] = Field(default_factory=list)
+    per_account: list[dict] = Field(default_factory=list)
     active_account: str = ""
     filter_count: int = 0
     rule_count: int = 0
