@@ -154,7 +154,7 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
     email = target.get("email", "")
     await ctx.store.delete(COLLECTION, target.id)
     await _invalidate_first_page(ctx, email, "INBOX")
-    return AccountDisconnected(disconnected=True, email=email, remaining=len(docs) - 1)
+    return AccountDisconnected(disconnected=True, email=email, remaining=len(docs.data) - 1)
 
 
 # ─── @chat.function wrappers ──────────────────────────────────────────── #

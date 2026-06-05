@@ -159,14 +159,14 @@ async def _all_accounts(ctx: Context) -> list[dict]:
 
 async def _active_account(ctx: Context, account_id: str = "") -> Optional[dict]:
     docs = await ctx.store.query(COLLECTION)
-    if not docs: return None
+    if not docs.data: return None
     if account_id:
-        for d in docs:
-            if d.id == account_id or d.get("email") == account_id:
+        for d in docs.data:
+            if d.id == account_id or d.data.get("email") == account_id:
                 return {"doc_id": d.id, **d.data}
         return None
-    for d in docs:
-        if d.get("is_active"): return {"doc_id": d.id, **d.data}
+    for d in docs.data:
+        if d.data.get("is_active"): return {"doc_id": d.id, **d.data}
     return {"doc_id": docs.data[0].id, **docs.data[0].data}
 
 

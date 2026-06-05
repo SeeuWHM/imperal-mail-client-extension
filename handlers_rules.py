@@ -10,13 +10,10 @@ import logging
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
-import logging as _logging
 from schemas_params import (
     CreateForwardRuleParams, CreateAutoreplyParams,
     RuleIdParam, ToggleRuleParams, EmptyParams,
 )
-
-_log = _logging.getLogger("mail")
 from schemas_sdl_builders_rules import (
     MailRule, MailRulePage, RuleOpResult,
     build_mail_rule, build_mail_rule_page, build_rule_op,
@@ -196,7 +193,7 @@ async def fn_trigger_rules_now(ctx, params: EmptyParams) -> ActionResult:
         # Show what rules exist
         rules_page = await ctx.store.query(RC, where={"owner_id": uid, "enabled": True}, limit=20)
         rule_count = len(rules_page.data)
-        _log.info(f"trigger_rules_now: user={uid} found {rule_count} enabled rule(s)")
+        log.info(f"trigger_rules_now: user={uid} found {rule_count} enabled rule(s)")
 
         if not rules_page.data:
             return ActionResult.success(
@@ -205,7 +202,7 @@ async def fn_trigger_rules_now(ctx, params: EmptyParams) -> ActionResult:
             )
 
         executed = await _process_user_rules(ctx)
-        _log.info(f"trigger_rules_now: executed {executed} action(s)")
+        log.info(f"trigger_rules_now: executed {executed} action(s)")
         rule_names = [r.data.get("name", r.id) for r in rules_page.data]
         summary = (f"Triggered {rule_count} rule(s): {', '.join(rule_names)}. "
                    f"Executed {executed} action(s).")
@@ -214,5 +211,5 @@ async def fn_trigger_rules_now(ctx, params: EmptyParams) -> ActionResult:
             summary=summary,
         )
     except Exception as e:
-        _log.error(f"trigger_rules_now failed: {e}")
+        log.error(f"trigger_rules_now failed: {e}")
         return ActionResult.error(f"Rule trigger failed: {e}", retryable=True)
