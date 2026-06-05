@@ -152,7 +152,7 @@ async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
 @chat.function("bulk_archive", action_type="write", event="bulk_archived",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Archive multiple emails in one operation. Pass message_ids as a comma-separated string.")
+               description="Archive multiple emails in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails).")
 async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
     """Archive multiple emails in one operation."""
     try:
@@ -169,7 +169,7 @@ async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
 @chat.function("bulk_delete", action_type="write", event="bulk_deleted",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Move multiple emails to Trash in one operation. Pass message_ids as a comma-separated string.")
+               description="Move multiple emails to Trash in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails).")
 async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
     """Move multiple emails to Trash in one operation."""
     try:
@@ -186,7 +186,7 @@ async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
 @chat.function("bulk_mark_read", action_type="write", event="bulk_marked_read",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Mark multiple emails as read in one operation. Pass message_ids as a comma-separated string.")
+               description="Mark multiple emails as read in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails). To act on 'all' emails in a folder, list that folder first (inbox()/folder() with the account) and pass every returned message_id.")
 async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
     """Mark multiple emails as read in one operation."""
     try:
@@ -203,7 +203,7 @@ async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
 @chat.function("bulk_mark_unread", action_type="write", event="bulk_marked_unread",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Mark multiple emails as unread in one operation. Pass message_ids as a comma-separated string.")
+               description="Mark multiple emails as unread in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails). To act on 'all' emails in a folder, list that folder first (inbox()/folder() with the account) and pass every returned message_id.")
 async def fn_bulk_mark_unread(ctx, params: BulkParams) -> ActionResult:
     """Mark multiple emails as unread in one operation."""
     try:
@@ -220,7 +220,7 @@ async def fn_bulk_mark_unread(ctx, params: BulkParams) -> ActionResult:
 @chat.function("bulk_move", action_type="write", event="bulk_moved",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Move multiple emails from one folder to another in one batch. Pass message_ids as comma-separated string. Examples: move spam to INBOX, move selected to archive, move trash items back to INBOX.")
+               description="Move multiple emails from one folder to another in one batch. Pass message_ids as comma-separated string. Examples: move spam to INBOX, move selected to archive, move trash items back to INBOX. Get the message_ids first via inbox()/folder()/search() on the SAME mailbox and pass account= for that mailbox (ids are per-account).")
 async def fn_bulk_move(ctx, params: BulkMoveParams) -> ActionResult:
     """Move multiple emails from one folder to another in one batch."""
     try:
@@ -239,7 +239,7 @@ async def fn_bulk_move(ctx, params: BulkMoveParams) -> ActionResult:
 @chat.function("bulk_star", action_type="write", event="bulk_starred",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Star or unstar multiple emails in one batch. Pass message_ids as comma-separated string. Use starred=true to star, starred=false to unstar.")
+               description="Star or unstar multiple emails in one batch. Pass message_ids as comma-separated string. Use starred=true to star, starred=false to unstar. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails).")
 async def fn_bulk_star(ctx, params: BulkStarParams) -> ActionResult:
     """Star or unstar multiple emails in one batch."""
     try:
@@ -258,7 +258,7 @@ async def fn_bulk_star(ctx, params: BulkStarParams) -> ActionResult:
 @chat.function("bulk_purge", action_type="destructive", event="bulk_purged",
                effects=["delete:email"],
                data_model=BulkMailOpResult,
-               description="Permanently delete multiple emails in one batch — cannot be recovered. Use delete() or bulk_delete() first if unsure. Pass message_ids as comma-separated string.")
+               description="Permanently delete multiple emails in one batch — cannot be recovered. Use delete() or bulk_delete() first if unsure. Pass message_ids as comma-separated string. Get the message_ids first via inbox()/folder()/search() on the SAME mailbox and pass account= for that mailbox (ids are per-account).")
 async def fn_bulk_purge(ctx, params: BulkPurgeParams) -> ActionResult:
     """Permanently delete multiple emails in one batch — irreversible."""
     try:
