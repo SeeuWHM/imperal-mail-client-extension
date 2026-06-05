@@ -72,6 +72,18 @@ async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
             account_email = acc.get("email", "") if acc else ""
         # Normalise specific emails list
         from_emails = [e.strip().lower() for e in (params.from_emails or []) if e.strip()]
+        # Idempotency — never create a duplicate filter with the same name for the
+        # same account (LLM/chain retries were producing two identical filters).
+        name_norm = params.name.strip().lower()
+        existing = await ctx.store.query(FILTERS_COLLECTION,
+                                         where={"owner_id": ctx.user.imperal_id}, limit=50)
+        for d in existing.data:
+            if (d.data.get("name", "").strip().lower() == name_norm and
+                    (d.data.get("account_email", "") or "") == account_email):
+                return ActionResult.success(
+                    data=build_mail_filter(d.id, d.data),
+                    summary=f"Smart filter '{d.data.get('name')}' already exists — reusing it.",
+                )
         doc = await ctx.store.create(FILTERS_COLLECTION, {
             "owner_id": ctx.user.imperal_id,
             "account_email": account_email,
@@ -205,7 +217,7 @@ async def fn_delete_filter(ctx, params: FilterIdParam) -> ActionResult:
 @chat.function("set_folder_prefs", action_type="write", event="prefs.updated",
                effects=["update:mail_prefs"],
                data_model=MailPrefsResult,
-               description="Choose which mail folders are shown in your inbox view. Pass an ordered list like ['INBOX','Starred','Work','Receipts']. Pass empty list to show all folders.")
+               description="Set which mail folders are shown in the inbox view. WARNING: this REPLACES the entire visible set — it does NOT add to it. When the user asks to ADD a folder (e.g. 'add starred'), you MUST first call get_folder_prefs to read the current visible folders, then pass the existing list PLUS the new one. Always include 'INBOX' unless the user explicitly asks to hide it. Pass an ordered list like ['INBOX','starred','sent']. Pass an empty list to reset to showing ALL folders.")
 async def fn_set_folder_prefs(ctx, params: SetFolderPrefsParams) -> ActionResult:
     """Set which mail folders are visible in the inbox panel."""
     try:

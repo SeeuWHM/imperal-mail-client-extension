@@ -24,6 +24,18 @@ FOLDER_LABELS: dict = {
     "unread":  "UNREAD",
 }
 
+# Upper bound for accurate search counting via id-only pagination. Gmail's
+# resultSizeEstimate is unreliable, so search() counts real message IDs page by
+# page (500/page). The cap bounds latency on very large result sets — beyond it
+# the reported total is the cap (a "≥cap" floor), which is plenty for routing.
+_SEARCH_COUNT_CAP = 2000
+
+# Max concurrent per-message metadata fetches when building search previews.
+# Gmail has no batch in this client, so previews are fetched one HTTP call each;
+# doing them serially turned a 200-result filter into 200 round-trips (the panel
+# timeout). Bounded concurrency keeps it fast without tripping Gmail rate limits.
+_META_CONCURRENCY = 12
+
 
 class GoogleReadMixin:
 
@@ -150,32 +162,57 @@ class GoogleReadMixin:
 
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
-        resp = await _api_get(ctx, "messages", acc, params={"q": query, "maxResults": min(max_results, 500)})
+        page_size  = min(max(max_results, 1), 500)
+        # First page (ids only). We NEVER trust resultSizeEstimate — it is a wildly
+        # inaccurate estimate (e.g. reports 15 for a query Gmail itself counts as 50).
+        resp = await _api_get(ctx, "messages", acc, params={
+            "q": query, "maxResults": page_size,
+            "fields": "messages/id,nextPageToken",
+        })
         resp.raise_for_status()
         body = resp.json()
-        refs = body.get("messages", [])
-        # resultSizeEstimate is Gmail's approximate total count for the query
-        estimate = body.get("resultSizeEstimate", 0)
+        refs = body.get("messages", []) or []
         if not refs:
             return self.ok(query=query, email=email_addr, results=[], total=0)
-        results = []
-        for ref in refs:
-            meta = await _api_get(ctx, f"messages/{ref['id']}", acc, params={
-                "format": "metadata", "metadataHeaders": ["From", "Subject", "Date"],
+
+        # Accurate total: walk nextPageToken counting real message IDs (id-only,
+        # no metadata fetch — cheap), bounded by _SEARCH_COUNT_CAP.
+        total      = len(refs)
+        page_token = body.get("nextPageToken")
+        while page_token and total < _SEARCH_COUNT_CAP:
+            r = await _api_get(ctx, "messages", acc, params={
+                "q": query, "maxResults": 500, "pageToken": page_token,
+                "fields": "messages/id,nextPageToken",
             })
+            r.raise_for_status()
+            b = r.json()
+            total     += len(b.get("messages", []) or [])
+            page_token = b.get("nextPageToken")
+
+        # Build previews (and ids for bulk ops) only for the first page. Fetch
+        # metadata concurrently (bounded) — serial fetches over a 200-result page
+        # were the filter-panel timeout. gather() preserves order.
+        sem = asyncio.Semaphore(_META_CONCURRENCY)
+
+        async def _preview(ref: dict):
+            async with sem:
+                meta = await _api_get(ctx, f"messages/{ref['id']}", acc, params={
+                    "format": "metadata", "metadataHeaders": ["From", "Subject", "Date"],
+                })
             if meta.status_code != 200:
-                continue
+                return None
             data    = meta.json()
             headers = data.get("payload", {}).get("headers", [])
-            results.append({
+            return {
                 "id":      ref["id"],
                 "subject": _header(headers, "Subject") or "(no subject)",
                 "from":    _short_sender(_header(headers, "From") or "unknown"),
                 "date":    _header(headers, "Date") or "",
                 "unread":  "UNREAD" in data.get("labelIds", []),
-            })
-        # Use the larger of estimate vs actual fetched count (estimate can be 0 on small results)
-        total = max(estimate, len(results))
+            }
+
+        fetched = await asyncio.gather(*[_preview(r) for r in refs])
+        results = [m for m in fetched if m]
         return self.ok(query=query, email=email_addr, results=results, total=total)
 
     async def folder(self, ctx: Context, acc: dict, folder_name: str, max_results: int = 20) -> dict:
