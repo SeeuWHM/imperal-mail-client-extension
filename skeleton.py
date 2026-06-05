@@ -79,11 +79,10 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
             unread_total += unread
             # Use total from get_folder_stats (real mailbox total, e.g. 18624+).
             # Falls back to len(messages) only if stats unavailable.
-            real_total = total if total > 0 else len(messages)
+            real_total = int(total) if total and total > 0 else len(messages)
             per_account.append({
                 "email": email,
                 "unread_count": unread,
-                "total_messages": real_total,
                 "is_active": bool(acc.get("is_active", False)),
             })
 
@@ -142,19 +141,17 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
             # Best-effort fallback — preserve last known per-account unread.
             per_account.append({
                 "email": email,
-                "unread_count": int(acc.get("unread_count", 0)),
-                "total_messages": 0,
+                "unread_count": int(acc.get("unread_count", 0) or 0),
                 "is_active": bool(acc.get("is_active", False)),
             })
-            unread_total += int(acc.get("unread_count", 0))
+            unread_total += int(acc.get("unread_count", 0) or 0)
 
-    # Build per_account with is_active flag
+    # Build per_account models — only fields the kernel schema knows: email, unread_count, is_active
     from schemas import PerAccountUnread
     pa_models = [
         PerAccountUnread(
             email=p["email"],
             unread_count=p.get("unread_count", 0),
-            total_messages=p.get("total_messages", 0),
             is_active=p.get("is_active", False),
         )
         for p in per_account

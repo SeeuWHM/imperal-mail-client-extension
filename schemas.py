@@ -235,12 +235,10 @@ class PerAccountUnread(BaseModel):
 
     Docs rule: skeleton lists ≤5 items expand inline — each field visible to LLM.
     Most users have ≤3 accounts so per_account is always fully expanded.
-    total_messages: real mailbox total from provider Labels API (e.g. 18624+).
     """
 
     email: str = ""
     unread_count: int = 0
-    total_messages: int = 0
     is_active: bool = False
 
 class InboxSummary(BaseModel):
