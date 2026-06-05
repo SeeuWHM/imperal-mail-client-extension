@@ -22,7 +22,7 @@ from providers.helpers import (
     _all_accounts, _inbox_messages_key, _refresh_token_if_needed,
     COLLECTION, INBOX_FETCH_SIZE, encode_cursor,
 )
-from schemas import InboxSummary, PerAccountUnread
+from schemas import PerAccountUnread
 
 log = logging.getLogger("mail")
 
@@ -31,13 +31,13 @@ log = logging.getLogger("mail")
 
 @ext.skeleton("mail_inbox_summary", ttl=60, alert=True,
               description="Per-account unread summary for classifier envelope + new-mail alerts.")
-async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
+async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
     accounts = await _all_accounts(ctx)
     if not accounts:
-        return ActionResult.success(
-            data=InboxSummary(accounts_connected=0, unread_total=0, per_account=[]).model_dump(),
-            summary="0 unread, 0 accounts connected",
-        )
+        return {"response": {
+            "unread_total": 0, "accounts_connected": 0, "per_account": [],
+            "active_account": "", "filter_count": 0, "rule_count": 0,
+        }}
 
     per_account: list[dict] = []
     unread_total = 0
@@ -180,20 +180,14 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> ActionResult:
     except Exception:
         pass
 
-    # Summary string — informative for classifier (strings ≤60 chars survive compression)
-    summary = (f"{unread_total} unread | active:{active_account[:30]} "
-               f"| {filter_count}filt {rule_count}rules")
-    return ActionResult.success(
-        data=InboxSummary(
-            unread_total=unread_total,
-            accounts_connected=len(accounts),
-            per_account=pa_models,
-            active_account=active_account,
-            filter_count=filter_count,
-            rule_count=rule_count,
-        ).model_dump(),
-        summary=summary,
-    )
+    return {"response": {
+        "unread_total": unread_total,
+        "accounts_connected": len(accounts),
+        "per_account": [p.model_dump() for p in pa_models],
+        "active_account": active_account,
+        "filter_count": filter_count,
+        "rule_count": rule_count,
+    }}
 
 
 @ext.tool("skeleton_alert_mail_inbox_summary",
