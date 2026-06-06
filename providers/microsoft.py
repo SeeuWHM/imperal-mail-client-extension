@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from imperal_sdk import Context
 
@@ -94,6 +95,51 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
             return {"total": data.get("totalItemCount", 0), "unread": data.get("unreadItemCount", 0)}
         except Exception:
             return {"total": 0, "unread": 0}
+
+    async def get_counts(self, ctx: Context, acc: dict) -> dict:
+        """Normalized counts. total = whole mailbox via /me/messages $count
+        (ConsistencyLevel: eventual). spam = JunkEmail, archive = Archive folder."""
+        inbox = await self.get_folder_stats(ctx, acc, "inbox")
+        spam  = await self.get_folder_stats(ctx, acc, "spam")
+        arch  = await self.get_folder_stats(ctx, acc, "archive")
+        total = int(inbox.get("total", 0) or 0)
+        try:
+            acc = await _refresh_token_if_needed(ctx, acc)
+            resp = await ctx.http.get(
+                f"{MS_GRAPH_BASE}/me/messages",
+                headers={"Authorization": f"Bearer {acc['access_token']}",
+                         "ConsistencyLevel": "eventual"},
+                params={"$top": 1, "$count": "true", "$select": "id"},
+            )
+            if resp.status_code == 200:
+                total = int(resp.json().get("@odata.count", total) or total)
+        except Exception:
+            pass
+        return {
+            "total":       total,
+            "inbox_total": int(inbox.get("total", 0) or 0),
+            "unread":      int(inbox.get("unread", 0) or 0),
+            "spam":        int(spam.get("total", 0) or 0),
+            "archive":     int(arch.get("total", 0) or 0),
+        }
+
+    async def get_today_count(self, ctx: Context, acc: dict) -> int:
+        """Messages received in the current UTC day (Inbox), via Graph $count + $filter."""
+        midnight = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+        try:
+            acc = await _refresh_token_if_needed(ctx, acc)
+            resp = await ctx.http.get(
+                f"{MS_GRAPH_BASE}/me/mailFolders/inbox/messages",
+                headers={"Authorization": f"Bearer {acc['access_token']}",
+                         "ConsistencyLevel": "eventual"},
+                params={"$top": 1, "$count": "true", "$select": "id",
+                        "$filter": f"receivedDateTime ge {midnight}"},
+            )
+            if resp.status_code == 200:
+                return int(resp.json().get("@odata.count", 0) or 0)
+        except Exception:
+            pass
+        return 0
 
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")

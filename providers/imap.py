@@ -15,7 +15,7 @@ from .helpers import (
 from .imap_connection import _imap_connect_auth, _sync_imap_test, _sync_smtp_test  # noqa: F401
 from .imap_read import (
     _sync_imap_inbox, _sync_imap_fetch_page, _sync_imap_unread_count,
-    _sync_imap_folder_stats,
+    _sync_imap_folder_stats, _sync_imap_today_count,
     _sync_imap_read, _sync_imap_search, _sync_imap_folder,
 )
 from .imap_write import (
@@ -118,6 +118,17 @@ class ImapMailProvider(BaseMailProvider):
                 imap_folder, password=args["password"], access_token=args["access_token"])
         except Exception:
             return {"total": 0, "unread": 0}
+
+    async def get_today_count(self, ctx: Context, acc: dict) -> int:
+        """Messages received today in INBOX, via IMAP SEARCH SINCE (server-side count)."""
+        acc  = await self._ensure_token(ctx, acc)
+        args = self._imap_args(acc)
+        try:
+            return await asyncio.to_thread(
+                _sync_imap_today_count, acc.get("email", ""), args["host"], args["port"],
+                password=args["password"], access_token=args["access_token"])
+        except Exception:
+            return 0
 
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")

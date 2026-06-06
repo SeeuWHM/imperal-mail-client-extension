@@ -101,6 +101,27 @@ def _sync_imap_folder_stats(email_addr: str, host: str, port: int, imap_folder: 
     return {"total": 0, "unread": 0}
 
 
+def _sync_imap_today_count(email_addr: str, host: str, port: int,
+                           *, password: str = "", access_token: str = "") -> int:
+    """Count INBOX messages received today via IMAP SEARCH SINCE (server-side)."""
+    import datetime as _dt
+    since = _dt.datetime.now(_dt.timezone.utc).strftime("%d-%b-%Y")
+    imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+    try:
+        r, _ = imap.select("INBOX", readonly=True)
+        if r != "OK":
+            return 0
+        r, data = imap.search(None, "SINCE", since)
+        if r != "OK" or not data or not data[0]:
+            return 0
+        return len(data[0].split())
+    except Exception:
+        return 0
+    finally:
+        try: imap.logout()
+        except Exception: pass
+
+
 def _sync_imap_inbox(email_addr: str, host: str, port: int, max_results: int = 20,
                      *, password: str = "", access_token: str = "") -> list[dict]:
     """Fetch recent INBOX messages — batch FETCH, single round trip."""

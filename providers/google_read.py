@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 
 from imperal_sdk import Context
 
@@ -111,6 +112,47 @@ class GoogleReadMixin:
             return {"total": 0, "unread": 0}
         data = resp.json()
         return {"total": data.get("messagesTotal", 0), "unread": data.get("messagesUnread", 0)}
+
+    async def get_counts(self, ctx: Context, acc: dict) -> dict:
+        """Normalized counts. total = whole-mailbox via users.getProfile.messagesTotal
+        (accurate, 1 call — avoids the search-count cap). archive = 0: Gmail has no
+        Archive folder (archived mail lives in 'All Mail')."""
+        total = 0
+        try:
+            resp = await _api_get(ctx, "profile", acc)
+            if resp.status_code == 200:
+                total = int(resp.json().get("messagesTotal", 0) or 0)
+        except Exception:
+            total = 0
+        inbox = await self.get_folder_stats(ctx, acc, "inbox")
+        spam  = await self.get_folder_stats(ctx, acc, "spam")
+        return {
+            "total":       total or int(inbox.get("total", 0) or 0),
+            "inbox_total": int(inbox.get("total", 0) or 0),
+            "unread":      int(inbox.get("unread", 0) or 0),
+            "spam":        int(spam.get("total", 0) or 0),
+            "archive":     0,
+        }
+
+    async def get_today_count(self, ctx: Context, acc: dict) -> int:
+        """Messages received today (UTC day). Gmail `after:` is date-granular;
+        count real ids via pagination (never resultSizeEstimate)."""
+        day = datetime.now(timezone.utc).strftime("%Y/%m/%d")
+        q = f"after:{day} -in:sent -in:chats"
+        total, page_token = 0, None
+        while True:
+            params = {"q": q, "maxResults": 500, "fields": "messages/id,nextPageToken"}
+            if page_token:
+                params["pageToken"] = page_token
+            resp = await _api_get(ctx, "messages", acc, params=params)
+            if resp.status_code != 200:
+                break
+            body = resp.json()
+            total += len(body.get("messages", []) or [])
+            page_token = body.get("nextPageToken")
+            if not page_token or total >= _SEARCH_COUNT_CAP:
+                break
+        return total
 
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")

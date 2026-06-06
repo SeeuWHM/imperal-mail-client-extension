@@ -1,10 +1,13 @@
 """Mail Client · Skeleton tools.
 
 The skeleton does:
-1. Surface a 6-field classifier envelope: ``unread_total``, ``active_account``,
-   ``per_account`` [{email, unread_count}], ``recent_emails`` [≤5 {title, from,
-   account, date}], ``filter_count``, ``rule_count``. Shape follows the docs
-   recipe ``recipes/skeleton-data-surface`` (counts + recent-item array ≤5).
+1. Surface a 5-field classifier envelope of READ-query counts (docs recipe
+   ``recipes/skeleton-data-surface`` — counts + per-item array ≤5):
+   ``active_account``, ``unread_total``, ``today_total``, ``total_all``,
+   ``per_account`` [≤5 {email, total, unread, spam, archive}].
+   Counts come from ``provider.get_counts`` / ``provider.get_today_count``
+   (normalized across Google / Microsoft / IMAP) — NOT from search, so the
+   brain answers "сколько всего / непрочитано / спам / архив / сегодня" directly.
 2. Diff against ``last_message_ids`` to fire ``ctx.notify()`` for new mail.
 3. Write first page of INBOX to ctx.cache so the panel opens instantly (0 extra API calls).
 """
@@ -14,7 +17,6 @@ import asyncio
 import logging
 import time as _time
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 
 from app import ext
 
@@ -26,33 +28,6 @@ from providers.helpers import (
 )
 
 log = logging.getLogger("mail")
-
-# Docs `recipes/skeleton-data-surface`: recent-item arrays cap at 5.
-_RECENT_EMAILS_MAX = 5
-_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-
-
-def _msg_sort_dt(date_str: str) -> datetime:
-    """Parse a provider message date (RFC2822 or ISO) → tz-aware UTC datetime.
-
-    Returns epoch on failure so undated messages sort last. Used only to order
-    the recent-emails surface — never raises.
-    """
-    if not date_str:
-        return _EPOCH
-    dt = None
-    try:
-        dt = parsedate_to_datetime(date_str)
-    except Exception:
-        try:
-            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-        except Exception:
-            dt = None
-    if dt is None:
-        return _EPOCH
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
 
 
 # ─── Skeleton ─────────────────────────────────────────────────────────── #
@@ -67,13 +42,14 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
     accounts = await _all_accounts(ctx)
     if not accounts:
         return {"response": {
-            "unread_total": 0, "active_account": "", "per_account": [],
-            "recent_emails": [], "filter_count": 0, "rule_count": 0,
+            "active_account": "", "unread_total": 0, "today_total": 0,
+            "total_all": 0, "per_account": [],
         }}
 
     per_account: list[dict] = []
-    recent_pool: list[dict] = []
     unread_total = 0
+    today_total = 0
+    total_all = 0
 
     for acc in accounts:
         email = acc.get("email", "")
@@ -83,17 +59,25 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
             acc = await asyncio.wait_for(_refresh_token_if_needed(ctx, acc), timeout=5.0)
             provider = get_provider(acc)
 
-            # Get folder stats (total + unread) via dedicated API endpoint
+            # Mailbox counts {total, inbox_total, unread, spam, archive} — normalized
+            # per provider (Gmail profile / Graph $count / IMAP STATUS), not search.
             try:
-                stats = await asyncio.wait_for(
-                    provider.get_folder_stats(ctx, acc, "INBOX"), timeout=5.0)
-                total = stats.get("total", 0)
-                unread = int(stats.get("unread", 0))
+                counts = await asyncio.wait_for(provider.get_counts(ctx, acc), timeout=8.0)
             except (asyncio.TimeoutError, Exception):
-                total = 0
-                unread = 0
+                counts = {}
+            try:
+                today = int(await asyncio.wait_for(
+                    provider.get_today_count(ctx, acc), timeout=8.0))
+            except (asyncio.TimeoutError, Exception):
+                today = 0
 
-            # Fetch page 1 via fetch_page (gives us message IDs for new-mail detection)
+            unread        = int(counts.get("unread", 0) or 0)
+            total_mailbox = int(counts.get("total", 0) or 0)
+            inbox_total   = int(counts.get("inbox_total", 0) or 0)
+            spam          = int(counts.get("spam", 0) or 0)
+            archive       = int(counts.get("archive", 0) or 0)
+
+            # Fetch page 1 — message IDs for new-mail detection + cache warmup.
             messages, next_cursor_data, has_more = await asyncio.wait_for(
                 provider.fetch_page(ctx, acc, "INBOX", INBOX_FETCH_SIZE, None),
                 timeout=10.0,
@@ -105,30 +89,25 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
             }
             truly_new = curr_ids - prev_ids
 
-            # Fall back to counting unread from messages if stats returned 0
+            # Fallbacks if the counts API returned nothing.
             if unread == 0:
                 unread = sum(1 for m in messages if m.get("unread"))
+            if inbox_total == 0:
+                inbox_total = len(messages)
+            if total_mailbox == 0:
+                total_mailbox = inbox_total
 
             unread_total += unread
-            # Use total from get_folder_stats (real mailbox total, e.g. 18624+).
-            # Falls back to len(messages) only if stats unavailable.
-            real_total = int(total) if total and total > 0 else len(messages)
+            today_total  += today
+            total_all    += total_mailbox
             per_account.append({
-                "email": email,
-                "unread_count": unread,
+                "email":     email,
+                "total":     total_mailbox,
+                "unread":    unread,
+                "spam":      spam,
+                "archive":   archive,
                 "is_active": bool(acc.get("is_active", False)),
             })
-
-            # Collect for the recent-emails surface (newest across all accounts,
-            # assembled after the loop). Reuses the page already fetched above —
-            # no extra API call.
-            for _m in messages:
-                recent_pool.append({
-                    "account": email,
-                    "subject": _m.get("subject") or "",
-                    "from":    _m.get("from") or "",
-                    "date":    _m.get("date") or "",
-                })
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {
@@ -156,7 +135,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
                     InboxMessages(
                         account_id=email, folder="INBOX",
                         messages=_normalized,
-                        total_in_folder=total,
+                        total_in_folder=inbox_total,
                         unread_in_folder=unread,
                         next_cursor=_next_cursor,
                         fetched_at=datetime.now(timezone.utc),
@@ -183,64 +162,39 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
         except (asyncio.TimeoutError, Exception) as e:
             log.error(f"Mail refresh error {email}: {e}")
             # Best-effort fallback — preserve last known per-account unread.
+            _last_unread = int(acc.get("unread_count", 0) or 0)
             per_account.append({
-                "email": email,
-                "unread_count": int(acc.get("unread_count", 0) or 0),
+                "email": email, "total": 0, "unread": _last_unread,
+                "spam": 0, "archive": 0,
                 "is_active": bool(acc.get("is_active", False)),
             })
-            unread_total += int(acc.get("unread_count", 0) or 0)
+            unread_total += _last_unread
 
-    # per_account — plain dicts {email, unread_count}. The active mailbox is
-    # surfaced once as the top-level `active_account`; the redundant per-item
-    # is_active flag is intentionally dropped (skeleton-budget hygiene).
+    # per_account — count cards {email, total, unread, spam, archive}. The active
+    # mailbox is surfaced once as the top-level `active_account`; the per-item
+    # is_active flag is used only to derive it, then dropped (≤5 fields/item).
     active_account = ""
     pa_list = []
     for p in per_account:
         p_email = str(p.get("email") or "")
-        p_unread = int(p.get("unread_count") or 0)
         if bool(p.get("is_active")) and not active_account:
             active_account = p_email
-        pa_list.append({"email": p_email, "unread_count": p_unread})
+        pa_list.append({
+            "email":   p_email,
+            "total":   int(p.get("total") or 0),
+            "unread":  int(p.get("unread") or 0),
+            "spam":    int(p.get("spam") or 0),
+            "archive": int(p.get("archive") or 0),
+        })
     if not active_account and pa_list:
         active_account = pa_list[0]["email"]
 
-    # recent_emails — newest across all accounts, ≤5, mirrors the docs recipe
-    # `skeleton-data-surface` (recent_tasks): label key `title` + compact scalars.
-    recent_pool.sort(key=lambda r: _msg_sort_dt(r.get("date", "")), reverse=True)
-    recent_emails = [
-        {
-            "title":   (r.get("subject") or "(no subject)")[:80],
-            "from":    (r.get("from") or "")[:60],
-            "account": r.get("account") or "",
-            "date":    (_msg_sort_dt(r["date"]).date().isoformat() if r.get("date") else ""),
-        }
-        for r in recent_pool[:_RECENT_EMAILS_MAX]
-    ]
-
-    # counts of configured filters and rules via ctx.store.query
-    filter_count = 0
-    rule_count = 0
-    try:
-        fpage = await ctx.store.query("mail_filters",
-                                      where={"owner_id": ctx.user.imperal_id}, limit=1)
-        filter_count = int(getattr(fpage, "total", 0) or 0)
-    except Exception:
-        pass
-    try:
-        rpage = await ctx.store.query("mail_rules",
-                                      where={"owner_id": ctx.user.imperal_id,
-                                             "enabled": True}, limit=1)
-        rule_count = int(getattr(rpage, "total", 0) or 0)
-    except Exception:
-        pass
-
     return {"response": {
-        "unread_total":   int(unread_total),
         "active_account": str(active_account),
+        "unread_total":   int(unread_total),
+        "today_total":    int(today_total),
+        "total_all":      int(total_all),
         "per_account":    pa_list,
-        "recent_emails":  recent_emails,
-        "filter_count":   int(filter_count),
-        "rule_count":     int(rule_count),
     }}
 
 

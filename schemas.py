@@ -250,12 +250,11 @@ class InboxSummary(BaseModel):
     list items are plain dicts — no nested Pydantic validation.
     """
 
-    unread_total: int = 0
     active_account: str = ""
-    per_account: list[dict] = Field(default_factory=list)    # {email, unread_count}
-    recent_emails: list[dict] = Field(default_factory=list)  # ≤5 {title, from, account, date}
-    filter_count: int = 0
-    rule_count: int = 0
+    unread_total: int = 0
+    today_total: int = 0
+    total_all: int = 0
+    per_account: list[dict] = Field(default_factory=list)  # {email, total, unread, spam, archive}
 
 class SkeletonAlertMessage(BaseModel):
     """skeleton_alert_mail_inbox_summary — lightweight unread count from store (no API calls)."""

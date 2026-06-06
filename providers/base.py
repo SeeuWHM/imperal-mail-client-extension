@@ -79,6 +79,29 @@ class BaseMailProvider(ABC):
         """
         return {"total": 0, "unread": await self.get_unread_count(ctx, acc, folder)}
 
+    async def get_counts(self, ctx: Context, acc: dict) -> dict:
+        """Return normalized mailbox counts {total, unread, spam, archive}.
+
+        Default derives from per-folder stats (total = INBOX total, unread = INBOX
+        unread). Providers with a cheaper whole-mailbox total (Gmail profile,
+        Graph $count) override `total`. Used by the skeleton classifier surface.
+        """
+        inbox = await self.get_folder_stats(ctx, acc, "inbox")
+        spam  = await self.get_folder_stats(ctx, acc, "spam")
+        arch  = await self.get_folder_stats(ctx, acc, "archive")
+        return {
+            "total":       int(inbox.get("total", 0) or 0),
+            "inbox_total": int(inbox.get("total", 0) or 0),
+            "unread":      int(inbox.get("unread", 0) or 0),
+            "spam":        int(spam.get("total", 0) or 0),
+            "archive":     int(arch.get("total", 0) or 0),
+        }
+
+    async def get_today_count(self, ctx: Context, acc: dict) -> int:
+        """Count messages received during the current UTC day. Default 0 —
+        override per provider (Gmail after:, Graph $filter, IMAP SINCE)."""
+        return 0
+
     async def purge(self, ctx: Context, acc: dict, message_id: str,
                     from_folder: str = "Trash") -> dict:
         return self.err("Permanent deletion not implemented for this provider")
