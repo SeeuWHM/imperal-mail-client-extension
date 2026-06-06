@@ -1,6 +1,42 @@
 # Changelog
 
-## [5.7.0] — 2026-06-04 (current prod, commit `c15a81a`)
+## post-5.7.0 patches — 2026-06-05/06 (commits `f549e4d` → `391b897`; code version stays 5.7.0)
+
+### Skeleton — zero-Pydantic response (fixes persistent InboxSummary ValidationError)
+- **`skeleton.py`** — `skeleton_refresh_mail_inbox_summary` now returns a RAW dict
+  `{"response": {…6 fields…}}`. No `InboxSummary(...)`, no `PerAccountUnread(...)`, no
+  `model_dump()` anywhere in the response path. `per_account` is a list of plain dicts
+  `{email, unread_count, is_active}`. This removed the recurring 3-error ValidationError on
+  every skeleton run (`f549e4d` ActionResult→dict, `53436d4` drop total_messages, `ff7108e` zero Pydantic).
+- **`schemas.py`** — `PerAccountUnread.total_messages` removed; `InboxSummary.per_account: list[dict]`.
+- `skeleton_alert_mail_inbox_summary` now takes `(old, new)` snapshots and reports the unread delta.
+
+### Search & filter counting — accurate, no timeout (`fc9474d`)
+- **`providers/google_read.py`** — `search()` counts the TRUE total by paginating real
+  message IDs (`fields=messages/id,nextPageToken`, cap 2000) and **ignores Gmail
+  `resultSizeEstimate`** (it under-reported, e.g. 15 for a 50-result query). Previews are
+  now fetched concurrently (`Semaphore(12)`) — eliminates the 15 s filter-panel timeout on
+  large result sets.
+- **`handlers_inbox.py`** — `search` description rewritten: `from:<brand>` not `from:domain.com`
+  (catches subdomains/related domains/display name), Gmail date operators (`newer_than:1d`,
+  `after:/before:`), and "total is accurate, no need for large max_results just to count".
+
+### Filters & folder prefs (`fc9474d`, `391b897`)
+- **`handlers_filters.py`** — `create_filter` is idempotent (same name + account_email → reuse,
+  no duplicates). `set_folder_prefs` description: it REPLACES the visible set (read current
+  prefs first when "adding"), + panel-visibility trigger phrases (RU/EN).
+
+### Bulk operations (`391b897`)
+- **`handlers_manage.py`** — all 7 bulk descriptions now instruct: load message_ids first via
+  inbox()/folder()/search() on the TARGET mailbox, and pass `account=` for that same mailbox
+  (a message_id from one account 404s on another). Fixes partial bulk failures (9/10, 1/3).
+
+### Branch/deploy note
+- Local branch is `master`; the Developer Portal deploys from `main`. All of the above reached
+  prod only after `git push origin master:main` (the fixes had been committed to `master` but
+  never pushed to `main`).
+
+## [5.7.0] — 2026-06-04 (commit `c15a81a`)
 
 ### Smart Filters — panel integration + per-account + pagination
 - **`panels_filter_view.py`** — `render_filter_panel` fetches all results (up to 200) in one API call, client-side pagination N/M pages; no extra calls per page. 15s asyncio timeout prevents panel hang.

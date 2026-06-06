@@ -1,7 +1,7 @@
 # imperal-mail-client-extension
 
-[![Imperal SDK](https://img.shields.io/badge/imperal--sdk-5.0.0-blue)](https://pypi.org/project/imperal-sdk/)
-[![Version](https://img.shields.io/badge/version-5.3.5-green)](https://github.com/SeeuWHM/imperal-mail-client-extension/releases)
+[![Imperal SDK](https://img.shields.io/badge/imperal--sdk-5.x-blue)](https://pypi.org/project/imperal-sdk/)
+[![Version](https://img.shields.io/badge/version-5.7.0-green)](https://github.com/SeeuWHM/imperal-mail-client-extension/releases)
 [![License](https://img.shields.io/badge/license-LGPL--2.1-orange)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Imperal%20Cloud-purple)](https://panel.imperal.io)
 
@@ -44,23 +44,28 @@ Or use the panel — click emails to open them, reply/forward with one click, mu
 
 ## Capabilities
 
-### Tools (37 total: 35 @chat.function + 2 skeleton)
+### Tools (54 total: 52 @chat.function + 2 skeleton)
 
-**Account management:** `connect`, `connect_microsoft`, `connect_yahoo`, `connect_imap`, `disconnect`, `status`, `switch_account`
+**Account management (7):** `connect`, `connect_microsoft`, `connect_yahoo`, `connect_imap`, `status`, `switch_account`, `disconnect`
 
-**Read:** `inbox`, `read_email`, `search`, `folder`, `get_thread`
+**Read (8):** `inbox`, `read_email`, `search`, `folder`, `get_thread`
 
-**Write:** `send`, `reply`, `forward`
+**Write (within Read group):** `send`, `reply`, `forward`
 
-**Manage:** `archive`, `delete`, `mark_read`, `mark_unread`, `star`, `move`, `purge`
+**Manage (14):** `archive`, `delete`, `mark_read`, `mark_unread`, `star`, `move`, `purge`, `bulk_archive`, `bulk_delete`, `bulk_mark_read`, `bulk_mark_unread`, `bulk_move`, `bulk_star`, `bulk_purge`
 
-**Bulk:** `bulk_archive`, `bulk_delete`, `bulk_mark_read`, `bulk_mark_unread`
+**Smart filters & folder prefs (8):** `create_filter`, `list_filters`, `apply_filter`, `update_filter`, `delete_filter`, `set_folder_prefs`, `get_folder_prefs`, `list_mail_folders`
 
-**Contacts:** `contacts`, `add_contact`, `sync_contacts`, `delete_contact`
+**Automation rules (6):** `create_forward_rule`, `create_autoreply`, `list_rules`, `toggle_rule`, `delete_rule`, `trigger_rules_now`
 
-**Panel:** `mail_action`, `folder_counts`, `get_oauth_url`, `add_imap`, `compose_send`
+**Contacts (4):** `contacts`, `add_contact`, `sync_contacts`, `delete_contact`
 
-**Skeleton:** `skeleton_refresh_mail_inbox_summary`, `skeleton_alert_mail_inbox_summary`
+**Panel (5):** `mail_action`, `folder_counts`, `get_oauth_url`, `add_imap`, `compose_send`
+
+**Skeleton (2):** `skeleton_refresh_mail_inbox_summary`, `skeleton_alert_mail_inbox_summary`
+
+> Bulk ops need the message_ids loaded first (via `inbox`/`folder`/`search`) and `account=`
+> matching the mailbox those ids came from.
 
 ### Panel (5 `@ext.panel` handlers + 1 SDK-auto `secrets`)
 
@@ -75,14 +80,18 @@ Or use the panel — click emails to open them, reply/forward with one click, mu
 
 ---
 
-## Architecture (v5.3.5 / SDK v5.0.0)
+## Architecture (v5.7.0 / SDK 5.x — 50 files)
 
 ```
 imperal-mail-client-extension/
 ├── main.py                   # Entry point — sys.modules cleanup + imports
 ├── app.py                    # Extension instance (SDK v5.0.0) + ChatExtension + lifecycle
-├── schemas.py                # Pydantic response schemas for all tools
+├── schemas.py                # Pydantic response schemas + re-export of schemas_params
 ├── schemas_params.py         # Pydantic input param models for @chat.function handlers
+├── schemas_sdl.py            # 22 SDL entity classes (mail.* roles)
+├── schemas_sdl_builders.py   # impl_result → SDL entity builders
+├── schemas_sdl_rules.py      # SDL entities for filters / rules / prefs
+├── schemas_sdl_builders_rules.py # builders for filter/rule/prefs SDL entities
 ├── ctx_helpers.py            # _user_id / _get_acc / _oauth_state (break import cycle)
 ├── cache_model_defs.py       # Pure Pydantic cache models (InboxMessages, UnreadSummary, AccountList)
 ├── cache_models.py           # ctx.cache model registrations
@@ -96,8 +105,14 @@ imperal-mail-client-extension/
 ├── handlers_contacts.py      # contacts / add_contact / sync_contacts / delete_contact
 ├── handlers_panel_actions.py # mail_action / folder_counts / get_oauth_url / add_imap
 ├── handlers_panel_compose.py # compose_send
+├── handlers_filters.py       # create/list/apply/update/delete_filter + set/get_folder_prefs + list_mail_folders
+├── handlers_rules.py         # create_forward_rule / create_autoreply / list/toggle/delete_rule / trigger_rules_now
+├── handlers_rule_runner.py   # @ext.schedule rule runner (backup) + match/forward/autoreply helpers
+├── handlers_rule_event.py    # process_event_email — primary real-time rule path (from on_email_received)
 ├── handlers_ui.py            # Inline chat UI builders: _inbox_ui / _email_ui / _search_ui
 ├── panels.py                 # @ext.panel registrations + inbox_panel handler
+├── panels_filters_bar.py     # Smart-filters bar (per active account)
+├── panels_filter_view.py     # render_filter_panel — filter results + client-side pagination
 ├── panels_inbox.py           # FOLDERS / _execute_panel_action / _build_folder_tabs / _build_email_list
 ├── panels_email_viewer.py    # build_email_viewer() — HTML sandbox, prev/next nav, action bar
 ├── panels_accounts.py        # build_accounts_panel()
@@ -129,32 +144,47 @@ imperal-mail-client-extension/
 
 | Collection | Contents |
 |------------|----------|
-| `gmail_accounts` | Connected accounts — OAuth tokens, IMAP credentials (Fernet-encrypted passwords), `unread_count`, `last_message_ids`, `last_fetched` |
+| `gmail_accounts` | Connected accounts — OAuth tokens, IMAP credentials (Fernet-encrypted passwords), `unread_count`, `last_message_ids`, `last_fetched`, `is_active` |
 | `mail_contacts` | Email contacts — name, email, source, last_seen |
 | `mail_last_read` | Last read message metadata — message_id, subject, sender, thread_id, **account** (for reply account restoration) |
+| `mail_filters` | Smart filter definitions incl. `account_email`, criteria_from / from_emails / criteria_subject |
+| `mail_rules` | Forward + auto-reply rules (criteria, forward_to / reply_template, schedule, last_run_at) |
+| `mail_autoreply_sent` | Auto-reply dedup — message_id + rule_id (no double replies) |
+| `mail_prefs` | Folder visibility preferences (visible_folders / hidden_folders) |
 
 > **Note:** Collection is named `gmail_accounts` for legacy backwards compatibility. It stores all provider types (Google, Microsoft, IMAP, Yahoo).
 
 ---
 
-## Skeleton (SDK v5.0.0)
+## Skeleton
 
-`skeleton_refresh_mail_inbox_summary` runs every 60s (TTL=60, alert=True):
+`skeleton_refresh_mail_inbox_summary` (TTL=60, alert=True) returns a **raw dict** —
+no Pydantic in the response path — as a 6-field classifier envelope:
 
 ```json
 {
-  "accounts_connected": 2,
-  "unread_total": 7,
-  "per_account": [
-    {"email": "user@gmail.com", "unread_count": 5, "message_count": 20},
-    {"email": "work@outlook.com", "unread_count": 2, "message_count": 15}
-  ]
+  "response": {
+    "unread_total": 18766,
+    "accounts_connected": 3,
+    "per_account": [
+      {"email": "webhostmost@outlook.com", "unread_count": 9,     "is_active": false},
+      {"email": "zalupa@ignat.best",       "unread_count": 2,     "is_active": false},
+      {"email": "ignat@webhostmost.com",   "unread_count": 18755, "is_active": true}
+    ],
+    "active_account": "ignat@webhostmost.com",
+    "filter_count": 0,
+    "rule_count": 0
+  }
 }
 ```
 
-`skeleton_alert_mail_inbox_summary` is a lightweight check — reads last-known `unread_count` from store (no API calls) and returns `{unread_total, per_account}` for kernel badge display and push-notification gating.
+Each run also: fetches folder stats + page 1 per account, diffs against `last_message_ids`
+→ `ctx.notify()` on new mail, and warms `ctx.cache` with 25 messages for instant panel load.
 
-Panel inbox rendering uses `ctx.cache` (`InboxMessages` model, TTL=90s), not the skeleton.
+`skeleton_alert_mail_inbox_summary(old, new)` returns `{"response": "<n> new unread email(s)"}`
+when `unread_total` rises — for kernel badge/push gating.
+
+Panel inbox rendering reads `ctx.cache` (`InboxMessages` model), not the skeleton.
 
 ---
 
@@ -176,5 +206,5 @@ Panel inbox rendering uses `ctx.cache` (`InboxMessages` model, TTL=90s), not the
 
 ## Built with
 
-- [imperal-sdk](https://github.com/imperalcloud/imperal-sdk) 5.0.0
+- [imperal-sdk](https://github.com/imperalcloud/imperal-sdk) 5.x
 - [Imperal Cloud](https://panel.imperal.io)
