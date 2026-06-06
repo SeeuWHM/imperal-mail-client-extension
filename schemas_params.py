@@ -13,6 +13,13 @@ class AccountParam(BaseModel):
     account: str = Field(default="", description="Account email or ID (omit for active account)")
 
 
+class CountParams(BaseModel):
+    """count_emails — exact email count by folder/state or by query."""
+    folder: str = Field(default="", description="Folder/state to count: all | unread | spam | archive | inbox | today | sent | trash. Leave empty if using query.")
+    query: str = Field(default="", description="Gmail-style query for a date/sender count, e.g. 'newer_than:1d', 'after:2026/06/05 before:2026/06/06', 'from:reddit'. Leave empty if using folder.")
+    account: str = Field(default="", description="Account email or ID. Omit to count across ALL connected accounts.")
+
+
 class ConnectImapParams(BaseModel):
     email_addr: str = Field(description="Email address")
     password: str = Field(description="IMAP password or app password")

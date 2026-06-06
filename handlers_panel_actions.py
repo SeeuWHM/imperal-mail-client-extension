@@ -19,7 +19,7 @@ from providers.helpers import (
 from providers.imap import _sync_imap_test
 
 from schemas import (
-    MailActionParams, AccountParam, OAuthParams, AddImapParams,
+    MailActionParams, AccountParam, CountParams, OAuthParams, AddImapParams,
     ConnectImapResult, FolderCountsResult, MailActionResult, OAuthUrlResult,
 )
 from schemas_sdl_builders import (
@@ -177,6 +177,73 @@ async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
         return ActionResult.success(
             data=build_folder_counts(r),
             summary=f"INBOX: {r.counts.get('INBOX', 0)} unread.",
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+async def impl_count(ctx, folder: str = "", query: str = "",
+                     account: str = "") -> FolderCountsResult:
+    """Exact email count. folder/state via provider.get_counts/get_today_count;
+    query (date/sender) via provider.search total (accurate, not a page length).
+    Returns counts keyed by account email + a 'total' across them."""
+    folder_k = (folder or "").strip().lower()
+    query_s  = (query or "").strip()
+    if account:
+        acc, _ = await _get_acc(ctx, account)
+        accs = [acc] if acc else []
+    else:
+        accs = await _all_accounts(ctx)
+    if not accs:
+        raise RuntimeError("No email account connected. Connect one first.")
+
+    counts: dict[str, int] = {}
+    grand = 0
+    for acc in accs:
+        email = acc.get("email", "")
+        provider = get_provider(acc)
+        n = 0
+        try:
+            if query_s:
+                r = await provider.search(ctx, acc, query=query_s, max_results=1)
+                n = int(r.get("total", 0) or 0)
+            else:
+                c = await provider.get_counts(ctx, acc)
+                if folder_k in ("", "all", "total"):
+                    n = int(c.get("total", 0) or 0)
+                elif folder_k == "unread":
+                    n = int(c.get("unread", 0) or 0)
+                elif folder_k == "spam":
+                    n = int(c.get("spam", 0) or 0)
+                elif folder_k == "archive":
+                    n = int(c.get("archive", 0) or 0)
+                elif folder_k == "inbox":
+                    n = int(c.get("inbox_total", 0) or 0)
+                elif folder_k == "today":
+                    n = int(await provider.get_today_count(ctx, acc) or 0)
+                else:
+                    fs = await provider.get_folder_stats(ctx, acc, folder_k)
+                    n = int(fs.get("total", 0) or 0)
+        except Exception as e:
+            log.warning("count_emails failed for %s: %s", email, e)
+            n = 0
+        counts[email] = n
+        grand += n
+    counts["total"] = grand
+    return FolderCountsResult(counts=counts)
+
+
+@chat.function("count_emails", action_type="read",
+               data_model=FolderCountsEntity,
+               description="Return the EXACT NUMBER of emails — use for ANY 'how many / сколько' question. CRITICAL: never answer a count by counting the items returned by inbox()/search()/folder() — those are capped display pages, not totals. Pass folder= for a folder/state count: 'all' (whole-mailbox total), 'unread', 'spam', 'archive', 'inbox', 'today', 'sent', 'trash'. OR pass query= for a date/sender count in Gmail syntax: 'newer_than:1d' (today), 'after:2026/06/05 before:2026/06/06' (one specific day), 'from:reddit'. Counts ALL connected accounts unless account= is given. Returns a per-account breakdown plus a 'total' key.")
+async def fn_count_emails(ctx, params: CountParams) -> ActionResult:
+    """Exact email count by folder/state or query, across one or all accounts."""
+    try:
+        r = await impl_count(ctx, folder=params.folder, query=params.query,
+                             account=params.account)
+        return ActionResult.success(
+            data=build_folder_counts(r),
+            summary=f"{r.counts.get('total', 0)} email(s).",
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
