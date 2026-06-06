@@ -244,14 +244,16 @@ class PerAccountUnread(BaseModel):
 class InboxSummary(BaseModel):
     """skeleton_refresh_mail_inbox_summary — 6-field classifier envelope for mail.
 
-    per_account uses list[dict] (not list[PerAccountUnread]) so the kernel never
-    runs nested Pydantic validation on per-account items — plain dicts only.
+    Reference shape ONLY. skeleton.py returns a raw ``{"response": {...}}`` dict
+    (no Pydantic in the response path). Shape follows the docs recipe
+    ``recipes/skeleton-data-surface`` (counts + a recent-item array ≤5). All
+    list items are plain dicts — no nested Pydantic validation.
     """
 
     unread_total: int = 0
-    accounts_connected: int = 0
-    per_account: list[dict] = Field(default_factory=list)
     active_account: str = ""
+    per_account: list[dict] = Field(default_factory=list)    # {email, unread_count}
+    recent_emails: list[dict] = Field(default_factory=list)  # ≤5 {title, from, account, date}
     filter_count: int = 0
     rule_count: int = 0
 

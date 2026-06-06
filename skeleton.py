@@ -1,7 +1,10 @@
 """Mail Client · Skeleton tools.
 
 The skeleton does:
-1. Surface ``unread_total`` + per-account ``unread_count`` for the classifier.
+1. Surface a 6-field classifier envelope: ``unread_total``, ``active_account``,
+   ``per_account`` [{email, unread_count}], ``recent_emails`` [≤5 {title, from,
+   account, date}], ``filter_count``, ``rule_count``. Shape follows the docs
+   recipe ``recipes/skeleton-data-surface`` (counts + recent-item array ≤5).
 2. Diff against ``last_message_ids`` to fire ``ctx.notify()`` for new mail.
 3. Write first page of INBOX to ctx.cache so the panel opens instantly (0 extra API calls).
 """
@@ -11,6 +14,7 @@ import asyncio
 import logging
 import time as _time
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 from app import ext
 
@@ -23,20 +27,52 @@ from providers.helpers import (
 
 log = logging.getLogger("mail")
 
+# Docs `recipes/skeleton-data-surface`: recent-item arrays cap at 5.
+_RECENT_EMAILS_MAX = 5
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def _msg_sort_dt(date_str: str) -> datetime:
+    """Parse a provider message date (RFC2822 or ISO) → tz-aware UTC datetime.
+
+    Returns epoch on failure so undated messages sort last. Used only to order
+    the recent-emails surface — never raises.
+    """
+    if not date_str:
+        return _EPOCH
+    dt = None
+    try:
+        dt = parsedate_to_datetime(date_str)
+    except Exception:
+        try:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except Exception:
+            dt = None
+    if dt is None:
+        return _EPOCH
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 
 # ─── Skeleton ─────────────────────────────────────────────────────────── #
 
 @ext.skeleton("mail_inbox_summary", ttl=60, alert=True,
               description="Per-account unread summary for classifier envelope + new-mail alerts.")
 async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
+    uid = ctx.user.imperal_id
+    if not uid:
+        return {"response": {"note": "no user on context"}}
+
     accounts = await _all_accounts(ctx)
     if not accounts:
         return {"response": {
-            "unread_total": 0, "accounts_connected": 0, "per_account": [],
-            "active_account": "", "filter_count": 0, "rule_count": 0,
+            "unread_total": 0, "active_account": "", "per_account": [],
+            "recent_emails": [], "filter_count": 0, "rule_count": 0,
         }}
 
     per_account: list[dict] = []
+    recent_pool: list[dict] = []
     unread_total = 0
 
     for acc in accounts:
@@ -82,6 +118,17 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
                 "unread_count": unread,
                 "is_active": bool(acc.get("is_active", False)),
             })
+
+            # Collect for the recent-emails surface (newest across all accounts,
+            # assembled after the loop). Reuses the page already fetched above —
+            # no extra API call.
+            for _m in messages:
+                recent_pool.append({
+                    "account": email,
+                    "subject": _m.get("subject") or "",
+                    "from":    _m.get("from") or "",
+                    "date":    _m.get("date") or "",
+                })
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {
@@ -143,18 +190,32 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
             })
             unread_total += int(acc.get("unread_count", 0) or 0)
 
-    # Build per_account as plain dicts — no Pydantic objects, no model_dump()
+    # per_account — plain dicts {email, unread_count}. The active mailbox is
+    # surfaced once as the top-level `active_account`; the redundant per-item
+    # is_active flag is intentionally dropped (skeleton-budget hygiene).
     active_account = ""
     pa_list = []
     for p in per_account:
-        email = str(p.get("email") or "")
-        unread_count = int(p.get("unread_count") or 0)
-        is_active = bool(p.get("is_active"))
-        if is_active and not active_account:
-            active_account = email
-        pa_list.append({"email": email, "unread_count": unread_count, "is_active": is_active})
+        p_email = str(p.get("email") or "")
+        p_unread = int(p.get("unread_count") or 0)
+        if bool(p.get("is_active")) and not active_account:
+            active_account = p_email
+        pa_list.append({"email": p_email, "unread_count": p_unread})
     if not active_account and pa_list:
         active_account = pa_list[0]["email"]
+
+    # recent_emails — newest across all accounts, ≤5, mirrors the docs recipe
+    # `skeleton-data-surface` (recent_tasks): label key `title` + compact scalars.
+    recent_pool.sort(key=lambda r: _msg_sort_dt(r.get("date", "")), reverse=True)
+    recent_emails = [
+        {
+            "title":   (r.get("subject") or "(no subject)")[:80],
+            "from":    (r.get("from") or "")[:60],
+            "account": r.get("account") or "",
+            "date":    (_msg_sort_dt(r["date"]).date().isoformat() if r.get("date") else ""),
+        }
+        for r in recent_pool[:_RECENT_EMAILS_MAX]
+    ]
 
     # counts of configured filters and rules via ctx.store.query
     filter_count = 0
@@ -174,12 +235,12 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
         pass
 
     return {"response": {
-        "unread_total": int(unread_total),
-        "accounts_connected": int(len(accounts)),
-        "per_account": pa_list,
+        "unread_total":   int(unread_total),
         "active_account": str(active_account),
-        "filter_count": int(filter_count),
-        "rule_count": int(rule_count),
+        "per_account":    pa_list,
+        "recent_emails":  recent_emails,
+        "filter_count":   int(filter_count),
+        "rule_count":     int(rule_count),
     }}
 
 
