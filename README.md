@@ -159,32 +159,41 @@ imperal-mail-client-extension/
 ## Skeleton
 
 `skeleton_refresh_mail_inbox_summary` (TTL=60, alert=True) returns a **raw dict** —
-no Pydantic in the response path — as a 6-field classifier envelope. Shape mirrors the
-docs recipe [`recipes/skeleton-data-surface`](https://docs.imperal.io/en/recipes/skeleton-data-surface/)
-(counts + flags + a recent-item array ≤5; label key `title`):
+no Pydantic in the response path — as a 5-field classifier envelope of **read-query
+counts** (docs recipe [`recipes/skeleton-data-surface`](https://docs.imperal.io/en/recipes/skeleton-data-surface/) —
+counts + per-item array ≤5). The brain answers "сколько всего / непрочитано / спам /
+архив / сегодня" **directly from these counts**, with no search (so no search-count cap):
 
 ```json
 {
   "response": {
-    "unread_total": 18766,
-    "active_account": "ignat@webhostmost.com",
+    "active_account": "ignatstremb@gmail.com",
+    "unread_total": 7012,
+    "today_total": 24,
+    "total_all": 25113,
     "per_account": [
-      {"email": "webhostmost@outlook.com", "unread_count": 9},
-      {"email": "zalupa@ignat.best",       "unread_count": 2},
-      {"email": "ignat@webhostmost.com",   "unread_count": 18755}
-    ],
-    "recent_emails": [
-      {"title": "Invoice #4471", "from": "billing@acme.com", "account": "ignat@webhostmost.com", "date": "2026-06-06"}
-    ],
-    "filter_count": 0,
-    "rule_count": 0
+      {"email": "ignatstremb@gmail.com", "total": 23000, "unread": 6900, "spam": 410, "archive": 0},
+      {"email": "webhostmost@outlook.com", "total": 2100, "unread": 9,    "spam": 12,  "archive": 80}
+    ]
   }
 }
 ```
 
-`recent_emails` is the newest ≤5 across all accounts, assembled from the page-1 messages
-the skeleton already fetches (no extra API). Dropped vs. the old envelope: `accounts_connected`
-(= `len(per_account)`) and per-account `is_active` (= top-level `active_account`).
+Counts come from `provider.get_counts → {total, inbox_total, unread, spam, archive}` and
+`provider.get_today_count`, **normalized across all providers**:
+
+| Count | Google | Microsoft | IMAP / Yahoo |
+|---|---|---|---|
+| `total` (whole mailbox) | `users.getProfile.messagesTotal` | `/me/messages $count` (ConsistencyLevel: eventual) | INBOX total (best-effort) |
+| `unread` | INBOX label `messagesUnread` | mailFolders/inbox `unreadItemCount` | STATUS UNSEEN |
+| `spam` | SPAM label total | JunkEmail folder total | Junk/Spam folder STATUS |
+| `archive` | **0** (Gmail has no Archive folder) | Archive folder total | Archive folder STATUS |
+| `today` | `after:YYYY/MM/DD` (id-pagination) | `$filter receivedDateTime ge` + `$count` | SEARCH SINCE |
+
+`per_account` is the per-mailbox card; top-level fields are the across-all-accounts
+aggregates. Dropped vs. older envelopes: `recent_emails` (low signal at scale),
+`accounts_connected` (= `len(per_account)`), per-account `is_active` (= `active_account`),
+`filter_count`/`rule_count` (detail-on-demand via `list_filters`/`list_rules`).
 
 Each run also: fetches folder stats + page 1 per account, diffs against `last_message_ids`
 → `ctx.notify()` on new mail, and warms `ctx.cache` with 25 messages for instant panel load.

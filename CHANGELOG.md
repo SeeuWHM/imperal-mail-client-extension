@@ -1,5 +1,26 @@
 # Changelog
 
+## skeleton read-query COUNT surface — 2026-06-06 (commit `b34b99a`; all providers)
+
+Skeleton reworked from a recent-items list into a **count surface** so the brain answers
+"сколько всего / непрочитано / спам / архив / сегодня" **directly from skeleton facts** —
+no search, so no search-count cap (the `2001` bug) and no page-limited list (the `15` bug).
+
+- **New provider methods** (`base` default + Google/Microsoft overrides; IMAP via default + SINCE):
+  - `get_counts(ctx, acc) → {total, inbox_total, unread, spam, archive}` — normalized.
+    Google `total` = `users.getProfile.messagesTotal`; Microsoft `total` = `/me/messages $count`
+    (ConsistencyLevel: eventual); IMAP `total` = INBOX total (best-effort). Gmail `archive` = 0
+    (no Archive folder). `spam`/`archive` via each provider's folder stats.
+  - `get_today_count(ctx, acc) → int` — Google `after:YYYY/MM/DD` (id-pagination, not estimate),
+    Microsoft `$filter receivedDateTime ge … + $count`, IMAP `SEARCH SINCE`.
+- **`skeleton.py`** envelope (5 fields): `active_account`, `unread_total`, `today_total`,
+  `total_all`, `per_account` `[≤5 {email, total, unread, spam, archive}]`. Per-account loop now
+  calls `get_counts` + `get_today_count` (instead of a single folder-stat). Cache warmup uses
+  `inbox_total` (panel inbox total stays correct); `ctx.store` unread/last_message_ids untouched.
+- **Dropped:** `recent_emails` (low signal at scale — anchored to the busiest mailbox),
+  `accounts_connected`, per-account `is_active`, `filter_count`/`rule_count` (detail-on-demand).
+- **Cost:** ~+3 API calls/account/tick (getProfile/$count + spam stat + today). Within quota.
+
 ## skeleton recent-emails surface — 2026-06-06 (commit `479c612`; built strictly per docs)
 
 Implemented **exactly** to the docs recipe `recipes/skeleton-data-surface` (counts + a
