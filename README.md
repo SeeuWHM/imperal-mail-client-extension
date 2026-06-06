@@ -159,24 +159,32 @@ imperal-mail-client-extension/
 ## Skeleton
 
 `skeleton_refresh_mail_inbox_summary` (TTL=60, alert=True) returns a **raw dict** —
-no Pydantic in the response path — as a 6-field classifier envelope:
+no Pydantic in the response path — as a 6-field classifier envelope. Shape mirrors the
+docs recipe [`recipes/skeleton-data-surface`](https://docs.imperal.io/en/recipes/skeleton-data-surface/)
+(counts + flags + a recent-item array ≤5; label key `title`):
 
 ```json
 {
   "response": {
     "unread_total": 18766,
-    "accounts_connected": 3,
-    "per_account": [
-      {"email": "webhostmost@outlook.com", "unread_count": 9,     "is_active": false},
-      {"email": "zalupa@ignat.best",       "unread_count": 2,     "is_active": false},
-      {"email": "ignat@webhostmost.com",   "unread_count": 18755, "is_active": true}
-    ],
     "active_account": "ignat@webhostmost.com",
+    "per_account": [
+      {"email": "webhostmost@outlook.com", "unread_count": 9},
+      {"email": "zalupa@ignat.best",       "unread_count": 2},
+      {"email": "ignat@webhostmost.com",   "unread_count": 18755}
+    ],
+    "recent_emails": [
+      {"title": "Invoice #4471", "from": "billing@acme.com", "account": "ignat@webhostmost.com", "date": "2026-06-06"}
+    ],
     "filter_count": 0,
     "rule_count": 0
   }
 }
 ```
+
+`recent_emails` is the newest ≤5 across all accounts, assembled from the page-1 messages
+the skeleton already fetches (no extra API). Dropped vs. the old envelope: `accounts_connected`
+(= `len(per_account)`) and per-account `is_active` (= top-level `active_account`).
 
 Each run also: fetches folder stats + page 1 per account, diffs against `last_message_ids`
 → `ctx.notify()` on new mail, and warms `ctx.cache` with 25 messages for instant panel load.

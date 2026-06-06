@@ -1,5 +1,23 @@
 # Changelog
 
+## skeleton recent-emails surface — 2026-06-06 (commit `479c612`; built strictly per docs)
+
+Implemented **exactly** to the docs recipe `recipes/skeleton-data-surface` (counts + a
+recent-item array ≤5, label key `title`, `{"response":{…}}`, degrade-to-zeros, ≤6 top-level fields).
+
+- **`skeleton.py`** — `skeleton_refresh_mail_inbox_summary` now returns the 6-field envelope:
+  `unread_total`, `active_account`, `per_account` `[{email, unread_count}]`,
+  **`recent_emails`** `[≤5 {title, from, account, date}]`, `filter_count`, `rule_count`.
+  `recent_emails` = newest ≤5 across all accounts, assembled from the page-1 messages the
+  skeleton already fetches → **no extra API call**. `date` normalized to `YYYY-MM-DD`.
+  Added the recipe's `uid` guard (`{"response": {"note": …}}` when no user).
+- **Dropped** as redundant: `accounts_connected` (= `len(per_account)`) and per-account
+  `is_active` (= top-level `active_account`).
+- **Untouched** (panel depends on them): the `ctx.cache` warmup (25 msgs incl. `date`) and the
+  `ctx.store` per-account `unread_count` / `last_message_ids` updates.
+- **`schemas.py`** — reference `InboxSummary` model synced to the new shape (skeleton still
+  returns a raw dict; the model documents the shape only).
+
 ## post-5.7.0 patches — 2026-06-05/06 (commits `f549e4d` → `391b897`; code version stays 5.7.0)
 
 ### Skeleton — zero-Pydantic response (fixes persistent InboxSummary ValidationError)
