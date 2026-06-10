@@ -174,6 +174,10 @@ class BulkOperationResult(BaseModel):
     deleted: Optional[int] = None
     marked_read: Optional[int] = None
     marked_unread: Optional[int] = None
+    starred: Optional[int] = None
+    unstarred: Optional[int] = None
+    moved: Optional[int] = None
+    purged: Optional[int] = None
     total: Optional[int] = None
     failed: Optional[int] = None
     errors: list[str] = Field(default_factory=list)
