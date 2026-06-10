@@ -4,10 +4,19 @@ from __future__ import annotations
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from handlers_ui import _email_ui, _inbox_ui, _search_ui
+from pydantic import BaseModel, Field as PField
+
 from handlers_inbox_impl import (
     impl_inbox, impl_read_email, impl_search, impl_folder,
     impl_get_thread, impl_send, impl_reply, impl_forward,
+    impl_top_senders,
 )
+
+
+class TopSendersParams(BaseModel):
+    days: int = PField(default=90, description="Look-back period in days (default 90 = last 3 months)")
+    limit: int = PField(default=10, description="Number of top senders to return (default 10)")
+    account: str = PField(default="", description="Account email or ID (omit for active account)")
 from schemas import InboxParams, MessageIdParams, SearchParams, ThreadParams
 from schemas import SendParams, ReplyParams, ForwardParams
 from schemas_sdl_builders import (
@@ -157,3 +166,43 @@ async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("top_senders", action_type="read",
+               data_model=SearchPage,
+               description=(
+                   "Find top email senders by message count over a date range. "
+                   "Two-phase: (1) sample 500 recent emails to discover candidates, "
+                   "(2) accurate count per candidate via search. "
+                   "Use when user asks 'кто мне больше всего пишет', 'from whom do I get the most emails', "
+                   "'топ отправителей за 3 месяца', 'top senders last N days'. "
+                   "Returns ranked list with exact counts. Default: top 10 senders in last 90 days."
+               ))
+async def fn_top_senders(ctx, params: TopSendersParams) -> ActionResult:
+    """Rank email senders by count over a time window."""
+    try:
+        senders = await impl_top_senders(ctx, days=params.days,
+                                         limit=params.limit, account=params.account)
+        if not senders:
+            return ActionResult.success(
+                data=build_search_page(type("R", (), {"query": "top_senders",
+                                                       "results": [], "total": 0})()),
+                summary=f"No emails found in the last {params.days} days.",
+            )
+        lines = [f"{i+1}. {s['sender']} ({s['email']}) — {s['count']} emails"
+                 for i, s in enumerate(senders)]
+        summary = f"Top {len(senders)} senders in last {params.days} days:\n" + "\n".join(lines)
+        fake_results = [
+            {"message_id": s["email"], "from": s["sender"],
+             "subject": f"{s['count']} emails in last {params.days}d",
+             "date": "", "unread": False, "count": s["count"]}
+            for s in senders
+        ]
+        fake_sr = type("SR", (), {"query": "top_senders",
+                                   "results": fake_results, "total": len(senders)})()
+        return ActionResult.success(
+            data=build_search_page(fake_sr),
+            summary=summary,
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=True)

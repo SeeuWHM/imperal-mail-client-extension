@@ -116,6 +116,37 @@ async def impl_purge(ctx, message_id: str, from_folder: str = "Trash",
                    "purge", message_id)
 
 
+def _ops_to_labels(operations: list[str]) -> tuple[list[str], list[str]]:
+    """Convert a list of operation names → (add_labels, remove_labels) for batchModify."""
+    add, remove = set(), set()
+    for op in operations:
+        if op == "read":    remove.add("UNREAD")
+        elif op == "unread": add.add("UNREAD")
+        elif op == "archive": remove.add("INBOX")
+        elif op == "delete":  add.add("TRASH"); remove.add("INBOX")
+        elif op == "star":    add.add("STARRED")
+        elif op == "unstar":  remove.add("STARRED")
+    # Resolve conflicts: if both add+remove same label, remove wins
+    remove -= remove & add
+    add -= add & remove
+    return sorted(add), sorted(remove)
+
+
+def _combined_state_filter(operations: list[str]) -> str:
+    """Pick the primary state filter for a multi-op combo."""
+    if "archive" in operations or "delete" in operations:
+        return " in:inbox"
+    if "read" in operations:
+        return " is:unread"
+    if "unread" in operations:
+        return " is:read"
+    if "star" in operations:
+        return " -is:starred"
+    if "unstar" in operations:
+        return " is:starred"
+    return ""
+
+
 async def _batch_direct(provider, ctx, acc, ids_list: list, operation: str) -> dict:
     """Call provider batch methods directly, bypassing MAX_BULK_IDS user-facing limit.
     Used internally by impl_mark_all_matching which controls chunking itself.
@@ -126,6 +157,14 @@ async def _batch_direct(provider, ctx, acc, ids_list: list, operation: str) -> d
         return await provider.bulk_mark_read(ctx, acc, ids_list, read=False)
     if operation == "archive" and hasattr(provider, "bulk_archive_messages"):
         return await provider.bulk_archive_messages(ctx, acc, ids_list)
+    if operation == "read_and_archive" and hasattr(provider, "bulk_read_and_archive"):
+        return await provider.bulk_read_and_archive(ctx, acc, ids_list)
+    # Comma-separated multi-op: combine into one batchModify for Gmail
+    if "," in operation and hasattr(provider, "_batch_modify"):
+        ops = [o.strip() for o in operation.split(",") if o.strip()]
+        add_labels, remove_labels = _ops_to_labels(ops)
+        return await provider._batch_modify(ctx, acc, ids_list,
+                                             add_labels or None, remove_labels or None)
     if operation == "delete" and hasattr(provider, "bulk_trash_messages"):
         return await provider.bulk_trash_messages(ctx, acc, ids_list)
     if operation == "star" and hasattr(provider, "bulk_star_messages"):
@@ -332,14 +371,21 @@ async def impl_mark_all_matching(ctx, query: str, operation: str,
     # Add Gmail state filter so we only fetch emails that still need the operation.
     # This makes each iteration self-terminating: once all matching emails have the
     # desired state, the search returns empty and the loop stops.
-    state_filter = {
-        "read":    " is:unread",
-        "unread":  " is:read",
-        "archive": " in:inbox",
-        "delete":  " NOT in:trash",
-        "star":    " -is:starred",
-        "unstar":  " is:starred",
-    }.get(operation, "")
+    # Support comma-separated multi-op (e.g. "read,archive" or "read,archive,star")
+    is_multi = "," in operation
+    if is_multi:
+        ops_list = [o.strip() for o in operation.split(",") if o.strip()]
+        state_filter = _combined_state_filter(ops_list)
+    else:
+        state_filter = {
+            "read":             " is:unread",
+            "unread":           " is:read",
+            "archive":          " in:inbox",
+            "read_and_archive": " in:inbox",
+            "delete":           " NOT in:trash",
+            "star":             " -is:starred",
+            "unstar":           " is:starred",
+        }.get(operation, "")
     full_query = query.strip() + state_filter
 
     acc, provider = await _get_acc(ctx, account)

@@ -28,7 +28,8 @@ class MarkAllMatchingParams(BaseModel):
         default="read",
         description="Action to apply to ALL matching emails: "
                     "'read' (mark as read), 'unread' (mark as unread), "
-                    "'archive' (remove from INBOX / for Gmail removes INBOX label), "
+                    "'archive' (remove from INBOX), "
+                    "'read_and_archive' (mark read AND remove from INBOX in ONE call — use this when user wants both), "
                     "'delete' (move to trash — recoverable), "
                     "'star' (add star/flag), 'unstar' (remove star)"
     )
@@ -309,7 +310,7 @@ async def fn_bulk_purge(ctx, params: BulkPurgeParams) -> ActionResult:
                ))
 async def fn_mark_all_matching_read(ctx, params: MarkAllMatchingParams) -> ActionResult:
     """Mark ALL emails matching query as read/unread/archived/deleted — iterates until empty."""
-    valid_ops = ("read", "unread", "archive", "delete", "star", "unstar")
+    valid_ops = ("read", "unread", "archive", "read_and_archive", "delete", "star", "unstar")
     if params.operation not in valid_ops:
         return ActionResult.error(
             f"Invalid operation '{params.operation}'. Use: {', '.join(valid_ops)}",

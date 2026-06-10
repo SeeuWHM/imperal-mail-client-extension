@@ -275,3 +275,63 @@ async def impl_forward(ctx, message_id: str, to: str,
         except Exception as e:
             log.warning("forward failed for %s: %s", acc.get("email", "?"), e)
     raise RuntimeError(last_err)
+
+
+async def impl_top_senders(ctx, days: int = 90, limit: int = 10,
+                           account: str = "") -> list[dict]:
+    """Two-phase top-senders analysis.
+
+    Phase 1: sample up to 500 recent emails, extract unique senders.
+    Phase 2: accurate count per candidate sender via search total.
+    Returns list of {sender, email, count} sorted descending.
+    """
+    import asyncio
+    import re
+
+    acc, _ = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected.")
+
+    email_re = re.compile(r"<([^>]+)>")
+
+    # Phase 1: sample to discover candidates
+    sample = await impl_search(ctx, query=f"newer_than:{days}d",
+                               max_results=500, account=account)
+
+    raw_counts: dict[str, int] = {}
+    for msg in sample.results:
+        from_str = (msg.get("from") or "").strip()
+        m = email_re.search(from_str)
+        sender_email = m.group(1).lower() if m else from_str.lower()
+        raw_counts[sender_email] = raw_counts.get(sender_email, 0) + 1
+
+    if not raw_counts:
+        return []
+
+    candidates = sorted(raw_counts, key=lambda e: raw_counts[e], reverse=True)[:30]
+
+    # Phase 2: accurate count per candidate (concurrent, max 5)
+    sem = asyncio.Semaphore(5)
+
+    async def _count(sender_email: str) -> tuple[str, int]:
+        async with sem:
+            try:
+                r = await impl_search(ctx, query=f"from:{sender_email} newer_than:{days}d",
+                                      max_results=1, account=account)
+                return sender_email, r.total or raw_counts.get(sender_email, 0)
+            except Exception:
+                return sender_email, raw_counts.get(sender_email, 0)
+
+    counted = await asyncio.gather(*[_count(e) for e in candidates])
+    top = sorted(counted, key=lambda x: x[1], reverse=True)[:limit]
+
+    result = []
+    for sender_email, count in top:
+        orig = next(
+            (msg.get("from", sender_email) for msg in sample.results
+             if sender_email in (msg.get("from") or "").lower()),
+            sender_email,
+        )
+        display = email_re.sub("", orig).strip(" ,") or sender_email
+        result.append({"sender": display, "email": sender_email, "count": count})
+    return result

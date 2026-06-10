@@ -198,6 +198,12 @@ class GoogleWriteMixin:
         remove = None if starred else ["STARRED"]
         return await self._batch_modify(ctx, acc, message_ids, add, remove)
 
+    async def bulk_read_and_archive(self, ctx: Context, acc: dict,
+                                    message_ids: list) -> dict:
+        """Remove INBOX + UNREAD in ONE batchModify call — half the round-trips."""
+        return await self._batch_modify(ctx, acc, message_ids,
+                                        remove_labels=["INBOX", "UNREAD"])
+
     async def bulk_purge_messages(self, ctx: Context, acc: dict,
                                   message_ids: list) -> dict:
         """messages.batchDelete — permanently delete up to 1000 messages."""
