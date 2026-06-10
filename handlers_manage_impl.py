@@ -116,6 +116,25 @@ async def impl_purge(ctx, message_id: str, from_folder: str = "Trash",
                    "purge", message_id)
 
 
+async def _batch_direct(provider, ctx, acc, ids_list: list, operation: str) -> dict:
+    """Call provider batch methods directly, bypassing MAX_BULK_IDS user-facing limit.
+    Used internally by impl_mark_all_matching which controls chunking itself.
+    """
+    if operation == "read" and hasattr(provider, "bulk_mark_read"):
+        return await provider.bulk_mark_read(ctx, acc, ids_list, read=True)
+    if operation == "unread" and hasattr(provider, "bulk_mark_read"):
+        return await provider.bulk_mark_read(ctx, acc, ids_list, read=False)
+    if operation == "archive" and hasattr(provider, "bulk_archive_messages"):
+        return await provider.bulk_archive_messages(ctx, acc, ids_list)
+    if operation == "delete" and hasattr(provider, "bulk_trash_messages"):
+        return await provider.bulk_trash_messages(ctx, acc, ids_list)
+    if operation == "star" and hasattr(provider, "bulk_star_messages"):
+        return await provider.bulk_star_messages(ctx, acc, ids_list, starred=True)
+    if operation == "unstar" and hasattr(provider, "bulk_star_messages"):
+        return await provider.bulk_star_messages(ctx, acc, ids_list, starred=False)
+    return {"RESULT": "ERROR", "error": f"No batch method for '{operation}'"}
+
+
 def _check_bulk_ids(ids: list, operation: str) -> None:
     if not ids:
         raise RuntimeError("No message IDs provided.")
@@ -310,8 +329,6 @@ async def impl_mark_all_matching(ctx, query: str, operation: str,
     Each iteration: 1 search call + 1 Gmail batchModify call (for Gmail).
     Safety cap: 20 iterations × 200 IDs = up to 4000 emails per call.
     """
-    from handlers_inbox_impl import impl_search
-
     # Add Gmail state filter so we only fetch emails that still need the operation.
     # This makes each iteration self-terminating: once all matching emails have the
     # desired state, the search returns empty and the loop stops.
@@ -325,40 +342,57 @@ async def impl_mark_all_matching(ctx, query: str, operation: str,
     }.get(operation, "")
     full_query = query.strip() + state_filter
 
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected.")
+
     total_succeeded = 0
     total_attempted = 0
     MAX_ITERATIONS = 20
 
     for _iteration in range(MAX_ITERATIONS):
-        result = await impl_search(ctx, query=full_query, max_results=200, account=account)
-        if not result.results:
-            break
-
-        ids_list = [m.get("message_id") or m.get("id") or "" for m in result.results]
-        ids_list = [i for i in ids_list if i]
-        if not ids_list:
-            break
-
-        ids_str = ",".join(ids_list)
-        total_attempted += len(ids_list)
-
-        if operation == "read":
-            bulk = await impl_bulk_mark_read(ctx, ids_str, account=account)
-        elif operation == "unread":
-            bulk = await impl_bulk_mark_unread(ctx, ids_str, account=account)
-        elif operation == "archive":
-            bulk = await impl_bulk_archive(ctx, ids_str, account=account)
-        elif operation == "delete":
-            bulk = await impl_bulk_delete(ctx, ids_str, account=account)
-        elif operation in ("star", "unstar"):
-            bulk = await impl_bulk_star(ctx, ids_str,
-                                        starred=(operation == "star"), account=account)
+        if hasattr(provider, "search_ids_only"):
+            # Gmail fast path: IDs only, no metadata fetch → no lost IDs from rate limits.
+            # Returns up to 1000 per call; batchModify handles all 1000 in one HTTP call.
+            ids_list = await provider.search_ids_only(ctx, acc, full_query, max_results=1000)
+            if not ids_list:
+                break
+            total_attempted += len(ids_list)
+            result = await _batch_direct(provider, ctx, acc, ids_list, operation)
+            succeeded = result.get("succeeded", 0) if result.get("RESULT") == "SUCCESS" else 0
+            total_succeeded += succeeded
+            if succeeded == 0:
+                break
         else:
-            break
-
-        total_succeeded += bulk.succeeded
-        if bulk.succeeded == 0:
-            break  # nothing changed — stop to avoid infinite loop
+            # Slow path (IMAP/MS): impl_search with metadata + impl_bulk_* with chunking.
+            from handlers_inbox_impl import impl_search
+            sr = await impl_search(ctx, query=full_query, max_results=200, account=account)
+            ids_list = [m.get("message_id") or m.get("id") or "" for m in sr.results]
+            ids_list = [i for i in ids_list if i]
+            if not ids_list:
+                break
+            total_attempted += len(ids_list)
+            # Chunk to MAX_BULK_IDS so impl_bulk_* checks pass
+            succeeded = 0
+            for i in range(0, len(ids_list), MAX_BULK_IDS):
+                chunk_str = ",".join(ids_list[i:i + MAX_BULK_IDS])
+                if operation == "read":
+                    b = await impl_bulk_mark_read(ctx, chunk_str, account=account)
+                elif operation == "unread":
+                    b = await impl_bulk_mark_unread(ctx, chunk_str, account=account)
+                elif operation == "archive":
+                    b = await impl_bulk_archive(ctx, chunk_str, account=account)
+                elif operation == "delete":
+                    b = await impl_bulk_delete(ctx, chunk_str, account=account)
+                elif operation in ("star", "unstar"):
+                    b = await impl_bulk_star(ctx, chunk_str,
+                                             starred=(operation == "star"), account=account)
+                else:
+                    b = BulkOperationResult(operation=operation, succeeded=0, total=0)
+                succeeded += b.succeeded
+            total_succeeded += succeeded
+            if succeeded == 0:
+                break
 
     per_op = {"read": "marked_read", "unread": "marked_unread", "archive": "archived",
               "delete": "deleted", "star": "starred", "unstar": "unstarred"}.get(operation)

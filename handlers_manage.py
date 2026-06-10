@@ -172,7 +172,7 @@ async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
 @chat.function("bulk_archive", action_type="write", event="bulk_archived",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Archive multiple emails in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails).")
+               description="Archive multiple emails. ⚠️ ROUTING RULE: if the user says 'archive ALL from X', 'заархивируй все от Y' — use mark_all_matching_read(operation='archive') instead. This function is for a specific known list of IDs. WORKFLOW: first call search()/inbox() to get message_ids.")
 async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
     """Archive multiple emails in one operation."""
     try:
@@ -189,7 +189,7 @@ async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
 @chat.function("bulk_delete", action_type="write", event="bulk_deleted",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Move multiple emails to Trash in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails).")
+               description="Move multiple emails to Trash (recoverable). ⚠️ ROUTING RULE: if user says 'delete ALL from X', 'удали все письма от Y' — use mark_all_matching_read(operation='delete') instead. This function is for a specific known list of IDs. WORKFLOW: first call search()/inbox() to get message_ids.")
 async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
     """Move multiple emails to Trash in one operation."""
     try:
@@ -206,7 +206,7 @@ async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
 @chat.function("bulk_mark_read", action_type="write", event="bulk_marked_read",
                effects=["update:email"],
                data_model=BulkMailOpResult,
-               description="Mark multiple emails as read in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails). To act on 'all' emails in a folder, list that folder first (inbox()/folder() with the account) and pass every returned message_id.")
+               description="Mark multiple emails as read. Pass message_ids as comma-separated string. ⚠️ ROUTING RULE: if the user says 'mark ALL emails from X as read', 'прочитай все от X', 'отметь все письма от Y' — use mark_all_matching_read() instead, NOT this function. This function is for a specific known list of IDs only. WORKFLOW: first call search()/inbox() to get message_ids, pass account= for that mailbox.")
 async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
     """Mark multiple emails as read in one operation."""
     try:

@@ -210,6 +210,37 @@ class GoogleReadMixin:
             result["attachments"] = attachments
         return self.ok(**result)
 
+    async def search_ids_only(self, ctx: Context, acc: dict, query: str,
+                              max_results: int = 1000) -> list[str]:
+        """Return message IDs for a query WITHOUT metadata fetch.
+
+        Used by bulk operations (mark_all_matching_read etc.) to avoid losing
+        IDs whose metadata fetch would return non-200 (rate limits, race conditions).
+        Up to 10 pages × 500 = 5000 IDs; stops at max_results.
+        """
+        collected: list[str] = []
+        page_token: str | None = None
+        while len(collected) < max_results:
+            params: dict = {
+                "q": query,
+                "maxResults": min(500, max_results - len(collected)),
+                "fields": "messages/id,nextPageToken",
+            }
+            if page_token:
+                params["pageToken"] = page_token
+            try:
+                resp = await _api_get(ctx, "messages", acc, params=params)
+                if resp.status_code != 200:
+                    break
+                body = resp.json()
+                collected.extend(r["id"] for r in body.get("messages", []) or [])
+                page_token = body.get("nextPageToken")
+                if not page_token:
+                    break
+            except Exception:
+                break
+        return collected[:max_results]
+
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         page_size  = min(max(max_results, 1), 500)
