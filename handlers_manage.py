@@ -8,11 +8,31 @@ from handlers_manage_impl import (
     impl_move, impl_purge,
     impl_bulk_archive, impl_bulk_delete, impl_bulk_mark_read, impl_bulk_mark_unread,
     impl_bulk_move, impl_bulk_star, impl_bulk_purge,
+    impl_mark_all_matching,
 )
+from pydantic import BaseModel, Field as PField
+
 from schemas import (
     MessageIdParams, StarParams, MoveParams, PurgeParams, BulkParams,
     BulkMoveParams, BulkStarParams, BulkPurgeParams,
 )
+
+
+class MarkAllMatchingParams(BaseModel):
+    query: str = PField(
+        description="Gmail search query for emails to act on — e.g. 'from:linkedin', "
+                    "'from:notifications@twitter.com', 'subject:invoice'. "
+                    "Do NOT add is:unread/is:read yourself — the function adds the right filter automatically."
+    )
+    operation: str = PField(
+        default="read",
+        description="Action to apply to ALL matching emails: "
+                    "'read' (mark as read), 'unread' (mark as unread), "
+                    "'archive' (remove from INBOX / for Gmail removes INBOX label), "
+                    "'delete' (move to trash — recoverable), "
+                    "'star' (add star/flag), 'unstar' (remove star)"
+    )
+    account: str = PField(default="", description="Account email or ID (omit for active account)")
 from schemas_sdl_builders import (
     MailOpResult, BulkMailOpResult,
     build_mail_op, build_bulk_mail_op,
@@ -271,3 +291,40 @@ async def fn_bulk_purge(ctx, params: BulkPurgeParams) -> ActionResult:
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)
+
+
+@chat.function("mark_all_matching_read", action_type="write", event="bulk_marked_read",
+               effects=["update:email"],
+               data_model=BulkMailOpResult,
+               description=(
+                   "Apply an action to ALL emails matching a query — iterates automatically until none remain. "
+                   "Use when user says: 'mark all LinkedIn emails as read', 'archive all from X', "
+                   "'delete all newsletters', 'star all from boss@company.com', "
+                   "'прочитай все письма от X', 'архивируй всё от Y', 'удали всю рассылку от Z'. "
+                   "Operations: read, unread, archive, delete, star, unstar. "
+                   "Gmail: uses batchModify/batchDelete API — 200 emails per iteration in ONE HTTP call (not per-email). "
+                   "Outlook/IMAP: parallel per-message with 5 concurrent connections. "
+                   "Do NOT add is:unread / is:starred to query — added automatically per operation. "
+                   "Handles 780+ emails in ~15 seconds. Safety cap: 20 iterations × 200 = 4000 emails."
+               ))
+async def fn_mark_all_matching_read(ctx, params: MarkAllMatchingParams) -> ActionResult:
+    """Mark ALL emails matching query as read/unread/archived/deleted — iterates until empty."""
+    valid_ops = ("read", "unread", "archive", "delete", "star", "unstar")
+    if params.operation not in valid_ops:
+        return ActionResult.error(
+            f"Invalid operation '{params.operation}'. Use: {', '.join(valid_ops)}",
+            retryable=False,
+        )
+    try:
+        r = await impl_mark_all_matching(ctx, query=params.query,
+                                         operation=params.operation, account=params.account)
+        op_label = {"read": "marked as read", "unread": "marked as unread",
+                    "archive": "archived", "delete": "moved to trash",
+                    "star": "starred", "unstar": "unstarred"}.get(params.operation, params.operation)
+        return ActionResult.success(
+            data=build_bulk_mail_op(r),
+            summary=f"{r.succeeded} email(s) {op_label} (query: '{params.query}').",
+            refresh_panels=["inbox"],
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=True)

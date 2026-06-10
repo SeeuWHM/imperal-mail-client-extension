@@ -8,13 +8,11 @@ from providers import get_provider
 from providers.helpers import _all_accounts, _remove_multiple_from_cache
 from schemas import BulkOperationResult, OperationResult
 
-# Hard cap per bulk call. Sequential calls would time out well below this;
-# parallel execution (asyncio.gather) keeps wall-clock under ~3s for 200 IDs.
+# Hard cap per bulk call.
+# Gmail: uses batchModify (1 HTTP call for all IDs — no concurrency concern).
+# MS Graph / IMAP: parallel per-message with semaphore.
 MAX_BULK_IDS = 200
-# 5 simultaneous API calls — safe for all providers:
-# Gmail (250 quota/s, mark_read=100 units ≈ 2.5 ops/s), IMAP (server connection limit ~5-10),
-# Microsoft Graph (~4 req/s). Even at N=5 this is ~10x faster than sequential.
-_BULK_CONCURRENCY = 5
+_BULK_CONCURRENCY = 5   # for non-Gmail providers
 
 
 def _unwrap(result: dict, op: str, message_id: str = "") -> OperationResult:
@@ -32,7 +30,6 @@ def _unwrap(result: dict, op: str, message_id: str = "") -> OperationResult:
 
 
 async def _try_all_accounts(ctx, message_id: str, op_name: str, op_fn) -> OperationResult:
-    """Try op_fn(acc, provider) across all connected accounts — first success wins."""
     accounts = await _all_accounts(ctx)
     if not accounts:
         raise RuntimeError("No email account connected. Connect one first.")
@@ -119,24 +116,29 @@ async def impl_purge(ctx, message_id: str, from_folder: str = "Trash",
                    "purge", message_id)
 
 
-async def _run_bulk(ctx, message_ids: str, operation: str, account: str = "") -> BulkOperationResult:
-    """Execute a bulk mail operation in parallel (up to _BULK_CONCURRENCY simultaneous calls).
-
-    Sequential execution caused timeouts on large batches (115 calls × 200ms = 23s).
-    Parallel execution completes 200 calls in ~3-5s with a 20-slot semaphore.
-    """
-    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+def _check_bulk_ids(ids: list, operation: str) -> None:
     if not ids:
         raise RuntimeError("No message IDs provided.")
     if len(ids) > MAX_BULK_IDS:
         raise RuntimeError(
-            f"Too many message IDs: {len(ids)}. Maximum per bulk call is {MAX_BULK_IDS}. "
-            "Split into multiple calls or use search(max_results=200) to get IDs in batches."
+            f"Too many message IDs: {len(ids)}. Max per call: {MAX_BULK_IDS}. "
+            "For 'mark ALL matching as read' use mark_all_matching_read() instead."
         )
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
 
+
+def _make_bulk_result(operation: str, succeeded: int, total: int,
+                      failed_count: int = 0, errors: list | None = None) -> BulkOperationResult:
+    per_op = {"archive": "archived", "delete": "deleted",
+              "read": "marked_read", "unread": "marked_unread"}.get(operation)
+    payload: dict = {"operation": operation, "succeeded": succeeded, "total": total,
+                     "failed": failed_count or None, "errors": (errors or [])[:3]}
+    if per_op:
+        payload[per_op] = succeeded
+    return BulkOperationResult(**payload)
+
+
+async def _parallel_bulk(ctx, acc, provider, ids: list, operation: str) -> BulkOperationResult:
+    """Parallel per-message fallback (MS Graph, IMAP, non-Gmail providers)."""
     sem = asyncio.Semaphore(_BULK_CONCURRENCY)
 
     async def _do_one(mid: str) -> dict:
@@ -144,14 +146,13 @@ async def _run_bulk(ctx, message_ids: str, operation: str, account: str = "") ->
             op_fn = {"archive": provider.archive, "delete": provider.delete}.get(operation)
             if op_fn:
                 return await op_fn(ctx, acc, mid)
-            elif operation == "read":
+            if operation == "read":
                 return await provider.mark_read(ctx, acc, mid, read=True)
-            elif operation == "unread":
+            if operation == "unread":
                 return await provider.mark_read(ctx, acc, mid, read=False)
             return {"RESULT": "ERROR", "error": "Unknown operation"}
 
     task_results = await asyncio.gather(*[_do_one(mid) for mid in ids], return_exceptions=True)
-
     success, failed, removed = 0, [], []
     for mid, r in zip(ids, task_results):
         if isinstance(r, Exception):
@@ -162,133 +163,207 @@ async def _run_bulk(ctx, message_ids: str, operation: str, account: str = "") ->
                 removed.append(mid)
         else:
             failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
-
     if removed:
         await _remove_multiple_from_cache(ctx, acc.get("email", ""), removed)
-
-    per_op_field = {"archive": "archived", "delete": "deleted",
-                    "read": "marked_read", "unread": "marked_unread"}.get(operation)
-    payload = {"operation": operation, "succeeded": success,
-               "total": len(ids), "failed": len(failed) or None, "errors": failed[:3]}
-    if per_op_field:
-        payload[per_op_field] = success
-    return BulkOperationResult(**payload)
-
-
-async def impl_bulk_archive(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
-    return await _run_bulk(ctx, message_ids, "archive", account=account)
-
-
-async def impl_bulk_delete(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
-    return await _run_bulk(ctx, message_ids, "delete", account=account)
+    return _make_bulk_result(operation, success, len(ids), len(failed), failed)
 
 
 async def impl_bulk_mark_read(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
-    return await _run_bulk(ctx, message_ids, "read", account=account)
+    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+    _check_bulk_ids(ids, "read")
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected.")
+    if hasattr(provider, "bulk_mark_read"):
+        r = await provider.bulk_mark_read(ctx, acc, ids, read=True)
+        if r.get("RESULT") == "SUCCESS":
+            return _make_bulk_result("read", r.get("succeeded", len(ids)), len(ids))
+    return await _parallel_bulk(ctx, acc, provider, ids, "read")
 
 
 async def impl_bulk_mark_unread(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
-    return await _run_bulk(ctx, message_ids, "unread", account=account)
-
-
-async def impl_bulk_move(ctx, message_ids: str, from_folder: str, to_folder: str,
-                         account: str = "") -> BulkOperationResult:
     ids = [i.strip() for i in message_ids.split(",") if i.strip()]
-    if not ids:
-        raise RuntimeError("No message IDs provided.")
-    if len(ids) > MAX_BULK_IDS:
-        raise RuntimeError(
-            f"Too many message IDs: {len(ids)}. Maximum per bulk call is {MAX_BULK_IDS}."
-        )
+    _check_bulk_ids(ids, "unread")
     acc, provider = await _get_acc(ctx, account)
     if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
+        raise RuntimeError("No email account connected.")
+    if hasattr(provider, "bulk_mark_read"):
+        r = await provider.bulk_mark_read(ctx, acc, ids, read=False)
+        if r.get("RESULT") == "SUCCESS":
+            return _make_bulk_result("unread", r.get("succeeded", len(ids)), len(ids))
+    return await _parallel_bulk(ctx, acc, provider, ids, "unread")
 
-    sem = asyncio.Semaphore(_BULK_CONCURRENCY)
 
-    async def _do_one(mid: str) -> dict:
-        async with sem:
-            return await provider.move(ctx, acc, mid, from_folder=from_folder, to_folder=to_folder)
+async def impl_bulk_archive(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
+    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+    _check_bulk_ids(ids, "archive")
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected.")
+    if hasattr(provider, "bulk_archive_messages"):
+        r = await provider.bulk_archive_messages(ctx, acc, ids)
+        if r.get("RESULT") == "SUCCESS":
+            return _make_bulk_result("archive", r.get("succeeded", len(ids)), len(ids))
+    return await _parallel_bulk(ctx, acc, provider, ids, "archive")
 
-    task_results = await asyncio.gather(*[_do_one(mid) for mid in ids], return_exceptions=True)
 
-    success, failed = 0, []
-    for mid, r in zip(ids, task_results):
-        if isinstance(r, Exception):
-            failed.append(f"{mid[:16]}: {r}")
-        elif r.get("RESULT") == "SUCCESS":
-            success += 1
-        else:
-            failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
-
-    return BulkOperationResult(operation="move", succeeded=success,
-                               total=len(ids), failed=len(failed) or None, errors=failed[:3])
+async def impl_bulk_delete(ctx, message_ids: str, account: str = "") -> BulkOperationResult:
+    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+    _check_bulk_ids(ids, "delete")
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected.")
+    if hasattr(provider, "bulk_trash_messages"):
+        r = await provider.bulk_trash_messages(ctx, acc, ids)
+        if r.get("RESULT") == "SUCCESS":
+            return _make_bulk_result("delete", r.get("succeeded", len(ids)), len(ids))
+    return await _parallel_bulk(ctx, acc, provider, ids, "delete")
 
 
 async def impl_bulk_star(ctx, message_ids: str, starred: bool = True,
                          account: str = "") -> BulkOperationResult:
     ids = [i.strip() for i in message_ids.split(",") if i.strip()]
-    if not ids:
-        raise RuntimeError("No message IDs provided.")
-    if len(ids) > MAX_BULK_IDS:
-        raise RuntimeError(
-            f"Too many message IDs: {len(ids)}. Maximum per bulk call is {MAX_BULK_IDS}."
-        )
+    _check_bulk_ids(ids, "star")
     acc, provider = await _get_acc(ctx, account)
     if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
-
+        raise RuntimeError("No email account connected.")
+    if hasattr(provider, "bulk_star_messages"):
+        r = await provider.bulk_star_messages(ctx, acc, ids, starred=starred)
+        if r.get("RESULT") == "SUCCESS":
+            op = "star" if starred else "unstar"
+            return _make_bulk_result(op, r.get("succeeded", len(ids)), len(ids))
+    # Parallel fallback
+    ids_str = ",".join(ids)
     sem = asyncio.Semaphore(_BULK_CONCURRENCY)
-
-    async def _do_one(mid: str) -> dict:
+    async def _do(mid):
         async with sem:
             return await provider.star(ctx, acc, mid, starred=starred)
-
-    task_results = await asyncio.gather(*[_do_one(mid) for mid in ids], return_exceptions=True)
-
+    results = await asyncio.gather(*[_do(mid) for mid in ids], return_exceptions=True)
     success, failed = 0, []
-    for mid, r in zip(ids, task_results):
+    for mid, r in zip(ids, results):
         if isinstance(r, Exception):
             failed.append(f"{mid[:16]}: {r}")
         elif r.get("RESULT") == "SUCCESS":
             success += 1
         else:
             failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
-
     op = "star" if starred else "unstar"
-    return BulkOperationResult(operation=op, succeeded=success,
+    return _make_bulk_result(op, success, len(ids), len(failed), failed)
+
+
+async def impl_bulk_move(ctx, message_ids: str, from_folder: str, to_folder: str,
+                         account: str = "") -> BulkOperationResult:
+    ids = [i.strip() for i in message_ids.split(",") if i.strip()]
+    _check_bulk_ids(ids, "move")
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected.")
+    sem = asyncio.Semaphore(_BULK_CONCURRENCY)
+    async def _do(mid):
+        async with sem:
+            return await provider.move(ctx, acc, mid, from_folder=from_folder, to_folder=to_folder)
+    results = await asyncio.gather(*[_do(mid) for mid in ids], return_exceptions=True)
+    success, failed = 0, []
+    for mid, r in zip(ids, results):
+        if isinstance(r, Exception):
+            failed.append(f"{mid[:16]}: {r}")
+        elif r.get("RESULT") == "SUCCESS":
+            success += 1
+        else:
+            failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
+    return BulkOperationResult(operation="move", succeeded=success,
                                total=len(ids), failed=len(failed) or None, errors=failed[:3])
 
 
 async def impl_bulk_purge(ctx, message_ids: str, from_folder: str = "Trash",
                           account: str = "") -> BulkOperationResult:
     ids = [i.strip() for i in message_ids.split(",") if i.strip()]
-    if not ids:
-        raise RuntimeError("No message IDs provided.")
-    if len(ids) > MAX_BULK_IDS:
-        raise RuntimeError(
-            f"Too many message IDs: {len(ids)}. Maximum per bulk call is {MAX_BULK_IDS}."
-        )
+    _check_bulk_ids(ids, "purge")
     acc, provider = await _get_acc(ctx, account)
     if not acc:
-        raise RuntimeError("No email account connected. Connect one first.")
-
+        raise RuntimeError("No email account connected.")
+    if hasattr(provider, "bulk_purge_messages"):
+        r = await provider.bulk_purge_messages(ctx, acc, ids)
+        if r.get("RESULT") == "SUCCESS":
+            return _make_bulk_result("purge", r.get("succeeded", len(ids)), len(ids))
     sem = asyncio.Semaphore(_BULK_CONCURRENCY)
-
-    async def _do_one(mid: str) -> dict:
+    async def _do(mid):
         async with sem:
             return await provider.purge(ctx, acc, mid, from_folder=from_folder)
-
-    task_results = await asyncio.gather(*[_do_one(mid) for mid in ids], return_exceptions=True)
-
+    results = await asyncio.gather(*[_do(mid) for mid in ids], return_exceptions=True)
     success, failed = 0, []
-    for mid, r in zip(ids, task_results):
+    for mid, r in zip(ids, results):
         if isinstance(r, Exception):
             failed.append(f"{mid[:16]}: {r}")
         elif r.get("RESULT") == "SUCCESS":
             success += 1
         else:
             failed.append(f"{mid[:16]}: {r.get('error') or '?'}")
+    return _make_bulk_result("purge", success, len(ids), len(failed), failed)
 
-    return BulkOperationResult(operation="purge", succeeded=success,
-                               total=len(ids), failed=len(failed) or None, errors=failed[:3])
+
+async def impl_mark_all_matching(ctx, query: str, operation: str,
+                                 account: str = "") -> BulkOperationResult:
+    """Loop: search(query + filter) → bulk op → repeat until empty.
+
+    Handles unlimited emails without pagination issues.
+    Each iteration: 1 search call + 1 Gmail batchModify call (for Gmail).
+    Safety cap: 20 iterations × 200 IDs = up to 4000 emails per call.
+    """
+    from handlers_inbox_impl import impl_search
+
+    # Add Gmail state filter so we only fetch emails that still need the operation.
+    # This makes each iteration self-terminating: once all matching emails have the
+    # desired state, the search returns empty and the loop stops.
+    state_filter = {
+        "read":    " is:unread",
+        "unread":  " is:read",
+        "archive": " in:inbox",
+        "delete":  " NOT in:trash",
+        "star":    " -is:starred",
+        "unstar":  " is:starred",
+    }.get(operation, "")
+    full_query = query.strip() + state_filter
+
+    total_succeeded = 0
+    total_attempted = 0
+    MAX_ITERATIONS = 20
+
+    for _iteration in range(MAX_ITERATIONS):
+        result = await impl_search(ctx, query=full_query, max_results=200, account=account)
+        if not result.results:
+            break
+
+        ids_list = [m.get("message_id") or m.get("id") or "" for m in result.results]
+        ids_list = [i for i in ids_list if i]
+        if not ids_list:
+            break
+
+        ids_str = ",".join(ids_list)
+        total_attempted += len(ids_list)
+
+        if operation == "read":
+            bulk = await impl_bulk_mark_read(ctx, ids_str, account=account)
+        elif operation == "unread":
+            bulk = await impl_bulk_mark_unread(ctx, ids_str, account=account)
+        elif operation == "archive":
+            bulk = await impl_bulk_archive(ctx, ids_str, account=account)
+        elif operation == "delete":
+            bulk = await impl_bulk_delete(ctx, ids_str, account=account)
+        elif operation in ("star", "unstar"):
+            bulk = await impl_bulk_star(ctx, ids_str,
+                                        starred=(operation == "star"), account=account)
+        else:
+            break
+
+        total_succeeded += bulk.succeeded
+        if bulk.succeeded == 0:
+            break  # nothing changed — stop to avoid infinite loop
+
+    per_op = {"read": "marked_read", "unread": "marked_unread", "archive": "archived",
+              "delete": "deleted", "star": "starred", "unstar": "unstarred"}.get(operation)
+    payload: dict = {"operation": operation, "succeeded": total_succeeded,
+                     "total": total_attempted}
+    if per_op:
+        payload[per_op] = total_succeeded
+    return BulkOperationResult(**payload)

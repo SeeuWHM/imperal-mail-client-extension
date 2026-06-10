@@ -153,6 +153,67 @@ class GoogleWriteMixin:
         except Exception as e:
             return self.err(f"Gmail purge failed: {e}")
 
+    # ── Gmail Batch APIs (single HTTP call for up to 1000 messages) ─────────
+
+    async def _batch_modify(self, ctx: Context, acc: dict, message_ids: list,
+                            add_labels: list | None = None,
+                            remove_labels: list | None = None) -> dict:
+        """messages.batchModify — one call, up to 1000 IDs."""
+        try:
+            acc = await _refresh_token_if_needed(ctx, acc)
+            payload: dict = {"ids": message_ids[:1000]}
+            if add_labels:
+                payload["addLabelIds"] = add_labels
+            if remove_labels:
+                payload["removeLabelIds"] = remove_labels
+            resp = await ctx.http.post(
+                f"{GMAIL_API}/messages/batchModify",
+                headers={"Authorization": f"Bearer {acc['access_token']}"},
+                json=payload,
+            )
+            if resp.status_code in (200, 204):
+                return self.ok(succeeded=len(message_ids), total=len(message_ids))
+            return self.err(f"batchModify {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            return self.err(f"batchModify failed: {e}")
+
+    async def bulk_mark_read(self, ctx: Context, acc: dict,
+                             message_ids: list, read: bool = True) -> dict:
+        add = [] if read else ["UNREAD"]
+        remove = ["UNREAD"] if read else []
+        return await self._batch_modify(ctx, acc, message_ids, add or None, remove or None)
+
+    async def bulk_archive_messages(self, ctx: Context, acc: dict,
+                                    message_ids: list) -> dict:
+        return await self._batch_modify(ctx, acc, message_ids, remove_labels=["INBOX"])
+
+    async def bulk_trash_messages(self, ctx: Context, acc: dict,
+                                  message_ids: list) -> dict:
+        return await self._batch_modify(ctx, acc, message_ids,
+                                        add_labels=["TRASH"], remove_labels=["INBOX"])
+
+    async def bulk_star_messages(self, ctx: Context, acc: dict,
+                                 message_ids: list, starred: bool = True) -> dict:
+        add = ["STARRED"] if starred else None
+        remove = None if starred else ["STARRED"]
+        return await self._batch_modify(ctx, acc, message_ids, add, remove)
+
+    async def bulk_purge_messages(self, ctx: Context, acc: dict,
+                                  message_ids: list) -> dict:
+        """messages.batchDelete — permanently delete up to 1000 messages."""
+        try:
+            acc = await _refresh_token_if_needed(ctx, acc)
+            resp = await ctx.http.post(
+                f"{GMAIL_API}/messages/batchDelete",
+                headers={"Authorization": f"Bearer {acc['access_token']}"},
+                json={"ids": message_ids[:1000]},
+            )
+            if resp.status_code in (200, 204):
+                return self.ok(succeeded=len(message_ids), total=len(message_ids))
+            return self.err(f"batchDelete {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            return self.err(f"batchDelete failed: {e}")
+
     async def create_folder(self, ctx: Context, acc: dict, folder_name: str) -> dict:
         """Create a Gmail label (labels are Gmail's folder equivalent)."""
         try:
