@@ -1,4 +1,4 @@
-"""Mail Client · Accounts/Filters/Rules Panel (right slot, multi-tab)."""
+"""Mail Client · Accounts / Filters Panel (right slot, multi-tab)."""
 from __future__ import annotations
 
 import logging
@@ -13,9 +13,6 @@ PROVIDER_LABELS = {
     "yahoo": "Yahoo",  "imap": "IMAP",
 }
 
-RULE_TYPE_LABELS = {"forward": "Forwarder", "autoreply": "Auto-reply"}
-RULE_TYPE_ICONS  = {"forward": "Forward", "autoreply": "MessageSquareReply"}
-
 
 # ── Tab navigation ────────────────────────────────────────────────────────────
 
@@ -23,7 +20,6 @@ def _tab_bar(active: str) -> ui.UINode:
     tabs = [
         ("accounts", "Accounts", "Users"),
         ("filters",  "Filters",  "Filter"),
-        ("rules",    "Rules",    "Bot"),
     ]
     buttons = [
         ui.Button(
@@ -54,7 +50,6 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
         provider  = acc.get("provider", "oauth")
         is_active = acc.get("is_active", False)
         unread    = int(acc.get("unread_count", 0) or 0)
-        # Active account: green border + checkmark badge + bold subtitle
         subtitle_text = PROVIDER_LABELS.get(provider, "Unknown")
         if is_active:
             subtitle_text = f"✓ Active — {subtitle_text}"
@@ -90,7 +85,6 @@ async def _build_filters_tab(ctx) -> ui.UINode:
     active_email = acc.get("email", "") if acc else ""
     page = await ctx.store.query("mail_filters",
                                  where={"owner_id": ctx.user.imperal_id}, limit=20)
-    # Show only filters for current active account (or legacy filters without account)
     page_data = [f for f in page.data
                  if not f.data.get("account_email") or
                  f.data.get("account_email") == active_email]
@@ -129,62 +123,14 @@ async def _build_filters_tab(ctx) -> ui.UINode:
     ], gap=2)
 
 
-# ── Rules tab ─────────────────────────────────────────────────────────────────
-
-async def _build_rules_tab(ctx) -> ui.UINode:
-    page = await ctx.store.query("mail_rules",
-                                 where={"owner_id": ctx.user.imperal_id}, limit=20)
-    if not page.data:
-        return ui.Stack([
-            ui.Empty(message="No automation rules", icon="Bot"),
-            ui.Alert(message="Tell Webbee: 'forward emails from X to Y' or 'set up out-of-office reply'",
-                     type="info"),
-        ], gap=2)
-
-    items = []
-    for r in page.data:
-        d = r.data
-        rtype = d.get("rule_type", "forward")
-        enabled = bool(d.get("enabled", True))
-        if rtype == "forward":
-            subtitle = f"→ {d.get('forward_to', '?')}"
-            if d.get("criteria_from"): subtitle += f" (from: {d['criteria_from']})"
-        else:
-            stype = d.get("schedule_type", "always")
-            if stype == "always":
-                subtitle = "Active always"
-            else:
-                t_start = d.get("schedule_start", "09:00")
-                t_end = d.get("schedule_end", "18:00")
-                subtitle = f"Outside {t_start}–{t_end}"
-        items.append(ui.ListItem(
-            id=r.id, title=d.get("name", "rule"),
-            subtitle=f"{RULE_TYPE_LABELS.get(rtype, rtype)} · {subtitle}",
-            badge=ui.Badge("ON", color="green") if enabled else ui.Badge("OFF", color="gray"),
-            actions=[
-                {"label": "Disable" if enabled else "Enable", "icon": "Power",
-                 "on_click": ui.Call("toggle_rule", rule_id=r.id, enabled=not enabled)},
-                {"label": "Delete", "icon": "Trash2",
-                 "on_click": ui.Call("delete_rule", rule_id=r.id)},
-            ],
-        ))
-
-    return ui.Stack([
-        ui.Text(f"{len(page.data)} rule(s) — runs every 5 min", variant="caption"),
-        ui.List(items=items),
-    ], gap=2)
-
-
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def build_accounts_panel(ctx, tab: str = "accounts", **kwargs) -> ui.UINode:
-    """Render accounts/filters/rules right panel with tab switching."""
+    """Render accounts/filters right panel with tab switching."""
     tab_bar = _tab_bar(tab)
     try:
         if tab == "filters":
             content = await _build_filters_tab(ctx)
-        elif tab == "rules":
-            content = await _build_rules_tab(ctx)
         else:
             content = await _build_accounts_tab(ctx)
     except Exception as exc:
