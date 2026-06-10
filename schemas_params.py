@@ -238,45 +238,6 @@ class FilterIdParam(BaseModel):
     max_results: int = Field(default=100, description="Max emails to return when applying filter (1-200)")
 
 
-# ── Automation rules ──────────────────────────────────────────────────────────
-
-class CreateForwardRuleParams(BaseModel):
-    """Create a forwarding rule — auto-forward matching emails to an address."""
-    name: str = Field(description="Rule name")
-    to_address: str = Field(description="Forward destination email address")
-    from_contains: str = Field(default="", description="Only forward emails from senders matching this (empty = all)")
-    subject_contains: str = Field(default="", description="Only forward emails with subject matching this (empty = all)")
-    comment: str = Field(default="", description="Prepended note on the forwarded email")
-
-
-class CreateAutoreplyParams(BaseModel):
-    """Create an auto-reply rule — send automated responses to incoming emails."""
-    name: str = Field(description="Rule name (e.g. 'Out of office')")
-    template: str = Field(description="Auto-reply message body")
-    subject_prefix: str = Field(default="Auto: ", description="Prefix added to reply subject")
-    schedule_type: str = Field(default="time_window",
-                               description="'always' = reply to all, 'time_window' = only outside business hours")
-    days: list[int] = Field(default=[0, 1, 2, 3, 4],
-                            description="Business days (0=Mon..6=Sun). Auto-reply fires OUTSIDE these days when type=time_window")
-    start_time: str = Field(default="09:00",
-                            description="Business hours start HH:MM — auto-reply fires OUTSIDE this window")
-    end_time: str = Field(default="18:00",
-                          description="Business hours end HH:MM")
-    timezone: str = Field(default="UTC", description="Timezone for schedule (e.g. 'Europe/Chisinau', 'UTC')")
-    from_contains: str = Field(default="", description="Only reply to emails from senders matching this (empty = all)")
-
-
-class RuleIdParam(BaseModel):
-    """Single rule ID selector."""
-    rule_id: str = Field(description="Rule ID from list_rules()")
-
-
-class ToggleRuleParams(BaseModel):
-    """Enable or disable a rule."""
-    rule_id: str = Field(description="Rule ID from list_rules()")
-    enabled: bool = Field(description="True to enable, False to disable")
-
-
 # ── Folder preferences ────────────────────────────────────────────────────────
 
 _FOLDER_CANONICAL = {

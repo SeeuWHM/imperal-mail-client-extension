@@ -111,7 +111,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
 
             try:
                 await ctx.store.update(COLLECTION, acc["doc_id"], {
-                    **{k: v for k, v in acc.items() if k != "doc_id"},
+                    **{k: v for k, v in acc.items() if k not in ("doc_id", "is_active")},
                     "last_fetched": int(_time.time()),
                     "unread_count": unread,
                     "last_message_ids": list(curr_ids),

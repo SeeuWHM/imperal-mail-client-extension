@@ -12,14 +12,19 @@ from providers.helpers import _invalidate_first_page, COLLECTION
 log = logging.getLogger(__name__)
 
 FOLDERS = [
-    {"key": "INBOX",   "label": "Inbox"},
-    {"key": "sent",    "label": "Sent"},
-    {"key": "drafts",  "label": "Drafts"},
-    {"key": "spam",    "label": "Spam"},
-    {"key": "trash",   "label": "Trash"},
-    {"key": "starred", "label": "Starred"},
-    {"key": "archive", "label": "Archive"},
+    {"key": "INBOX",    "label": "Inbox"},
+    {"key": "sent",     "label": "Sent"},
+    {"key": "drafts",   "label": "Drafts"},
+    {"key": "spam",     "label": "Spam"},
+    {"key": "trash",    "label": "Trash"},
+    {"key": "starred",  "label": "Starred"},
+    # archive shown for IMAP/Outlook; all_mail shown for Gmail/Yahoo
+    {"key": "archive",  "label": "Archive"},
+    {"key": "all_mail", "label": "All Mail"},
 ]
+
+# Providers that use "All Mail" instead of "Archive"
+_ALLMAIL_PROVIDERS = ("oauth", "yahoo")
 
 # Map user-facing names (from set_folder_prefs) to canonical folder keys
 FOLDER_KEY_MAP = {
@@ -27,6 +32,7 @@ FOLDER_KEY_MAP = {
     "sent": "sent",   "drafts": "drafts",
     "spam": "spam",   "trash": "trash",
     "starred": "starred", "archive": "archive",
+    "all_mail": "all_mail", "allmail": "all_mail",
 }
 
 
@@ -107,15 +113,35 @@ async def _switch_active_account(ctx, target_email: str) -> None:
 
 def _build_folder_tabs(folder: str, active_email: str,
                        folder_unread: dict | None = None,
-                       visible_folders: list | None = None) -> ui.UINode:
-    """Folder tab buttons. Filtered by visible_folders prefs if set."""
+                       visible_folders: list | None = None,
+                       provider_type: str = "",
+                       custom_folders: list | None = None) -> ui.UINode:
+    """Folder tab buttons. Provider-aware: Gmail/Yahoo → All Mail; IMAP/Outlook → Archive."""
     counts = folder_unread or {}
-    # Filter FOLDERS by user prefs; if no prefs → show all
+    is_allmail_provider = provider_type in _ALLMAIL_PROVIDERS
+
+    # Build provider-specific base folder list:
+    # Gmail/Yahoo: show "All Mail", hide "Archive"
+    # IMAP/Outlook/unknown: show "Archive", hide "All Mail"
+    base = [
+        f for f in FOLDERS
+        if not (f["key"] == "archive" and is_allmail_provider)
+        and not (f["key"] == "all_mail" and not is_allmail_provider)
+    ]
+
+    # Apply user visibility preferences
     if visible_folders:
         canonical = {FOLDER_KEY_MAP.get(v, v) for v in visible_folders}
-        active_folders = [f for f in FOLDERS if f["key"] in canonical]
+        active_folders = [f for f in base if f["key"] in canonical]
     else:
-        active_folders = FOLDERS
+        active_folders = base
+
+    # Append custom folders (labels created via create_mail_folder)
+    if custom_folders:
+        existing_keys = {f["key"] for f in active_folders}
+        for cf in custom_folders:
+            if cf and cf not in existing_keys:
+                active_folders.append({"key": cf, "label": cf})
     buttons = []
     for f in active_folders:
         key   = f["key"]

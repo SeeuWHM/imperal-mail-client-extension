@@ -23,7 +23,7 @@ from schemas_sdl_builders import (
                effects=["update:email"],
                data_model=MailOpResult,
                id_projection="message_id",
-               description="Archive a single email — removes it from INBOX, stays searchable and recoverable. Requires message_id: call inbox() or search() first if you don't have it yet. Not the same as delete().")
+               description="Archive a single email — removes it from INBOX, stays searchable and recoverable. GMAIL NOTE: Gmail has no system Archive folder — archiving = removing from INBOX (email lives in 'All Mail'). To browse archived emails, use search(query='label:all'). For a physical Archive folder in Gmail, create one first with create_mail_folder('Archive') then use move(). Requires message_id: call inbox() or search() first if you don't have it yet.")
 async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
     """Archive a single email — removes it from INBOX, stays searchable and recoverable."""
     try:
@@ -41,7 +41,7 @@ async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
                effects=["update:email"],
                data_model=MailOpResult,
                id_projection="message_id",
-               description="Move a single email to Trash — recoverable until emptied. Requires message_id: call inbox() or search() first if you don't have it yet. Use purge() for permanent deletion.")
+               description="Move a single email to Trash/Deleted Items — RECOVERABLE (Gmail: 30 days, Outlook: until emptied). This is NOT permanent — use purge() for permanent deletion. Requires message_id: call inbox() or search() first if you don't have it yet.")
 async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
     """Move a single email to Trash — recoverable until emptied."""
     try:
@@ -134,7 +134,7 @@ async def fn_move(ctx, params: MoveParams) -> ActionResult:
                effects=["delete:email"],
                data_model=MailOpResult,
                id_projection="message_id",
-               description="Permanently delete an email — cannot be recovered. Requires message_id: call inbox() or search() first if you don't have it. Use delete() to move to Trash first if unsure.")
+               description="PERMANENTLY delete an email — cannot be recovered from Trash or anywhere else. Use delete() first if unsure (moves to Trash, recoverable). Requires message_id: call inbox() or search() first if you don't have it.")
 async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
     """Permanently delete an email — cannot be recovered."""
     try:

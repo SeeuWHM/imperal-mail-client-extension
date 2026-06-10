@@ -24,33 +24,6 @@ class MailFilterPage(sdl.EntityList[MailFilter]):
     pass
 
 
-# ── Automation rule (forwarder + auto-responder) ──────────────────────────────
-
-class MailRule(sdl.Entity):
-    """Mail automation rule — forward matching emails or send automatic replies."""
-
-    kind: str = "mail_rule"
-    rule_type: str | None = sdl_field(role="mail.rule_type")       # "forward" | "autoreply"
-    enabled: bool = sdl_field(role="mail.enabled", default=True)
-    criteria_from: str | None = sdl_field(role="mail.criteria_from")
-    criteria_subject: str | None = sdl_field(role="mail.criteria_subject")
-    forward_to: str | None = sdl_field(role="mail.forward_to")
-    reply_template: str | None = sdl_field(role="mail.reply_template")
-    subject_prefix: str | None = sdl_field(role="mail.subject_prefix")
-    schedule_type: str | None = sdl_field(role="mail.schedule_type")  # always | time_window
-    schedule_days: list[int] | None = sdl_field(role="mail.schedule_days")
-    schedule_start: str | None = sdl_field(role="mail.schedule_start")  # "HH:MM"
-    schedule_end: str | None = sdl_field(role="mail.schedule_end")      # "HH:MM"
-    timezone: str | None = sdl_field(role="mail.timezone")
-    last_run_at: str | None = sdl_field(role="mail.last_run_at")
-
-
-class MailRulePage(sdl.EntityList[MailRule]):
-    """Paginated list of automation rules — returned by list_rules()."""
-
-    pass
-
-
 # ── Operation result ──────────────────────────────────────────────────────────
 
 class RuleOpResult(sdl.Entity):

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from schemas_sdl_rules import (
-    MailFilter, MailFilterPage, MailRule, MailRulePage, RuleOpResult, MailPrefsResult,
+    MailFilter, MailFilterPage, RuleOpResult, MailPrefsResult,
     MailFoldersResult,
 )
 
@@ -26,34 +26,6 @@ def build_mail_filter_page(docs: list) -> MailFilterPage:
     """Convert list of store documents → MailFilterPage SDL entity list."""
     items = [build_mail_filter(d.id, d.data) for d in docs]
     return MailFilterPage(items=items, total=len(items))
-
-
-def build_mail_rule(doc_id: str, data: dict) -> MailRule:
-    """Convert store document dict → MailRule SDL entity."""
-    return MailRule(
-        id=doc_id,
-        title=data.get("name", "rule"),
-        kind="mail_rule",
-        rule_type=data.get("rule_type"),
-        enabled=bool(data.get("enabled", True)),
-        criteria_from=data.get("criteria_from") or None,
-        criteria_subject=data.get("criteria_subject") or None,
-        forward_to=data.get("forward_to") or None,
-        reply_template=data.get("reply_template") or None,
-        subject_prefix=data.get("subject_prefix") or None,
-        schedule_type=data.get("schedule_type") or None,
-        schedule_days=data.get("schedule_days") or None,
-        schedule_start=data.get("schedule_start") or None,
-        schedule_end=data.get("schedule_end") or None,
-        timezone=data.get("timezone") or None,
-        last_run_at=data.get("last_run_at") or None,
-    )
-
-
-def build_mail_rule_page(docs: list) -> MailRulePage:
-    """Convert list of store documents → MailRulePage SDL entity list."""
-    items = [build_mail_rule(d.id, d.data) for d in docs]
-    return MailRulePage(items=items, total=len(items))
 
 
 def build_rule_op(entity_id: str, name: str, enabled: bool | None = None) -> RuleOpResult:

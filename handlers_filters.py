@@ -224,8 +224,15 @@ async def fn_set_folder_prefs(ctx, params: SetFolderPrefsParams) -> ActionResult
         uid = ctx.user.imperal_id
         existing = await ctx.store.query(PREFS_COLLECTION, where={"owner_id": uid}, limit=1)
         visible = [f.strip() for f in params.visible_folders if f.strip()]
-        # all standard folders except those in visible list are "hidden"
-        all_folders = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
+        # Determine standard folders for this account's provider type
+        from providers.helpers import _active_account as _resolve_acc
+        _curr_acc = await _resolve_acc(ctx, "")
+        _ptype = _curr_acc.get("provider", "oauth") if _curr_acc else "oauth"
+        from panels_inbox import _ALLMAIL_PROVIDERS
+        if _ptype in _ALLMAIL_PROVIDERS:
+            all_folders = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "all_mail"]
+        else:
+            all_folders = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
         hidden = [f for f in all_folders if f not in visible] if visible else []
         doc_data = {"owner_id": uid, "visible_folders": visible, "hidden_folders": hidden}
         if existing.data:
@@ -267,21 +274,43 @@ async def fn_get_folder_prefs(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("list_mail_folders", action_type="read",
                data_model=MailFoldersResult,
-               description="List all available mail folders (INBOX/sent/drafts/spam/trash/starred/archive) and show which are currently visible or hidden in the panel. Use when user asks 'what folders do I have', 'какие папки в почте', 'what sections are hidden'.")
+               description=(
+                   "List all available mail folders and custom labels, showing which are visible "
+                   "or hidden in the panel. Gmail shows 'All Mail' instead of 'Archive' (Gmail has "
+                   "no system Archive folder). Custom folders created via create_mail_folder() also "
+                   "appear here. Use when user asks 'what folders do I have', 'какие папки в почте'."
+               ))
 async def fn_list_mail_folders(ctx, params: EmptyParams) -> ActionResult:
-    """List available mail folders + current visibility preferences as SDL entity."""
+    """List available mail folders + custom labels + current visibility preferences."""
     try:
-        from panels_inbox import FOLDERS
+        from providers.helpers import _active_account as _resolve_acc
+        from panels_inbox import FOLDERS, _ALLMAIL_PROVIDERS
+        acc = await _resolve_acc(ctx, "")
+        ptype = acc.get("provider", "oauth") if acc else "oauth"
+        is_allmail = ptype in _ALLMAIL_PROVIDERS
+
         prefs_page = await ctx.store.query(PREFS_COLLECTION,
                                            where={"owner_id": ctx.user.imperal_id}, limit=1)
         hidden_keys: list[str] = []
+        custom_folders: list[str] = []
         if prefs_page.data:
-            hidden_keys = prefs_page.data[0].data.get("hidden_folders", [])
-        all_keys = [f["key"] for f in FOLDERS]
-        visible  = [k for k in all_keys if k not in hidden_keys]
-        summary  = f"Visible: {', '.join(visible) or 'all'}"
+            d = prefs_page.data[0].data
+            hidden_keys = d.get("hidden_folders") or []
+            custom_folders = d.get("custom_folders") or []
+
+        # Standard folders filtered for this provider
+        all_keys = [
+            f["key"] for f in FOLDERS
+            if not (f["key"] == "archive" and is_allmail)
+            and not (f["key"] == "all_mail" and not is_allmail)
+        ] + custom_folders
+
+        visible = [k for k in all_keys if k not in hidden_keys]
+        summary = f"Visible: {', '.join(visible) or 'all'}"
         if hidden_keys:
             summary += f". Hidden: {', '.join(hidden_keys)}"
+        if custom_folders:
+            summary += f". Custom: {', '.join(custom_folders)}"
         return ActionResult.success(
             data=build_mail_folders(all_keys, visible, hidden_keys),
             summary=summary + ".",

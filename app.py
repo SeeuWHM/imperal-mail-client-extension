@@ -49,21 +49,3 @@ async def on_install(ctx):
     log.info(f"mail installed for user {uid}")
 
 
-@ext.on_event("email.received")
-async def on_email_received(ctx, event):
-    """Real-time rule execution — fires instantly on every incoming email.
-
-    Primary path: email.received event is confirmed working in prod logs.
-    @ext.schedule is backup (may not be active on current platform fleet).
-    ctx is already user-scoped — no list_users fan-out needed.
-    Uses event payload directly (message_id, from, subject) to avoid extra API call.
-    """
-    uid = ctx.user.imperal_id if ctx and hasattr(ctx, "user") and ctx.user else ""
-    log.info(f"mail email.received for {uid}: event={list(event.keys())}")
-    try:
-        from handlers_rule_event import process_event_email
-        count = await process_event_email(ctx, event)
-        if count:
-            log.info(f"mail email.received: executed {count} rule action(s) for {uid}")
-    except Exception as e:
-        log.warning(f"mail email.received: rule processing failed for {uid}: {e}")

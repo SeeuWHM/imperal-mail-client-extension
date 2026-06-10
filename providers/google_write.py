@@ -152,3 +152,54 @@ class GoogleWriteMixin:
             return self.err(f"Gmail permanent delete failed: {resp.status_code}")
         except Exception as e:
             return self.err(f"Gmail purge failed: {e}")
+
+    async def create_folder(self, ctx: Context, acc: dict, folder_name: str) -> dict:
+        """Create a Gmail label (labels are Gmail's folder equivalent)."""
+        try:
+            resp = await _api_post(ctx, "labels", acc, json={
+                "name": folder_name,
+                "labelListVisibility": "labelShow",
+                "messageListVisibility": "show",
+            })
+            if resp.status_code in (200, 201):
+                d = resp.json()
+                return self.ok(created=True, folder_id=d.get("id"),
+                               folder_name=d.get("name", folder_name))
+            if resp.status_code == 409:
+                return self.err(f"Gmail label '{folder_name}' already exists.")
+            return self.err(f"Create label failed {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            return self.err(f"Gmail create_folder failed: {e}")
+
+    async def delete_folder(self, ctx: Context, acc: dict, folder_name: str) -> dict:
+        """Delete a Gmail label by name (emails inside are NOT deleted)."""
+        try:
+            acc = await _refresh_token_if_needed(ctx, acc)
+            # List all labels to find the ID by name
+            list_resp = await ctx.http.get(
+                f"{GMAIL_API}/labels",
+                headers={"Authorization": f"Bearer {acc['access_token']}"},
+            )
+            if list_resp.status_code != 200:
+                return self.err(f"Could not list labels: {list_resp.status_code}")
+            labels = list_resp.json().get("labels", [])
+            label = next(
+                (l for l in labels if l.get("name", "").lower() == folder_name.lower()),
+                None,
+            )
+            if not label:
+                return self.err(f"Gmail label '{folder_name}' not found.")
+            # Prevent deleting system labels
+            if label.get("type") == "system":
+                return self.err(
+                    f"Cannot delete system label '{folder_name}' (INBOX, Sent, Trash, etc.)."
+                )
+            del_resp = await ctx.http.delete(
+                f"{GMAIL_API}/labels/{label['id']}",
+                headers={"Authorization": f"Bearer {acc['access_token']}"},
+            )
+            if del_resp.status_code in (200, 204, 404):
+                return self.ok(deleted=True, folder_name=folder_name)
+            return self.err(f"Delete label failed {del_resp.status_code}: {del_resp.text[:200]}")
+        except Exception as e:
+            return self.err(f"Gmail delete_folder failed: {e}")

@@ -108,7 +108,7 @@ async def inbox_panel(
         await _switch_active_account(ctx, do_switch_account)
         folder, search_query = "INBOX", ""
         page_cursor, prev_cursor, page_num, folder_stats_unread = "", "", 1, 0
-        for _fkey in [f["key"] for f in FOLDERS]:
+        for _fkey in [f["key"] for f in FOLDERS] + ["all_mail"]:
             await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
     from providers.helpers import _active_account as _resolve_active
@@ -193,22 +193,28 @@ async def inbox_panel(
         except Exception:
             pass
 
-    # Read folder visibility preferences
+    # Read folder visibility preferences and custom folders
     visible_folders: list | None = None
+    custom_folders: list = []
     try:
         prefs_page = await ctx.store.query("mail_prefs",
                                            where={"owner_id": ctx.user.imperal_id}, limit=1)
         if prefs_page.data:
-            vf = prefs_page.data[0].data.get("visible_folders")
+            d = prefs_page.data[0].data
+            vf = d.get("visible_folders")
             visible_folders = vf if vf else None
+            custom_folders = d.get("custom_folders") or []
     except Exception:
         pass
 
+    provider_type = acc.get("provider", "oauth")
     effective_unread = inbox_msgs.unread_in_folder or (folder_stats_unread if page_num > 1 else 0)
     folder_tabs = _build_folder_tabs(
         folder, active_email,
         folder_unread={folder: effective_unread} if effective_unread else None,
         visible_folders=visible_folders,
+        provider_type=provider_type,
+        custom_folders=custom_folders,
     )
 
     q = search_query.strip()
