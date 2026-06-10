@@ -1,4 +1,4 @@
-"""Mail Client — Extension instance + lifecycle (SDK v5.2.0 / SDL)."""
+"""Mail Client — Extension instance + lifecycle (SDK v5.2.2 / SDL)."""
 from __future__ import annotations
 
 import logging
@@ -14,11 +14,12 @@ log = logging.getLogger("mail")
 
 ext = Extension(
     "mail",
-    version="5.8.0",
+    version="6.1.0",
     display_name="Mail Client",
     description=(
         "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "
-        "Inbox, send, reply, forward, search, archive, manage emails, contacts."
+        "Inbox, send, reply, forward, search, archive, manage emails, contacts, "
+        "custom folders/labels. Gmail batchModify for instant bulk operations."
     ),
     icon="mail.svg",
     actions_explicit=True,
@@ -29,9 +30,9 @@ chat = ChatExtension(
     ext=ext,
     tool_name="tool_mail_client_chat",
     description=(
-        "Mail Client — inbox, read emails, send, reply, forward, search, archive, "
-        "delete, mark read/unread, star, browse folders, view threads, bulk operations, "
-        "contacts CRUD + sync. Connect Google, Microsoft, Yahoo, IMAP."
+        "Mail Client — inbox, send, reply, forward, search, archive, delete, "
+        "mark read/unread, star, folders, threads, bulk operations (mark_all_matching_read), "
+        "custom folder/label creation, contacts. Connect Google, Microsoft, Yahoo, IMAP."
     ),
 )
 
