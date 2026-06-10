@@ -20,7 +20,7 @@ from schemas_sdl_builders import (
 
 @chat.function("inbox", action_type="read",
                data_model=InboxPage,
-               description="PRIMARY function to list emails. Use this when user asks for recent/latest/new emails, wants to see their inbox, or check mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns message previews with IDs, subjects, senders, dates, read state. Do NOT use search() for listing recent emails — use inbox(). To COUNT emails (how many / сколько) use count_emails(), NEVER the length of this list — it is a capped page.")
+               description="PRIMARY function to LIST recent emails (newest first). Use when the user wants to see/check their inbox or asks for recent/latest/new mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns a CAPPED PAGE of message previews (IDs, subjects, senders, dates, read state) — it is NOT the whole folder and carries no folder total; use has_more to page. ROUTING — do NOT answer these from this capped page: (a) COUNT questions ('how many / сколько / total / all / всего') → call count_emails(); (b) emails for a specific DATE or period ('today / this week / since 1 June / за сегодня') → call search() with a Gmail date operator (today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/07); (c) by sender or keyword → call search(). NEVER report the length of this list as a count or total — it is a capped page.")
 async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
     """PRIMARY function to list emails."""
     try:

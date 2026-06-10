@@ -1,5 +1,31 @@
 # Changelog
 
+## v5.8.0 — 2026-06-09 — admin-ticket fixes (inbox total / MS date search / routing)
+
+Three fixes from the Imperal-admin ticket, verified against the live code, our prior
+count work (`b34b99a`, `4a590a7`), and `docs.imperal.io`. (`count`/`count_today` was already
+shipped as `count_emails` in `4a590a7` — confirmed, no change needed.)
+
+- **Inbox no longer reports a fake total** (`schemas_sdl_builders.build_inbox_page`):
+  was `total=len(items)` — the length of a CAPPED display page, a lying fact that leaks into
+  the narrator/chains. Now `total=None`, which SDL explicitly permits (`EntityList.total` is
+  `int | None`, "total across all pages, **if known**" — for a page it is not known). Pagination
+  awareness stays via `has_more` + `unread_count`. `SearchPage.total` is untouched (it carries a
+  real provider count). To COUNT, callers use `count_emails()`.
+- **Microsoft date-operator search** (`providers/microsoft.py`): Gmail date operators
+  (`newer_than:1d`, `after:`, `before:`) are Gmail-only — Graph treated them as plain `$search`
+  text, so date searches/counts on MS accounts were wrong. Now `search()` translates them to a
+  Graph `$filter` on `receivedDateTime` (same field/format proven in `get_today_count`):
+  pure-date → `$filter` with exact `@odata.count`; text-only → unchanged `$search`; mixed
+  text+date → `$filter` date window + client-side text match (Graph forbids `$search`+`$filter`
+  together, so this is the only reliable path; total bounded by the ≤250 window). Unparseable
+  date tokens are left intact, never silently dropped. This also fixes `count_emails(query=…)`
+  date counts on MS (it routes through the same `search`).
+- **`inbox()` description rewritten** for routing precision: explicitly sends COUNT
+  ("how many / сколько / total / all") → `count_emails()`, DATE/period ("today / this week /
+  since …") → `search()` with the matching Gmail date operator (`newer_than:1d` etc.), and
+  sender/keyword → `search()`. States plainly that the list is a capped page with no folder total.
+
 ## skeleton read-query COUNT surface — 2026-06-06 (commit `b34b99a`; all providers)
 
 Skeleton reworked from a recent-items list into a **count surface** so the brain answers

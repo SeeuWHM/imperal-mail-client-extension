@@ -112,9 +112,13 @@ def build_email_preview(d: dict, account: str = "") -> EmailPreview:
 def build_inbox_page(r: InboxPageResult, folder: str = "inbox") -> InboxPage:
     """Convert InboxPageResult → InboxPage SDL entity list."""
     items = [build_email_preview(m) for m in (r.messages or [])]
+    # total is intentionally None: this is a capped display PAGE, not a folder total —
+    # the real count is unknown here without a separate count query. Per SDL,
+    # EntityList.total is `int | None` ("total across all pages, if known"). Pagination
+    # awareness comes from has_more + unread_count; to COUNT emails use count_emails().
     return InboxPage(
         items=items,
-        total=len(items),
+        total=None,
         has_more=r.has_more,
         cursor=r.cursor,
         unread_count=r.unread_count,

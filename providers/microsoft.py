@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timezone, timedelta
 
 from imperal_sdk import Context
 
@@ -22,6 +23,71 @@ _MS_PAGE_FOLDERS: dict = {
     "inbox": "inbox", "sent": "sentitems", "spam": "junkemail",
     "trash": "deleteditems", "drafts": "drafts", "archive": "archive",
 }
+
+# ─── Gmail date-operator → Graph $filter receivedDateTime translation ──────────
+# Gmail query operators (newer_than:1d, after:YYYY/MM/DD, before:…) are Gmail-only;
+# Microsoft Graph does not understand them in $search and would treat them as plain
+# text. We translate the date operators into a Graph $filter on receivedDateTime
+# (the same field/format proven in get_today_count). Graph forbids $search and
+# $filter in one request, so search() uses $filter for the date window and, when a
+# text term also remains, matches it client-side over that window.
+_DATE_OP_RE = re.compile(r"\b(newer_than|older_than|after|before):(\S+)", re.IGNORECASE)
+_REL_RE = re.compile(r"^(\d+)([dwmy])$", re.IGNORECASE)
+_UNIT_DAYS = {"d": 1, "w": 7, "m": 30, "y": 365}
+
+
+def _iso_z(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_abs_date(val: str) -> datetime | None:
+    """Parse Gmail-style absolute date (YYYY/MM/DD or YYYY-MM-DD) as UTC midnight."""
+    try:
+        return datetime.strptime(val.replace("/", "-"), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _split_date_filter(query: str) -> tuple[str | None, str]:
+    """Extract Gmail date operators → ('receivedDateTime …' clause | None, residual_query).
+
+    Only operators we can translate are removed; anything unparseable is left in the
+    residual so it is never silently dropped.
+    """
+    clauses: list[str] = []
+    now = datetime.now(timezone.utc)
+
+    def _repl(m: "re.Match") -> str:
+        op, val = m.group(1).lower(), m.group(2)
+        if op in ("newer_than", "older_than"):
+            rm = _REL_RE.match(val)
+            if not rm:
+                return m.group(0)  # leave token untranslated
+            bound = now - timedelta(days=int(rm.group(1)) * _UNIT_DAYS[rm.group(2).lower()])
+            clauses.append(f"receivedDateTime {'ge' if op == 'newer_than' else 'lt'} {_iso_z(bound)}")
+            return ""
+        d = _parse_abs_date(val)
+        if d is None:
+            return m.group(0)
+        clauses.append(f"receivedDateTime {'ge' if op == 'after' else 'lt'} {_iso_z(d)}")
+        return ""
+
+    residual = re.sub(r"\s+", " ", _DATE_OP_RE.sub(_repl, query or "")).strip()
+    return (" and ".join(clauses) if clauses else None), residual
+
+
+def _residual_terms(residual: str) -> list[str]:
+    """Lowercased text terms for client-side matching (strip from:/to:/subject: prefixes)."""
+    cleaned = re.sub(r"\b(from|to|subject):", " ", residual, flags=re.IGNORECASE)
+    return [t for t in cleaned.lower().split() if t]
+
+
+def _msg_matches(msg: dict, terms: list[str]) -> bool:
+    """True if every term appears in the message's from/name/subject (client-side AND)."""
+    if not terms:
+        return True
+    hay = f"{msg.get('from', '')} {msg.get('from_name', '')} {msg.get('subject', '')}".lower()
+    return all(t in hay for t in terms)
 
 
 class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
@@ -202,25 +268,66 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         acc = await _refresh_token_if_needed(ctx, acc)
-        # ConsistencyLevel: eventual is required for $count with $search in Graph API
+        headers = {
+            "Authorization": f"Bearer {acc['access_token']}",
+            # ConsistencyLevel: eventual is required for $count (with $search or advanced $filter)
+            "ConsistencyLevel": "eventual",
+        }
+        date_clause, residual = _split_date_filter(query)
+
+        # No date operators → original full-text $search path (unchanged).
+        if not date_clause:
+            resp = await ctx.http.get(
+                f"{MS_GRAPH_BASE}/me/messages",
+                headers=headers,
+                params={
+                    "$search": f'"{query}"',
+                    "$top": min(max_results, 250),
+                    "$count": "true",
+                    "$select": "id,subject,from,receivedDateTime,isRead",
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            results = [_norm_graph_msg(m) for m in data.get("value", [])]
+            total = data.get("@odata.count", len(results))
+            return self.ok(query=query, email=email_addr, results=results, total=total)
+
+        # Date operators present. Graph forbids $search + $filter together, so use
+        # $filter on receivedDateTime (accurate @odata.count for the date window).
+        # When a text term also remains, match it client-side over that window
+        # (the only reliable option — Graph cannot combine the two).
+        # NOTE: no $orderby here — Graph rejects $orderby alongside an advanced
+        # ($count + ConsistencyLevel:eventual) $filter query in some cases, and
+        # /me/messages already defaults to receivedDateTime descending. This mirrors
+        # the proven get_today_count pattern (filter + count, no orderby).
+        page = 250 if residual else min(max(max_results, 1), 250)
         resp = await ctx.http.get(
             f"{MS_GRAPH_BASE}/me/messages",
-            headers={
-                "Authorization": f"Bearer {acc['access_token']}",
-                "ConsistencyLevel": "eventual",
-            },
+            headers=headers,
             params={
-                "$search": f'"{query}"',
-                "$top": min(max_results, 250),
+                "$filter": date_clause,
                 "$count": "true",
+                "$top": page,
                 "$select": "id,subject,from,receivedDateTime,isRead",
             },
         )
         resp.raise_for_status()
         data = resp.json()
-        results = [_norm_graph_msg(m) for m in data.get("value", [])]
-        total = data.get("@odata.count", len(results))
-        return self.ok(query=query, email=email_addr, results=results, total=total)
+        msgs = [_norm_graph_msg(m) for m in data.get("value", [])]
+
+        if not residual:
+            total = data.get("@odata.count", len(msgs))
+            return self.ok(query=query, email=email_addr,
+                           results=msgs[:max_results], total=total)
+
+        # Mixed text + date: client-side text match over the date window. The total
+        # is bounded by the fetched window (<=250) — Graph cannot count text+date in
+        # one call. Pure-date and pure-text queries above are exact.
+        terms = _residual_terms(residual)
+        matched = [m for m in msgs if _msg_matches(m, terms)]
+        return self.ok(query=query, email=email_addr,
+                       results=matched[:max_results], total=len(matched))
 
     async def folder(self, ctx: Context, acc: dict, folder_name: str, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")
