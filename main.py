@@ -17,6 +17,7 @@ _MODULES = (
     "handlers_connect",
     "handlers_inbox_impl", "handlers_inbox",
     "handlers_manage_impl", "handlers_manage",
+    "handlers_cleanup_impl",
     "handlers_contacts", "handlers_panel_compose", "handlers_panel_actions",
     "handlers_filters", "handlers_folders",
     "panels_filters_bar", "panels_filter_view",
@@ -44,6 +45,7 @@ import handlers_connect           # noqa: E402, F401
 import handlers_inbox_impl        # noqa: E402, F401
 import handlers_inbox             # noqa: E402, F401
 import handlers_manage_impl       # noqa: E402, F401
+import handlers_cleanup_impl      # noqa: E402, F401
 import handlers_manage            # noqa: E402, F401
 import handlers_contacts          # noqa: E402, F401
 import handlers_panel_compose     # noqa: E402, F401
