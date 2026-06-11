@@ -7,6 +7,47 @@ from collections import defaultdict
 _UNSUB_URL_RE = re.compile(r'<(https?://[^>]+)>', re.IGNORECASE)
 _UNSUB_MAILTO_RE = re.compile(r'<(mailto:[^>]+)>', re.IGNORECASE)
 
+# For HTML body parsing
+_HTML_LINK_RE = re.compile(r'<a[^>]+href=["\']([^"\']{10,})["\'][^>]*>(.*?)</a>',
+                            re.IGNORECASE | re.DOTALL)
+_PLAIN_URL_RE = re.compile(r'https?://\S{10,}', re.IGNORECASE)
+_UNSUB_KEYWORDS = frozenset(["unsubscribe", "opt-out", "opt_out", "optout",
+                              "отписат", "manage preferences", "manage subscription"])
+
+
+def _extract_unsub_links_from_body(body: str) -> list[str]:
+    """Extract unsubscribe-like URLs from email HTML/plain body."""
+    if not body:
+        return []
+
+    found: list[str] = []
+    body_low = body.lower()
+
+    # Pass 1: HTML links where href OR anchor text suggests unsubscribe
+    for m in _HTML_LINK_RE.finditer(body):
+        href = m.group(1).strip()
+        text = re.sub(r'<[^>]+>', '', m.group(2)).strip().lower()
+        href_low = href.lower()
+        if any(kw in href_low or kw in text for kw in _UNSUB_KEYWORDS):
+            if href.startswith("http"):
+                found.append(href)
+
+    if found:
+        return list(dict.fromkeys(found))[:3]   # dedupe, top 3
+
+    # Pass 2: bare URLs near "unsubscribe" text
+    lines = body.split('\n')
+    for i, line in enumerate(lines):
+        line_low = line.lower()
+        if any(kw in line_low for kw in _UNSUB_KEYWORDS):
+            window = '\n'.join(lines[max(0, i - 1): min(len(lines), i + 3)])
+            for url_m in _PLAIN_URL_RE.finditer(window):
+                url = url_m.group(0).rstrip('.,);')
+                if url not in found:
+                    found.append(url)
+
+    return list(dict.fromkeys(found))[:3]
+
 from handlers_manage_impl import impl_mark_all_matching, _get_acc
 from handlers_inbox_impl import impl_top_senders
 from schemas import BulkOperationResult
@@ -102,8 +143,26 @@ async def impl_unsubscribe_from_query(ctx, query: str, account: str = "") -> dic
         unsub_header, post_data = await provider.get_list_unsubscribe(ctx, acc, message_id)
 
         if not unsub_header:
+            # Fallback: read full email body and parse HTML unsubscribe links
+            from handlers_inbox_impl import impl_read_email
+            try:
+                email_body = await impl_read_email(ctx, message_id=message_id, account=account)
+                body_links = _extract_unsub_links_from_body(email_body.body or "")
+                if body_links:
+                    url = body_links[0]
+                    try:
+                        resp = await ctx.http.get(url, timeout=10.0)
+                        success = resp.status_code < 400
+                        return {"success": success, "url": url, "status": resp.status_code,
+                                "note": "Unsubscribed via body link." if success
+                                        else f"Body link returned HTTP {resp.status_code}"}
+                    except Exception as e:
+                        return {"success": False, "url": url,
+                                "note": f"Body link request failed: {type(e).__name__}"}
+            except Exception:
+                pass
             return {"success": False, "url": "",
-                    "note": "No List-Unsubscribe header. Manual unsubscribe required."}
+                    "note": "No List-Unsubscribe header or parseable unsubscribe link found."}
 
         url_match = _UNSUB_URL_RE.search(unsub_header)
         if not url_match:
