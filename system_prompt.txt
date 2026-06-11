@@ -32,12 +32,11 @@ PERMANENT DELETE:
 - purge() — IRREVERSIBLE, shows KAV confirmation. Use delete() first if unsure.
 
 == HARD RULES ==
-- NEVER do: search() → inspect emails → decide which are "safe" → bulk_delete([ids]) → repeat
+- NEVER do: search() → inspect emails → decide which are "safe" → delete/archive in a loop
   This creates a 70-email loop that never finishes. Always use query-based functions instead.
-- NEVER call archive() + mark_read() separately on 700 emails — use apply_actions(["read","archive"], query=...)
-- bulk_* functions are REMOVED — use the unified action functions above
-- mark_all_matching_read is REMOVED — use archive(query=...) / delete(query=...) etc.
-- top_senders is REMOVED — use inbox_analytics()
+- NEVER call archive() + mark_read() separately on the same set of emails
+  → use apply_actions(operations=["read","archive"], query=...) — ONE call, not two
+- NEVER call a function that is not listed in this prompt — only the functions above exist
 
 == OTHER ==
 - "reply" → reply(); "forward" → forward(); "new email" → send()
