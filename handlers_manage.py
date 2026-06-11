@@ -17,7 +17,7 @@ from handlers_manage_impl import (
     impl_mark_all_matching,
     _get_acc, _batch_direct,
 )
-from handlers_cleanup_impl import impl_inbox_cleanup
+from handlers_cleanup_impl import impl_inbox_cleanup, impl_unsubscribe_from_query
 from schemas import BulkOperationResult
 from schemas_params import (
     ArchiveParams, DeleteParams, MarkReadParams, StarUnifiedParams,
@@ -236,15 +236,15 @@ async def fn_move(ctx, params: MoveUnifiedParams) -> ActionResult:
                data_model=BulkMailOpResult,
                description=(
                    "Apply MULTIPLE operations to the SAME emails in one efficient call. "
-                   "Use when combining actions: ['read','archive'], ['star','archive'], "
-                   "['read','archive','star']. "
-                   "Gmail: combined into ONE batchModify call — faster than calling separately. "
-                   "Allowed operations: 'archive', 'read', 'unread', 'star', 'unstar', 'delete'. "
-                   "Single email: message_ids='<id>'. ALL matching: query='from:linkedin'. "
-                   "For single-operation tasks use archive/delete/mark_read/star directly."
+                   "Use when combining actions on same set: ['read','archive'], ['unsubscribe','archive','read']. "
+                   "Gmail: label ops combined into ONE batchModify. "
+                   "Allowed: 'archive', 'read', 'unread', 'star', 'unstar', 'delete', 'unsubscribe'. "
+                   "'unsubscribe': reads List-Unsubscribe header from most recent matching email and calls it. "
+                   "ALL matching: query='from:neil patel'. Single: message_ids='<id>'. "
+                   "For single-operation use archive/delete/mark_read/star directly."
                ))
 async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
-    allowed = {"archive", "read", "unread", "star", "unstar", "delete"}
+    allowed = {"archive", "read", "unread", "star", "unstar", "delete", "unsubscribe"}
     bad = [o for o in params.operations if o not in allowed]
     if bad:
         return ActionResult.error(
@@ -253,8 +253,32 @@ async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
     if not params.operations:
         return ActionResult.error("operations list is empty.", retryable=False)
 
-    ops_str = ",".join(params.operations)
+    # Unsubscribe is handled separately — it's a one-shot HTTP call, not a batch label op.
+    unsub_note = ""
+    core_ops = [o for o in params.operations if o != "unsubscribe"]
+
+    ops_str = ",".join(core_ops) if core_ops else ""
     try:
+        # Handle unsubscribe first if requested
+        if "unsubscribe" in params.operations:
+            unsub_query = params.query
+            if not unsub_query and params.message_ids:
+                ids = _ids(params.message_ids)
+                unsub_query = f"rfc822msgid:{ids[0]}" if ids else ""
+            if unsub_query:
+                unsub_result = await impl_unsubscribe_from_query(ctx, unsub_query,
+                                                                  params.account)
+                unsub_note = unsub_result.get("note", "")
+            if not core_ops:
+                # Unsubscribe only — return immediately
+                return ActionResult.success(
+                    data=build_bulk_mail_op(BulkOperationResult(operation="unsubscribe",
+                                                                 succeeded=1 if unsub_result.get("success") else 0,
+                                                                 total=1)),
+                    summary=unsub_note or "Unsubscribe attempted.",
+                    refresh_panels=["inbox"],
+                )
+
         if params.message_ids:
             ids = _ids(params.message_ids)
             ids_str = ",".join(ids)
@@ -281,10 +305,12 @@ async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
                                                     account=params.account)
                 result = BulkOperationResult(operation=ops_str, succeeded=last.succeeded,
                                              total=len(ids))
-            summary = f"Applied {params.operations} to {result.succeeded} email(s)."
+            prefix = f"{unsub_note} " if unsub_note else ""
+            summary = f"{prefix}Applied {core_ops} to {result.succeeded} email(s)."
         elif params.query:
             result = await impl_mark_all_matching(ctx, params.query, ops_str, params.account)
-            summary = (f"Applied {params.operations} to {result.succeeded} email(s) "
+            prefix = f"{unsub_note} " if unsub_note else ""
+            summary = (f"{prefix}Applied {core_ops} to {result.succeeded} email(s) "
                        f"(query: '{params.query}').")
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
@@ -301,16 +327,29 @@ async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
                data_model=BulkMailOpResult,
                description=(
                    "Bulk cleanup by category or sender — no need to know the exact query. "
-                   "categories: 'promotions', 'social', 'newsletters', 'outreach', "
-                   "'updates', 'forums', 'spam'. "
+                   "categories: 'promotions', 'social', 'newsletters', 'outreach', 'updates', 'forums', 'spam'. "
                    "Gmail maps to native category: labels; Outlook/IMAP use pattern matching. "
                    "Use when user says 'clean up obvious outreach', 'archive all promotions', "
-                   "'delete my newsletters'. "
-                   "Add from_senders=['linkedin'] for specific senders. "
-                   "operation: 'archive' (default), 'delete', 'read', 'star'."
+                   "'delete my newsletters', 'unsubscribe from this sender'. "
+                   "from_senders=['neil patel'] for specific senders. "
+                   "operation: 'archive' (default), 'delete', 'read', 'star', "
+                   "'unsubscribe' (find List-Unsubscribe header and call it)."
                ))
 async def fn_inbox_cleanup(ctx, params: InboxCleanupParams) -> ActionResult:
     try:
+        if params.operation == "unsubscribe":
+            from handlers_cleanup_impl import impl_unsubscribe_from_query, _build_cleanup_query
+            query = await _build_cleanup_query(ctx, params.categories, params.from_senders,
+                                               params.older_than_days, params.account)
+            result_dict = await impl_unsubscribe_from_query(ctx, query, params.account)
+            n = 1 if result_dict.get("success") else 0
+            bulk = BulkOperationResult(operation="unsubscribe", succeeded=n, total=1)
+            return ActionResult.success(
+                data=build_bulk_mail_op(bulk),
+                summary=result_dict.get("note", "Unsubscribe attempted."),
+                refresh_panels=["inbox"],
+            )
+
         result = await impl_inbox_cleanup(
             ctx,
             categories=params.categories,

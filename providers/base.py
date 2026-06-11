@@ -106,6 +106,12 @@ class BaseMailProvider(ABC):
                     from_folder: str = "Trash") -> dict:
         return self.err("Permanent deletion not implemented for this provider")
 
+    async def get_list_unsubscribe(self, ctx: Context, acc: dict,
+                                   message_id: str) -> tuple[str, str]:
+        """Return (list_unsubscribe_header_value, list_unsubscribe_post_value).
+        Empty strings if not found. Override per provider."""
+        return "", ""
+
     @staticmethod
     def ok(**kwargs) -> dict:
         return {"RESULT": "SUCCESS", **kwargs}

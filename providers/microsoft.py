@@ -265,6 +265,20 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
         if attachments: result["attachments"] = attachments
         return self.ok(**result)
 
+    async def get_list_unsubscribe(self, ctx: Context, acc: dict,
+                                   message_id: str) -> tuple[str, str]:
+        acc = await _refresh_token_if_needed(ctx, acc)
+        resp = await ctx.http.get(
+            f"{MS_GRAPH_BASE}/me/messages/{message_id}",
+            headers={"Authorization": f"Bearer {acc['access_token']}"},
+            params={"$select": "internetMessageHeaders"},
+        )
+        if resp.status_code != 200:
+            return "", ""
+        hdrs_list = resp.json().get("internetMessageHeaders") or []
+        hdrs = {h["name"].lower(): h["value"] for h in hdrs_list}
+        return hdrs.get("list-unsubscribe", ""), hdrs.get("list-unsubscribe-post", "")
+
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         acc = await _refresh_token_if_needed(ctx, acc)

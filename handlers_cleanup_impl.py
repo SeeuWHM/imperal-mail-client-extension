@@ -1,7 +1,11 @@
-"""Mail Client — inbox_cleanup and inbox_analytics implementation."""
+"""Mail Client — inbox_cleanup, inbox_analytics, and unsubscribe implementation."""
 from __future__ import annotations
 
+import re
 from collections import defaultdict
+
+_UNSUB_URL_RE = re.compile(r'<(https?://[^>]+)>', re.IGNORECASE)
+_UNSUB_MAILTO_RE = re.compile(r'<(mailto:[^>]+)>', re.IGNORECASE)
 
 from handlers_manage_impl import impl_mark_all_matching, _get_acc
 from handlers_inbox_impl import impl_top_senders
@@ -46,21 +50,22 @@ async def impl_inbox_cleanup(
             f"Invalid operation '{operation}'. Use: {', '.join(_VALID_CLEANUP_OPS)}"
         )
 
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected.")
+    query = await _build_cleanup_query(ctx, categories, from_senders, older_than_days, account)
+    return await impl_mark_all_matching(ctx, query=query, operation=operation, account=account)
 
-    is_gmail = hasattr(provider, "search_ids_only")
+
+async def _build_cleanup_query(ctx, categories: list, from_senders: list,
+                                older_than_days: int, account: str = "") -> str:
+    """Build provider-aware search query from cleanup params."""
+    acc, provider = await _get_acc(ctx, account)
+    is_gmail = acc and hasattr(provider, "search_ids_only")
     cat_map = _GMAIL_CATEGORY_MAP if is_gmail else _GENERIC_CATEGORY_MAP
 
     query_parts: list[str] = []
-
     for cat in categories:
-        cat = cat.lower().strip()
-        q = cat_map.get(cat, "")
+        q = cat_map.get(cat.lower().strip(), "")
         if q:
             query_parts.append(f"({q})")
-
     for sender in from_senders:
         s = sender.strip()
         if s:
@@ -71,16 +76,53 @@ async def impl_inbox_cleanup(
             "Specify at least one category or from_senders. "
             f"Supported categories: {', '.join(_GMAIL_CATEGORY_MAP)}"
         )
-
-    if len(query_parts) == 1:
-        query = query_parts[0].strip("()")
-    else:
-        query = " OR ".join(query_parts)
-
+    query = query_parts[0].strip("()") if len(query_parts) == 1 else " OR ".join(query_parts)
     if older_than_days > 0:
         query = f"({query}) older_than:{older_than_days}d"
+    return query
 
-    return await impl_mark_all_matching(ctx, query=query, operation=operation, account=account)
+
+async def impl_unsubscribe_from_query(ctx, query: str, account: str = "") -> dict:
+    """Find the most recent email matching query, extract List-Unsubscribe, call it."""
+    from handlers_inbox_impl import impl_search
+
+    acc, provider = await _get_acc(ctx, account)
+    if not acc:
+        raise RuntimeError("No email account connected.")
+
+    sr = await impl_search(ctx, query=query, max_results=1, account=account)
+    if not sr.results:
+        return {"success": False, "url": "", "note": "No email found matching the query."}
+
+    message_id = (sr.results[0].get("message_id") or sr.results[0].get("id") or "").strip()
+    if not message_id:
+        return {"success": False, "url": "", "note": "Could not retrieve message ID."}
+
+    unsub_header, post_data = await provider.get_list_unsubscribe(ctx, acc, message_id)
+
+    if not unsub_header:
+        return {"success": False, "url": "",
+                "note": "No List-Unsubscribe header in this email. Manual unsubscribe required."}
+
+    url_match = _UNSUB_URL_RE.search(unsub_header)
+    if not url_match:
+        mailto_match = _UNSUB_MAILTO_RE.search(unsub_header)
+        note = (f"Unsubscribe via email to: {mailto_match.group(1)}" if mailto_match
+                else f"Header found but no HTTP URL: {unsub_header}")
+        return {"success": False, "url": unsub_header, "note": note}
+
+    url = url_match.group(1)
+    try:
+        if post_data and "One-Click" in post_data:
+            resp = await ctx.http.post(url, data={"List-Unsubscribe": "One-Click"},
+                                       headers={"Content-Type": "application/x-www-form-urlencoded"})
+        else:
+            resp = await ctx.http.get(url)
+        success = resp.status_code < 400
+        return {"success": success, "url": url, "status": resp.status_code,
+                "note": "Unsubscribed." if success else f"HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"success": False, "url": url, "note": f"Request failed: {e}"}
 
 
 async def impl_inbox_analytics(

@@ -241,6 +241,18 @@ class GoogleReadMixin:
                 break
         return collected[:max_results]
 
+    async def get_list_unsubscribe(self, ctx: Context, acc: dict,
+                                   message_id: str) -> tuple[str, str]:
+        resp = await _api_get(ctx, f"messages/{message_id}", acc, params={
+            "format": "metadata",
+            "metadataHeaders": ["List-Unsubscribe", "List-Unsubscribe-Post"],
+        })
+        if resp.status_code != 200:
+            return "", ""
+        hdrs = {h["name"].lower(): h["value"]
+                for h in resp.json().get("payload", {}).get("headers", [])}
+        return hdrs.get("list-unsubscribe", ""), hdrs.get("list-unsubscribe-post", "")
+
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         page_size  = min(max(max_results, 1), 500)
