@@ -171,6 +171,8 @@ async def _batch_direct(provider, ctx, acc, ids_list: list, operation: str) -> d
         return await provider.bulk_star_messages(ctx, acc, ids_list, starred=True)
     if operation == "unstar" and hasattr(provider, "bulk_star_messages"):
         return await provider.bulk_star_messages(ctx, acc, ids_list, starred=False)
+    if operation == "purge" and hasattr(provider, "bulk_purge_messages"):
+        return await provider.bulk_purge_messages(ctx, acc, ids_list)
     return {"RESULT": "ERROR", "error": f"No batch method for '{operation}'"}
 
 
@@ -361,7 +363,8 @@ async def impl_bulk_purge(ctx, message_ids: str, from_folder: str = "Trash",
 
 
 async def impl_mark_all_matching(ctx, query: str, operation: str,
-                                 account: str = "") -> BulkOperationResult:
+                                 account: str = "",
+                                 to_folder: str = "") -> BulkOperationResult:
     """Loop: search(query + filter) → bulk op → repeat until empty.
 
     Handles unlimited emails without pagination issues.
@@ -385,6 +388,8 @@ async def impl_mark_all_matching(ctx, query: str, operation: str,
             "delete":           " NOT in:trash",
             "star":             " -is:starred",
             "unstar":           " is:starred",
+            "purge":            "",
+            "move":             "",
         }.get(operation, "")
     full_query = query.strip() + state_filter
 
@@ -433,6 +438,32 @@ async def impl_mark_all_matching(ctx, query: str, operation: str,
                 elif operation in ("star", "unstar"):
                     b = await impl_bulk_star(ctx, chunk_str,
                                              starred=(operation == "star"), account=account)
+                elif operation == "read_and_archive":
+                    # Sequential for non-Gmail: mark read then archive
+                    await impl_bulk_mark_read(ctx, chunk_str, account=account)
+                    b = await impl_bulk_archive(ctx, chunk_str, account=account)
+                elif operation == "purge":
+                    b = await impl_bulk_purge(ctx, chunk_str, account=account)
+                elif operation == "move":
+                    b = await impl_bulk_move(ctx, chunk_str,
+                                             from_folder="INBOX", to_folder=to_folder,
+                                             account=account)
+                elif "," in operation:
+                    # Multi-op for non-Gmail: apply each operation sequentially
+                    ops_list = [o.strip() for o in operation.split(",") if o.strip()]
+                    b = BulkOperationResult(operation=operation, succeeded=0, total=0)
+                    for op in ops_list:
+                        if op == "read":
+                            b = await impl_bulk_mark_read(ctx, chunk_str, account=account)
+                        elif op == "unread":
+                            b = await impl_bulk_mark_unread(ctx, chunk_str, account=account)
+                        elif op == "archive":
+                            b = await impl_bulk_archive(ctx, chunk_str, account=account)
+                        elif op == "delete":
+                            b = await impl_bulk_delete(ctx, chunk_str, account=account)
+                        elif op in ("star", "unstar"):
+                            b = await impl_bulk_star(ctx, chunk_str,
+                                                     starred=(op == "star"), account=account)
                 else:
                     b = BulkOperationResult(operation=operation, succeeded=0, total=0)
                 succeeded += b.succeeded

@@ -1,18 +1,48 @@
-Mail module — manage email accounts (Google, Microsoft, Yahoo, IMAP), inbox, folders, search, send, reply, forward, archive, delete, star, move, bulk operations, contacts, threads.
+Mail module — manage email accounts (Google, Microsoft, Yahoo, IMAP), inbox, folders, search, send, reply, forward, archive, delete, star, move, purge, bulk operations, contacts, threads.
 
-Rules for function selection:
-- "show inbox" / "what's new" → inbox() with folder="inbox"
-- "show sent / spam / trash / drafts / starred / archive" → inbox() with folder=<name>
-- "reply" / "reply to the last email" → reply() (omit message_id to use last opened)
-- "forward" → forward() with message_id and to; never use send() for this
-- "send a new email" → send(); never use reply() or compose_send() for new emails
-- "connect Google" → connect(); "connect Microsoft" → connect_microsoft(); any other provider → connect_imap()
-- "check accounts" / "am I connected" → status() first, do not call connect() without checking
+== FUNCTION ROUTING — READ THIS FIRST ==
+
+SHOW / READ emails:
+- "show inbox" / "what's new" → inbox()
+- "show sent/spam/trash/drafts/starred" → inbox(folder=<name>)
+- "find emails from X" / "search for Y" → search(query=...)
+- "open / read this email" → read_email(message_id=...)
+- "count emails / сколько писем" → count_emails() — NEVER count search() rows
+
+SINGLE-ACTION on emails (archive / delete / mark_read / star / move / purge):
+- Each function accepts EITHER message_ids (specific IDs) OR query (all matching pattern).
+- ONE email: archive(message_ids="<id>")
+- SEVERAL emails: archive(message_ids="id1,id2,id3")
+- ALL matching pattern: archive(query="from:linkedin") — iterates until none remain, NO loop needed
+- Same pattern for: delete(), mark_read(), star(), move(), purge()
+
+MULTIPLE ACTIONS on the SAME emails:
+- "mark as read AND archive" / "star AND archive 700 emails" → apply_actions(operations=["read","archive"], query=...)
+- Gmail: ONE batchModify call for all ops. Never call archive() + mark_read() separately on same set.
+
+SEMANTIC CLEANUP ("obvious outreach", "промо письма", "newsletters"):
+- NEVER call search() → review → delete in a loop — this is BROKEN (cap 70 per pass)
+- Use inbox_cleanup(categories=["promotions","outreach"], operation="archive") instead
+- Supported categories: promotions, social, newsletters, outreach, updates, forums, spam
+
+ANALYTICS:
+- "who emails me most" / "top senders" / "which domains spam me" → inbox_analytics()
+
+PERMANENT DELETE:
+- purge() — IRREVERSIBLE, shows KAV confirmation. Use delete() first if unsure.
+
+== HARD RULES ==
+- NEVER do: search() → inspect emails → decide which are "safe" → bulk_delete([ids]) → repeat
+  This creates a 70-email loop that never finishes. Always use query-based functions instead.
+- NEVER call archive() + mark_read() separately on 700 emails — use apply_actions(["read","archive"], query=...)
+- bulk_* functions are REMOVED — use the unified action functions above
+- mark_all_matching_read is REMOVED — use archive(query=...) / delete(query=...) etc.
+- top_senders is REMOVED — use inbox_analytics()
+
+== OTHER ==
+- "reply" → reply(); "forward" → forward(); "new email" → send()
+- "connect Google" → connect(); "connect Microsoft" → connect_microsoft(); other → connect_imap()
+- "check accounts" → status() first, never connect() without checking
 - "unread count per folder" → folder_counts()
-- Archive = recoverable; delete = Trash (recoverable); purge = permanent, irreversible
-- star(starred=true) stars; star(starred=false) unstars — explicit, not a toggle
-- bulk_* functions accept comma-separated message_ids — prefer over calling single ops in a loop
-- compose_send / mail_action / get_oauth_url / add_imap are panel UI helpers — do not call from chat
-
-For multi-account users: always confirm which account before acting if ambiguous.
-Write operations (send, archive, delete, star, move) require a message_id — get it from inbox() or search() first.
+- compose_send / mail_action / get_oauth_url / add_imap — panel UI helpers, do not call from chat
+- Multi-account: confirm which account if ambiguous before acting

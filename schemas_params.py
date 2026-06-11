@@ -267,3 +267,195 @@ class SetFolderPrefsParams(BaseModel):
         if not isinstance(v, list):
             return []
         return [_FOLDER_CANONICAL.get(x.strip().lower(), x.strip()) for x in v if x.strip()]
+
+
+# ── Unified action params (single / bulk / all-matching) ─────────────────────
+# Each function accepts message_ids OR query — never both.
+# message_ids: comma-separated IDs (1 or many).
+# query:       search expression → acts on ALL matching until none remain.
+
+class ArchiveParams(BaseModel):
+    message_ids: str = Field(
+        default="",
+        description="ID(s) to archive — single or comma-separated list from inbox()/search(). "
+                    "Provide this OR query, not both.",
+    )
+    query: str = Field(
+        default="",
+        description="Archive ALL emails matching this query until none remain. "
+                    "Gmail: 'from:linkedin', 'category:promotions', 'older_than:30d'. "
+                    "Provide this OR message_ids.",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
+
+class DeleteParams(BaseModel):
+    message_ids: str = Field(
+        default="",
+        description="ID(s) to move to Trash — single or comma-separated. "
+                    "Recoverable (Gmail 30 days, Outlook until emptied). "
+                    "Provide this OR query.",
+    )
+    query: str = Field(
+        default="",
+        description="Move ALL emails matching this query to Trash. "
+                    "Recoverable. Provide this OR message_ids.",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
+
+class MarkReadParams(BaseModel):
+    message_ids: str = Field(
+        default="",
+        description="ID(s) to mark — single or comma-separated. Provide this OR query.",
+    )
+    query: str = Field(
+        default="",
+        description="Act on ALL emails matching this query. Provide this OR message_ids.",
+    )
+    read: bool = Field(
+        default=True,
+        description="True = mark as read (clear unread badge). "
+                    "False = mark as unread (restore unread badge).",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
+
+class StarUnifiedParams(BaseModel):
+    message_ids: str = Field(
+        default="",
+        description="ID(s) to star/unstar — single or comma-separated. Provide this OR query.",
+    )
+    query: str = Field(
+        default="",
+        description="Star/unstar ALL emails matching this query. Provide this OR message_ids.",
+    )
+    starred: bool = Field(
+        default=True,
+        description="True = add star/flag. False = remove star/flag.",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
+
+class MoveUnifiedParams(BaseModel):
+    message_ids: str = Field(
+        default="",
+        description="ID(s) to move — single or comma-separated. Provide this OR query.",
+    )
+    query: str = Field(
+        default="",
+        description="Move ALL emails matching this query. Provide this OR message_ids.",
+    )
+    to_folder: str = Field(
+        description="Destination folder: 'spam', 'INBOX', 'Archive', 'trash', or custom label. "
+                    "Gmail uses label names; Outlook maps common names automatically.",
+    )
+    from_folder: str = Field(
+        default="INBOX",
+        description="Source folder when using message_ids (default: INBOX).",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
+
+class PurgeUnifiedParams(BaseModel):
+    message_ids: str = Field(
+        default="",
+        description="ID(s) to permanently delete — single or comma-separated. "
+                    "IRREVERSIBLE — cannot be recovered. Provide this OR query.",
+    )
+    query: str = Field(
+        default="",
+        description="Permanently delete ALL emails matching this query. "
+                    "IRREVERSIBLE. Provide this OR message_ids.",
+    )
+    from_folder: str = Field(
+        default="Trash",
+        description="Folder to purge from when using message_ids (default: Trash).",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
+
+class ApplyActionsParams(BaseModel):
+    operations: list[str] = Field(
+        description="One or more operations applied to the SAME emails in a single efficient call. "
+                    "Allowed: 'archive', 'read', 'unread', 'star', 'unstar', 'delete'. "
+                    "Example: ['read', 'archive'] = mark as read AND archive together. "
+                    "Gmail: combined into ONE batchModify call. "
+                    "Use this instead of calling archive + mark_read separately.",
+    )
+    message_ids: str = Field(
+        default="",
+        description="ID(s) — single or comma-separated. Provide this OR query.",
+    )
+    query: str = Field(
+        default="",
+        description="Apply to ALL emails matching this query. Provide this OR message_ids.",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def _coerce(cls, v): return _coerce_ids(v)
+
+
+class InboxCleanupParams(BaseModel):
+    categories: list[str] = Field(
+        default_factory=list,
+        description="Email categories to clean up. Allowed: 'promotions', 'social', "
+                    "'newsletters', 'outreach', 'updates', 'forums', 'spam'. "
+                    "Gmail maps to native category: labels; Outlook/IMAP use pattern matching. "
+                    "Combine with from_senders for more precision.",
+    )
+    from_senders: list[str] = Field(
+        default_factory=list,
+        description="Sender patterns to clean — e.g. ['linkedin', 'noreply@company.com']. "
+                    "Works on all providers. Combined with categories via OR.",
+    )
+    older_than_days: int = Field(
+        default=0,
+        description="Restrict to emails older than N days (0 = no age filter).",
+    )
+    operation: str = Field(
+        default="archive",
+        description="What to do: 'archive' (recoverable, default), 'delete' (Trash), "
+                    "'read' (mark as read), 'star' (flag for review).",
+    )
+    account: str = Field(default="", description="Account email or ID (omit for active account)")
+
+
+class InboxAnalyticsParams(BaseModel):
+    period_days: int = Field(
+        default=90,
+        description="Look-back period in days: 7, 30, 90 (default), 365.",
+    )
+    group_by: str = Field(
+        default="sender",
+        description="Grouping mode: 'sender' = top individual senders; "
+                    "'domain' = top sending domains (useful for newsletter/outreach analysis).",
+    )
+    limit: int = Field(default=10, description="Rows to return (max 50).")
+    account: str = Field(default="", description="Account email or ID (omit for active account)")

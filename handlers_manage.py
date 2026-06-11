@@ -1,331 +1,371 @@
-"""Mail Client · Email management @chat.function handlers (SDK 5.2.0 / SDL)."""
+"""Mail Client — unified action @chat.function handlers (SDK 5.2.0 / SDL).
+
+Each function accepts EITHER message_ids (specific emails) OR query (all matching).
+- message_ids: single ID or comma-separated list → single or bulk op.
+- query: search expression → iterates until all matching emails are processed.
+"""
 from __future__ import annotations
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
+
 from handlers_manage_impl import (
     impl_archive, impl_delete, impl_mark_read, impl_mark_unread, impl_star,
     impl_move, impl_purge,
     impl_bulk_archive, impl_bulk_delete, impl_bulk_mark_read, impl_bulk_mark_unread,
     impl_bulk_move, impl_bulk_star, impl_bulk_purge,
     impl_mark_all_matching,
+    _get_acc, _batch_direct,
 )
-from pydantic import BaseModel, Field as PField
-
-from schemas import (
-    MessageIdParams, StarParams, MoveParams, PurgeParams, BulkParams,
-    BulkMoveParams, BulkStarParams, BulkPurgeParams,
+from handlers_cleanup_impl import impl_inbox_cleanup
+from schemas import BulkOperationResult
+from schemas_params import (
+    ArchiveParams, DeleteParams, MarkReadParams, StarUnifiedParams,
+    MoveUnifiedParams, PurgeUnifiedParams, ApplyActionsParams, InboxCleanupParams,
 )
+from schemas_sdl_builders import BulkMailOpResult, build_bulk_mail_op
 
 
-class MarkAllMatchingParams(BaseModel):
-    query: str = PField(
-        description="Gmail search query for emails to act on — e.g. 'from:linkedin', "
-                    "'from:notifications@twitter.com', 'subject:invoice'. "
-                    "Do NOT add is:unread/is:read yourself — the function adds the right filter automatically."
-    )
-    operation: str = PField(
-        default="read",
-        description="Action to apply to ALL matching emails: "
-                    "'read' (mark as read), 'unread' (mark as unread), "
-                    "'archive' (remove from INBOX), "
-                    "'read_and_archive' (mark read AND remove from INBOX in ONE call — use this when user wants both), "
-                    "'delete' (move to trash — recoverable), "
-                    "'star' (add star/flag), 'unstar' (remove star)"
-    )
-    account: str = PField(default="", description="Account email or ID (omit for active account)")
-from schemas_sdl_builders import (
-    MailOpResult, BulkMailOpResult,
-    build_mail_op, build_bulk_mail_op,
-)
+def _ids(s: str) -> list[str]:
+    return [i.strip() for i in s.split(",") if i.strip()]
 
+
+def _single_to_bulk(ok: bool, operation: str) -> BulkOperationResult:
+    """Wrap a single-message result into BulkOperationResult for uniform data_model."""
+    n = 1 if ok else 0
+    field_map = {
+        "archive": "archived", "delete": "deleted", "purge": "purged",
+        "mark_read": "marked_read", "read": "marked_read",
+        "mark_unread": "marked_unread", "unread": "marked_unread",
+        "star": "starred", "unstar": "unstarred", "move": "moved",
+    }
+    kwargs: dict = {"operation": operation, "succeeded": n, "total": 1}
+    field = field_map.get(operation)
+    if field:
+        kwargs[field] = n
+    return BulkOperationResult(**kwargs)
+
+
+# ── archive ───────────────────────────────────────────────────────────────────
 
 @chat.function("archive", action_type="write", event="archived",
                effects=["update:email"],
-               data_model=MailOpResult,
-               id_projection="message_id",
-               description="Archive a single email — removes it from INBOX, stays searchable and recoverable. GMAIL NOTE: Gmail has no system Archive folder — archiving = removing from INBOX (email lives in 'All Mail'). To browse archived emails, use search(query='label:all'). For a physical Archive folder in Gmail, create one first with create_mail_folder('Archive') then use move(). Requires message_id: call inbox() or search() first if you don't have it yet.")
-async def fn_archive(ctx, params: MessageIdParams) -> ActionResult:
-    """Archive a single email — removes it from INBOX, stays searchable and recoverable."""
+               data_model=BulkMailOpResult,
+               description=(
+                   "Archive emails — removes from INBOX, stays recoverable (Gmail: All Mail; "
+                   "Outlook: Archive folder; IMAP: moves to Archive). "
+                   "Single email: message_ids='<id>'. "
+                   "Multiple emails: message_ids='id1,id2,id3'. "
+                   "ALL matching a pattern: query='from:linkedin' — iterates until none remain. "
+                   "Provide message_ids OR query, not both."
+               ))
+async def fn_archive(ctx, params: ArchiveParams) -> ActionResult:
     try:
-        r = await impl_archive(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(
-            data=build_mail_op(r),
-            summary=f"Archived {params.message_id}.",
-            refresh_panels=["inbox"],
-        )
+        if params.message_ids:
+            ids = _ids(params.message_ids)
+            if len(ids) == 1:
+                r = await impl_archive(ctx, message_id=ids[0], account=params.account)
+                result = _single_to_bulk(r.ok, "archive")
+                summary = "Archived 1 email."
+            else:
+                result = await impl_bulk_archive(ctx, params.message_ids, account=params.account)
+                summary = f"Archived {result.succeeded} email(s)."
+        elif params.query:
+            result = await impl_mark_all_matching(ctx, params.query, "archive", params.account)
+            summary = f"Archived {result.succeeded} email(s) matching '{params.query}'."
+        else:
+            return ActionResult.error("Provide message_ids or query.", retryable=False)
+        return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
+                                    refresh_panels=["inbox"])
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
+
+# ── delete ────────────────────────────────────────────────────────────────────
 
 @chat.function("delete", action_type="write", event="deleted",
                effects=["update:email"],
-               data_model=MailOpResult,
-               id_projection="message_id",
-               description="Move a single email to Trash/Deleted Items — RECOVERABLE (Gmail: 30 days, Outlook: until emptied). This is NOT permanent — use purge() for permanent deletion. Requires message_id: call inbox() or search() first if you don't have it yet.")
-async def fn_delete(ctx, params: MessageIdParams) -> ActionResult:
-    """Move a single email to Trash — recoverable until emptied."""
+               data_model=BulkMailOpResult,
+               description=(
+                   "Move emails to Trash — RECOVERABLE (Gmail: 30 days; Outlook: until emptied). "
+                   "Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. "
+                   "ALL matching: query='from:newsletter' — iterates until none remain. "
+                   "Use purge() for permanent deletion. Provide message_ids OR query."
+               ))
+async def fn_delete(ctx, params: DeleteParams) -> ActionResult:
     try:
-        r = await impl_delete(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(
-            data=build_mail_op(r),
-            summary=f"Moved {params.message_id} to Trash.",
-            refresh_panels=["inbox"],
-        )
+        if params.message_ids:
+            ids = _ids(params.message_ids)
+            if len(ids) == 1:
+                r = await impl_delete(ctx, message_id=ids[0], account=params.account)
+                result = _single_to_bulk(r.ok, "delete")
+                summary = "Moved 1 email to Trash."
+            else:
+                result = await impl_bulk_delete(ctx, params.message_ids, account=params.account)
+                summary = f"Moved {result.succeeded} email(s) to Trash."
+        elif params.query:
+            result = await impl_mark_all_matching(ctx, params.query, "delete", params.account)
+            summary = f"Moved {result.succeeded} email(s) to Trash (query: '{params.query}')."
+        else:
+            return ActionResult.error("Provide message_ids or query.", retryable=False)
+        return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
+                                    refresh_panels=["inbox"])
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
+
+# ── mark_read ─────────────────────────────────────────────────────────────────
 
 @chat.function("mark_read", action_type="write", event="marked_read",
                effects=["update:email"],
-               data_model=MailOpResult,
-               id_projection="message_id",
-               description="Mark a single email as read (clears the unread indicator). For multiple emails use bulk_mark_read().")
-async def fn_mark_read(ctx, params: MessageIdParams) -> ActionResult:
-    """Mark a single email as read (clears the unread indicator)."""
+               data_model=BulkMailOpResult,
+               description=(
+                   "Mark emails as read (read=true, default) or unread (read=false). "
+                   "Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. "
+                   "ALL matching: query='from:linkedin' — processes until none remain. "
+                   "Provide message_ids OR query."
+               ))
+async def fn_mark_read(ctx, params: MarkReadParams) -> ActionResult:
+    op = "read" if params.read else "unread"
+    label = "read" if params.read else "unread"
     try:
-        r = await impl_mark_read(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(
-            data=build_mail_op(r),
-            summary=f"Marked {params.message_id} as read.",
-            refresh_panels=["inbox"],
-        )
+        if params.message_ids:
+            ids = _ids(params.message_ids)
+            if len(ids) == 1:
+                r = (await impl_mark_read(ctx, message_id=ids[0], account=params.account)
+                     if params.read else
+                     await impl_mark_unread(ctx, message_id=ids[0], account=params.account))
+                result = _single_to_bulk(r.ok, op)
+                summary = f"Marked 1 email as {label}."
+            else:
+                result = (await impl_bulk_mark_read(ctx, params.message_ids, account=params.account)
+                          if params.read else
+                          await impl_bulk_mark_unread(ctx, params.message_ids, account=params.account))
+                summary = f"Marked {result.succeeded} email(s) as {label}."
+        elif params.query:
+            result = await impl_mark_all_matching(ctx, params.query, op, params.account)
+            summary = f"Marked {result.succeeded} email(s) as {label} (query: '{params.query}')."
+        else:
+            return ActionResult.error("Provide message_ids or query.", retryable=False)
+        return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
+                                    refresh_panels=["inbox"])
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
-@chat.function("mark_unread", action_type="write", event="marked_unread",
-               effects=["update:email"],
-               data_model=MailOpResult,
-               id_projection="message_id",
-               description="Mark a single email as unread (restores the unread indicator). For multiple emails use bulk_mark_unread().")
-async def fn_mark_unread(ctx, params: MessageIdParams) -> ActionResult:
-    """Mark a single email as unread (restores the unread indicator)."""
-    try:
-        r = await impl_mark_unread(ctx, message_id=params.message_id, account=params.account)
-        return ActionResult.success(
-            data=build_mail_op(r),
-            summary=f"Marked {params.message_id} as unread.",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
-
+# ── star ──────────────────────────────────────────────────────────────────────
 
 @chat.function("star", action_type="write", event="starred",
                effects=["update:email"],
-               data_model=MailOpResult,
-               id_projection="message_id",
-               description="Add or remove the starred/important flag on an email. Pass starred=true to star, starred=false to unstar — explicit, not a toggle. Requires message_id: call inbox() or search() first if you don't have it yet.")
-async def fn_star(ctx, params: StarParams) -> ActionResult:
-    """Add or remove the starred/important flag on an email."""
+               data_model=BulkMailOpResult,
+               description=(
+                   "Star (starred=true, default) or unstar (starred=false) emails. "
+                   "Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. "
+                   "ALL matching: query='from:boss@company.com'. "
+                   "Provide message_ids OR query."
+               ))
+async def fn_star(ctx, params: StarUnifiedParams) -> ActionResult:
+    op = "star" if params.starred else "unstar"
+    label = "Starred" if params.starred else "Unstarred"
     try:
-        r = await impl_star(ctx, message_id=params.message_id,
-                            starred=params.starred, account=params.account)
-        action = "Starred" if params.starred else "Unstarred"
-        return ActionResult.success(
-            data=build_mail_op(r),
-            summary=f"{action} {params.message_id}.",
-            refresh_panels=["inbox"],
-        )
+        if params.message_ids:
+            ids = _ids(params.message_ids)
+            if len(ids) == 1:
+                r = await impl_star(ctx, message_id=ids[0], starred=params.starred,
+                                    account=params.account)
+                result = _single_to_bulk(r.ok, op)
+                summary = f"{label} 1 email."
+            else:
+                result = await impl_bulk_star(ctx, params.message_ids, starred=params.starred,
+                                              account=params.account)
+                summary = f"{label} {result.succeeded} email(s)."
+        elif params.query:
+            result = await impl_mark_all_matching(ctx, params.query, op, params.account)
+            summary = f"{label} {result.succeeded} email(s) (query: '{params.query}')."
+        else:
+            return ActionResult.error("Provide message_ids or query.", retryable=False)
+        return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
+                                    refresh_panels=["inbox"])
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
+
+# ── move ──────────────────────────────────────────────────────────────────────
 
 @chat.function("move", action_type="write", event="moved",
                effects=["update:email"],
-               data_model=MailOpResult,
-               id_projection="message_id",
-               description="Move an email from one folder to another — e.g. INBOX→spam, Trash→INBOX (untrash). Requires both from_folder and to_folder.")
-async def fn_move(ctx, params: MoveParams) -> ActionResult:
-    """Move an email from one folder to another — e.g."""
+               data_model=BulkMailOpResult,
+               description=(
+                   "Move emails to a folder. to_folder is required. "
+                   "Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. "
+                   "ALL matching: query='from:linkedin' — moves all until none remain. "
+                   "Examples: move to 'spam', 'INBOX', 'Archive', 'trash', or a custom label. "
+                   "Provide message_ids OR query."
+               ))
+async def fn_move(ctx, params: MoveUnifiedParams) -> ActionResult:
     try:
-        r = await impl_move(ctx, message_id=params.message_id, from_folder=params.from_folder,
-                            to_folder=params.to_folder, account=params.account)
-        return ActionResult.success(
-            data=build_mail_op(r),
-            summary=f"Moved {params.message_id} to {params.to_folder}.",
-            refresh_panels=["inbox"],
-        )
+        if params.message_ids:
+            ids = _ids(params.message_ids)
+            if len(ids) == 1:
+                r = await impl_move(ctx, message_id=ids[0], from_folder=params.from_folder,
+                                    to_folder=params.to_folder, account=params.account)
+                result = _single_to_bulk(r.ok, "move")
+                summary = f"Moved 1 email to {params.to_folder}."
+            else:
+                result = await impl_bulk_move(ctx, params.message_ids,
+                                              from_folder=params.from_folder,
+                                              to_folder=params.to_folder,
+                                              account=params.account)
+                summary = f"Moved {result.succeeded} email(s) to {params.to_folder}."
+        elif params.query:
+            result = await impl_mark_all_matching(ctx, params.query, "move", params.account,
+                                                  to_folder=params.to_folder)
+            summary = f"Moved {result.succeeded} email(s) to {params.to_folder}."
+        else:
+            return ActionResult.error("Provide message_ids or query.", retryable=False)
+        return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
+                                    refresh_panels=["inbox"])
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
 
 
-@chat.function("purge", action_type="destructive", event="purged",
-               effects=["delete:email"],
-               data_model=MailOpResult,
-               id_projection="message_id",
-               description="PERMANENTLY delete an email — cannot be recovered from Trash or anywhere else. Use delete() first if unsure (moves to Trash, recoverable). Requires message_id: call inbox() or search() first if you don't have it.")
-async def fn_purge(ctx, params: PurgeParams) -> ActionResult:
-    """Permanently delete an email — cannot be recovered."""
-    try:
-        r = await impl_purge(ctx, message_id=params.message_id,
-                             from_folder=params.from_folder, account=params.account)
-        return ActionResult.success(
-            data=build_mail_op(r),
-            summary=f"Permanently deleted {params.message_id}.",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+# ── apply_actions ─────────────────────────────────────────────────────────────
 
-
-@chat.function("bulk_archive", action_type="write", event="bulk_archived",
-               effects=["update:email"],
-               data_model=BulkMailOpResult,
-               description="Archive multiple emails. ⚠️ ROUTING RULE: if the user says 'archive ALL from X', 'заархивируй все от Y' — use mark_all_matching_read(operation='archive') instead. This function is for a specific known list of IDs. WORKFLOW: first call search()/inbox() to get message_ids.")
-async def fn_bulk_archive(ctx, params: BulkParams) -> ActionResult:
-    """Archive multiple emails in one operation."""
-    try:
-        r = await impl_bulk_archive(ctx, message_ids=params.message_ids, account=params.account)
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"Archived {r.succeeded} email(s).",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
-
-
-@chat.function("bulk_delete", action_type="write", event="bulk_deleted",
-               effects=["update:email"],
-               data_model=BulkMailOpResult,
-               description="Move multiple emails to Trash (recoverable). ⚠️ ROUTING RULE: if user says 'delete ALL from X', 'удали все письма от Y' — use mark_all_matching_read(operation='delete') instead. This function is for a specific known list of IDs. WORKFLOW: first call search()/inbox() to get message_ids.")
-async def fn_bulk_delete(ctx, params: BulkParams) -> ActionResult:
-    """Move multiple emails to Trash in one operation."""
-    try:
-        r = await impl_bulk_delete(ctx, message_ids=params.message_ids, account=params.account)
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"Deleted {r.succeeded} email(s).",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
-
-
-@chat.function("bulk_mark_read", action_type="write", event="bulk_marked_read",
-               effects=["update:email"],
-               data_model=BulkMailOpResult,
-               description="Mark multiple emails as read. Pass message_ids as comma-separated string. ⚠️ ROUTING RULE: if the user says 'mark ALL emails from X as read', 'прочитай все от X', 'отметь все письма от Y' — use mark_all_matching_read() instead, NOT this function. This function is for a specific known list of IDs only. WORKFLOW: first call search()/inbox() to get message_ids, pass account= for that mailbox.")
-async def fn_bulk_mark_read(ctx, params: BulkParams) -> ActionResult:
-    """Mark multiple emails as read in one operation."""
-    try:
-        r = await impl_bulk_mark_read(ctx, message_ids=params.message_ids, account=params.account)
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"Marked {r.succeeded} email(s) as read.",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
-
-
-@chat.function("bulk_mark_unread", action_type="write", event="bulk_marked_unread",
-               effects=["update:email"],
-               data_model=BulkMailOpResult,
-               description="Mark multiple emails as unread in one operation. Pass message_ids as a comma-separated string. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails). To act on 'all' emails in a folder, list that folder first (inbox()/folder() with the account) and pass every returned message_id.")
-async def fn_bulk_mark_unread(ctx, params: BulkParams) -> ActionResult:
-    """Mark multiple emails as unread in one operation."""
-    try:
-        r = await impl_bulk_mark_unread(ctx, message_ids=params.message_ids, account=params.account)
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"Marked {r.succeeded} email(s) as unread.",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
-
-
-@chat.function("bulk_move", action_type="write", event="bulk_moved",
-               effects=["update:email"],
-               data_model=BulkMailOpResult,
-               description="Move multiple emails from one folder to another in one batch. Pass message_ids as comma-separated string. Examples: move spam to INBOX, move selected to archive, move trash items back to INBOX. Get the message_ids first via inbox()/folder()/search() on the SAME mailbox and pass account= for that mailbox (ids are per-account).")
-async def fn_bulk_move(ctx, params: BulkMoveParams) -> ActionResult:
-    """Move multiple emails from one folder to another in one batch."""
-    try:
-        r = await impl_bulk_move(ctx, message_ids=params.message_ids,
-                                 from_folder=params.from_folder, to_folder=params.to_folder,
-                                 account=params.account)
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"Moved {r.succeeded} email(s) to {params.to_folder}.",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
-
-
-@chat.function("bulk_star", action_type="write", event="bulk_starred",
-               effects=["update:email"],
-               data_model=BulkMailOpResult,
-               description="Star or unstar multiple emails in one batch. Pass message_ids as comma-separated string. Use starred=true to star, starred=false to unstar. WORKFLOW: first call inbox()/folder()/search() on the TARGET mailbox to load the emails and collect their message_ids, then pass account= for THAT SAME mailbox (a message_id from one account does not exist in another — wrong account = the op fails).")
-async def fn_bulk_star(ctx, params: BulkStarParams) -> ActionResult:
-    """Star or unstar multiple emails in one batch."""
-    try:
-        r = await impl_bulk_star(ctx, message_ids=params.message_ids,
-                                 starred=params.starred, account=params.account)
-        action = "Starred" if params.starred else "Unstarred"
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"{action} {r.succeeded} email(s).",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
-
-
-@chat.function("bulk_purge", action_type="destructive", event="bulk_purged",
-               effects=["delete:email"],
-               data_model=BulkMailOpResult,
-               description="Permanently delete multiple emails in one batch — cannot be recovered. Use delete() or bulk_delete() first if unsure. Pass message_ids as comma-separated string. Get the message_ids first via inbox()/folder()/search() on the SAME mailbox and pass account= for that mailbox (ids are per-account).")
-async def fn_bulk_purge(ctx, params: BulkPurgeParams) -> ActionResult:
-    """Permanently delete multiple emails in one batch — irreversible."""
-    try:
-        r = await impl_bulk_purge(ctx, message_ids=params.message_ids,
-                                  from_folder=params.from_folder, account=params.account)
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"Permanently deleted {r.succeeded} email(s).",
-            refresh_panels=["inbox"],
-        )
-    except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
-
-
-@chat.function("mark_all_matching_read", action_type="write", event="bulk_marked_read",
+@chat.function("apply_actions", action_type="write", event="bulk_marked_read",
                effects=["update:email"],
                data_model=BulkMailOpResult,
                description=(
-                   "Apply an action to ALL emails matching a query — iterates automatically until none remain. "
-                   "Use when user says: 'mark all LinkedIn emails as read', 'archive all from X', "
-                   "'delete all newsletters', 'star all from boss@company.com', "
-                   "'прочитай все письма от X', 'архивируй всё от Y', 'удали всю рассылку от Z'. "
-                   "Operations: read, unread, archive, delete, star, unstar. "
-                   "Gmail: uses batchModify/batchDelete API — 200 emails per iteration in ONE HTTP call (not per-email). "
-                   "Outlook/IMAP: parallel per-message with 5 concurrent connections. "
-                   "Do NOT add is:unread / is:starred to query — added automatically per operation. "
-                   "Handles 780+ emails in ~15 seconds. Safety cap: 20 iterations × 200 = 4000 emails."
+                   "Apply MULTIPLE operations to the SAME emails in one efficient call. "
+                   "Use when combining actions: ['read','archive'], ['star','archive'], "
+                   "['read','archive','star']. "
+                   "Gmail: combined into ONE batchModify call — faster than calling separately. "
+                   "Allowed operations: 'archive', 'read', 'unread', 'star', 'unstar', 'delete'. "
+                   "Single email: message_ids='<id>'. ALL matching: query='from:linkedin'. "
+                   "For single-operation tasks use archive/delete/mark_read/star directly."
                ))
-async def fn_mark_all_matching_read(ctx, params: MarkAllMatchingParams) -> ActionResult:
-    """Mark ALL emails matching query as read/unread/archived/deleted — iterates until empty."""
-    valid_ops = ("read", "unread", "archive", "read_and_archive", "delete", "star", "unstar")
-    if params.operation not in valid_ops:
+async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
+    allowed = {"archive", "read", "unread", "star", "unstar", "delete"}
+    bad = [o for o in params.operations if o not in allowed]
+    if bad:
         return ActionResult.error(
-            f"Invalid operation '{params.operation}'. Use: {', '.join(valid_ops)}",
-            retryable=False,
+            f"Invalid operation(s): {bad}. Allowed: {sorted(allowed)}", retryable=False
         )
+    if not params.operations:
+        return ActionResult.error("operations list is empty.", retryable=False)
+
+    ops_str = ",".join(params.operations)
     try:
-        r = await impl_mark_all_matching(ctx, query=params.query,
-                                         operation=params.operation, account=params.account)
-        op_label = {"read": "marked as read", "unread": "marked as unread",
-                    "archive": "archived", "delete": "moved to trash",
-                    "star": "starred", "unstar": "unstarred"}.get(params.operation, params.operation)
-        return ActionResult.success(
-            data=build_bulk_mail_op(r),
-            summary=f"{r.succeeded} email(s) {op_label} (query: '{params.query}').",
-            refresh_panels=["inbox"],
-        )
+        if params.message_ids:
+            ids = _ids(params.message_ids)
+            ids_str = ",".join(ids)
+            acc, provider = await _get_acc(ctx, params.account)
+            # Gmail: _batch_direct combines into ONE batchModify call
+            r = await _batch_direct(provider, ctx, acc, ids, ops_str)
+            if r.get("RESULT") == "SUCCESS":
+                n = r.get("succeeded", len(ids))
+                result = BulkOperationResult(operation=ops_str, succeeded=n, total=len(ids))
+            else:
+                # Slow path (IMAP/MS): apply each operation sequentially
+                last = BulkOperationResult(operation=ops_str, succeeded=0, total=len(ids))
+                for op in params.operations:
+                    if op == "read":
+                        last = await impl_bulk_mark_read(ctx, ids_str, account=params.account)
+                    elif op == "unread":
+                        last = await impl_bulk_mark_unread(ctx, ids_str, account=params.account)
+                    elif op == "archive":
+                        last = await impl_bulk_archive(ctx, ids_str, account=params.account)
+                    elif op == "delete":
+                        last = await impl_bulk_delete(ctx, ids_str, account=params.account)
+                    elif op in ("star", "unstar"):
+                        last = await impl_bulk_star(ctx, ids_str, starred=(op == "star"),
+                                                    account=params.account)
+                result = BulkOperationResult(operation=ops_str, succeeded=last.succeeded,
+                                             total=len(ids))
+            summary = f"Applied {params.operations} to {result.succeeded} email(s)."
+        elif params.query:
+            result = await impl_mark_all_matching(ctx, params.query, ops_str, params.account)
+            summary = (f"Applied {params.operations} to {result.succeeded} email(s) "
+                       f"(query: '{params.query}').")
+        else:
+            return ActionResult.error("Provide message_ids or query.", retryable=False)
+        return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
+                                    refresh_panels=["inbox"])
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
+
+
+# ── inbox_cleanup ─────────────────────────────────────────────────────────────
+
+@chat.function("inbox_cleanup", action_type="write", event="bulk_archived",
+               effects=["update:email"],
+               data_model=BulkMailOpResult,
+               description=(
+                   "Bulk cleanup by category or sender — no need to know the exact query. "
+                   "categories: 'promotions', 'social', 'newsletters', 'outreach', "
+                   "'updates', 'forums', 'spam'. "
+                   "Gmail maps to native category: labels; Outlook/IMAP use pattern matching. "
+                   "Use when user says 'clean up obvious outreach', 'archive all promotions', "
+                   "'delete my newsletters'. "
+                   "Add from_senders=['linkedin'] for specific senders. "
+                   "operation: 'archive' (default), 'delete', 'read', 'star'."
+               ))
+async def fn_inbox_cleanup(ctx, params: InboxCleanupParams) -> ActionResult:
+    try:
+        result = await impl_inbox_cleanup(
+            ctx,
+            categories=params.categories,
+            from_senders=params.from_senders,
+            older_than_days=params.older_than_days,
+            operation=params.operation,
+            account=params.account,
+        )
+        op_label = {"archive": "archived", "delete": "moved to Trash",
+                    "read": "marked as read", "star": "starred"}.get(params.operation,
+                                                                      params.operation)
+        return ActionResult.success(
+            data=build_bulk_mail_op(result),
+            summary=f"{result.succeeded} email(s) {op_label}.",
+            refresh_panels=["inbox"],
+        )
+    except ValueError as e:
+        return ActionResult.error(str(e), retryable=False)
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+# ── purge ─────────────────────────────────────────────────────────────────────
+
+@chat.function("purge", action_type="destructive", event="purged",
+               effects=["delete:email"],
+               data_model=BulkMailOpResult,
+               description=(
+                   "PERMANENTLY delete emails — cannot be recovered from Trash or anywhere. "
+                   "Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. "
+                   "ALL matching: query='from:newsletter@X.com'. "
+                   "Use delete() first if unsure (moves to Trash, recoverable). "
+                   "Provide message_ids OR query."
+               ))
+async def fn_purge(ctx, params: PurgeUnifiedParams) -> ActionResult:
+    try:
+        if params.message_ids:
+            ids = _ids(params.message_ids)
+            if len(ids) == 1:
+                r = await impl_purge(ctx, message_id=ids[0], from_folder=params.from_folder,
+                                     account=params.account)
+                result = _single_to_bulk(r.ok, "purge")
+                summary = "Permanently deleted 1 email."
+            else:
+                result = await impl_bulk_purge(ctx, params.message_ids,
+                                               from_folder=params.from_folder,
+                                               account=params.account)
+                summary = f"Permanently deleted {result.succeeded} email(s)."
+        elif params.query:
+            result = await impl_mark_all_matching(ctx, params.query, "purge", params.account)
+            summary = (f"Permanently deleted {result.succeeded} email(s) "
+                       f"(query: '{params.query}').")
+        else:
+            return ActionResult.error("Provide message_ids or query.", retryable=False)
+        return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
+                                    refresh_panels=["inbox"])
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=False)

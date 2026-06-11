@@ -9,16 +9,11 @@ from pydantic import BaseModel, Field as PField
 from handlers_inbox_impl import (
     impl_inbox, impl_read_email, impl_search, impl_folder,
     impl_get_thread, impl_send, impl_reply, impl_forward,
-    impl_top_senders,
 )
-
-
-class TopSendersParams(BaseModel):
-    days: int = PField(default=90, description="Look-back period in days (default 90 = last 3 months)")
-    limit: int = PField(default=10, description="Number of top senders to return (default 10)")
-    account: str = PField(default="", description="Account email or ID (omit for active account)")
+from handlers_cleanup_impl import impl_inbox_analytics
 from schemas import InboxParams, MessageIdParams, SearchParams, ThreadParams
 from schemas import SendParams, ReplyParams, ForwardParams
+from schemas_params import InboxAnalyticsParams
 from schemas_sdl_builders import (
     EmailMessage, InboxPage, SearchPage,
     EmailThread, SentEmailResult,
@@ -64,7 +59,19 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
 
 @chat.function("search", action_type="read",
                data_model=SearchPage,
-               description="Find emails — searches ALL connected accounts by default (leave account= empty). GMAIL QUERY RULES: (1) Use the from: prefix for sender queries, matching by BRAND/NAME — 'from:reddit' (catches reddit.com, redditmail.com, *.reddit.com and the display name) NOT 'from:reddit.com' which matches ONLY that exact domain and misses most senders. Same for 'from:google' NOT 'from:google.com', 'from:linkedin' NOT 'from:linkedin.com'. (2) Use a full exact address ONLY when the user gives one: from:noreply@company.com. (3) Never use a bare keyword without from: for a sender — that's a full-text body search. (4) DATES — use Gmail operators: today=newer_than:1d, this week=newer_than:7d, this month=newer_than:30d, or after:2026/06/01 / before:2026/06/06 for ranges. Combine freely: 'from:reddit newer_than:1d'. COUNTING: do NOT count the rows this returns (it is a capped display page) — for ANY 'how many / сколько' question (total, unread, spam, archive, today, a date, a sender) call count_emails() instead, it returns the exact number. BULK OPS: use max_results=200 then pass ALL message_ids from results. OLDEST EVER: oldest_first=true + max_results=1.")
+               description=(
+                   "Find and DISPLAY emails — returns a capped preview page for reading. "
+                   "GMAIL QUERY RULES: (1) from: by BRAND NAME — 'from:reddit' not 'from:reddit.com'; "
+                   "'from:linkedin' not 'from:linkedin.com'. Bare brand catches all subdomains. "
+                   "(2) Full address only when user gives one: from:noreply@company.com. "
+                   "(3) No bare keyword for sender — that's body search. "
+                   "(4) DATES: today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, "
+                   "range=after:2026/06/01 before:2026/06/06. "
+                   "COUNTING: do NOT count rows here — call count_emails() for 'how many / сколько'. "
+                   "BULK ACTIONS: do NOT use search() + bulk_delete/archive loop — "
+                   "use archive(query=...) / delete(query=...) / apply_actions(query=...) directly. "
+                   "OLDEST EVER: oldest_first=true + max_results=1."
+               ))
 async def fn_search(ctx, params: SearchParams) -> ActionResult:
     """Find specific emails by content, sender, or subject."""
     try:
@@ -168,41 +175,44 @@ async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
         return ActionResult.error(str(e), retryable=False)
 
 
-@chat.function("top_senders", action_type="read",
+@chat.function("inbox_analytics", action_type="read",
                data_model=SearchPage,
                description=(
-                   "Find top email senders by message count over a date range. "
-                   "Two-phase: (1) sample 500 recent emails to discover candidates, "
-                   "(2) accurate count per candidate via search. "
-                   "Use when user asks 'кто мне больше всего пишет', 'from whom do I get the most emails', "
-                   "'топ отправителей за 3 месяца', 'top senders last N days'. "
-                   "Returns ranked list with exact counts. Default: top 10 senders in last 90 days."
+                   "Analyze what's in your inbox — who writes most, which domains send most. "
+                   "group_by='sender' (default): top individual senders ranked by count. "
+                   "group_by='domain': top sending domains — useful for newsletter/outreach analysis. "
+                   "Use when user asks: 'who emails me most?', 'кто мне больше всего пишет', "
+                   "'top senders', 'which domains spam me', 'покажи топ отправителей'. "
+                   "Default: top 10 over last 90 days."
                ))
-async def fn_top_senders(ctx, params: TopSendersParams) -> ActionResult:
-    """Rank email senders by count over a time window."""
+async def fn_inbox_analytics(ctx, params: InboxAnalyticsParams) -> ActionResult:
     try:
-        senders = await impl_top_senders(ctx, days=params.days,
-                                         limit=params.limit, account=params.account)
+        senders = await impl_inbox_analytics(
+            ctx,
+            period_days=params.period_days,
+            group_by=params.group_by,
+            limit=params.limit,
+            account=params.account,
+        )
         if not senders:
             return ActionResult.success(
-                data=build_search_page(type("R", (), {"query": "top_senders",
+                data=build_search_page(type("R", (), {"query": "analytics",
                                                        "results": [], "total": 0})()),
-                summary=f"No emails found in the last {params.days} days.",
+                summary=f"No emails found in the last {params.period_days} days.",
             )
-        lines = [f"{i+1}. {s['sender']} ({s['email']}) — {s['count']} emails"
+        label = "domain" if params.group_by == "domain" else "sender"
+        lines = [f"{i+1}. {s['sender']} — {s['count']} emails"
                  for i, s in enumerate(senders)]
-        summary = f"Top {len(senders)} senders in last {params.days} days:\n" + "\n".join(lines)
+        summary = (f"Top {len(senders)} {label}s in last {params.period_days} days:\n"
+                   + "\n".join(lines))
         fake_results = [
             {"message_id": s["email"], "from": s["sender"],
-             "subject": f"{s['count']} emails in last {params.days}d",
-             "date": "", "unread": False, "count": s["count"]}
+             "subject": f"{s['count']} emails in last {params.period_days}d",
+             "date": "", "unread": False}
             for s in senders
         ]
-        fake_sr = type("SR", (), {"query": "top_senders",
+        fake_sr = type("SR", (), {"query": "inbox_analytics",
                                    "results": fake_results, "total": len(senders)})()
-        return ActionResult.success(
-            data=build_search_page(fake_sr),
-            summary=summary,
-        )
+        return ActionResult.success(data=build_search_page(fake_sr), summary=summary)
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
