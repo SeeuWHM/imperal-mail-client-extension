@@ -86,43 +86,48 @@ async def impl_unsubscribe_from_query(ctx, query: str, account: str = "") -> dic
     """Find the most recent email matching query, extract List-Unsubscribe, call it."""
     from handlers_inbox_impl import impl_search
 
-    acc, provider = await _get_acc(ctx, account)
-    if not acc:
-        raise RuntimeError("No email account connected.")
-
-    sr = await impl_search(ctx, query=query, max_results=1, account=account)
-    if not sr.results:
-        return {"success": False, "url": "", "note": "No email found matching the query."}
-
-    message_id = (sr.results[0].get("message_id") or sr.results[0].get("id") or "").strip()
-    if not message_id:
-        return {"success": False, "url": "", "note": "Could not retrieve message ID."}
-
-    unsub_header, post_data = await provider.get_list_unsubscribe(ctx, acc, message_id)
-
-    if not unsub_header:
-        return {"success": False, "url": "",
-                "note": "No List-Unsubscribe header in this email. Manual unsubscribe required."}
-
-    url_match = _UNSUB_URL_RE.search(unsub_header)
-    if not url_match:
-        mailto_match = _UNSUB_MAILTO_RE.search(unsub_header)
-        note = (f"Unsubscribe via email to: {mailto_match.group(1)}" if mailto_match
-                else f"Header found but no HTTP URL: {unsub_header}")
-        return {"success": False, "url": unsub_header, "note": note}
-
-    url = url_match.group(1)
     try:
-        if post_data and "One-Click" in post_data:
-            resp = await ctx.http.post(url, data={"List-Unsubscribe": "One-Click"},
-                                       headers={"Content-Type": "application/x-www-form-urlencoded"})
-        else:
-            resp = await ctx.http.get(url)
-        success = resp.status_code < 400
-        return {"success": success, "url": url, "status": resp.status_code,
-                "note": "Unsubscribed." if success else f"HTTP {resp.status_code}"}
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            return {"success": False, "url": "", "note": "No email account connected."}
+
+        sr = await impl_search(ctx, query=query, max_results=1, account=account)
+        if not sr.results:
+            return {"success": False, "url": "", "note": "No email found matching the query."}
+
+        message_id = (sr.results[0].get("message_id") or sr.results[0].get("id") or "").strip()
+        if not message_id:
+            return {"success": False, "url": "", "note": "Could not retrieve message ID."}
+
+        unsub_header, post_data = await provider.get_list_unsubscribe(ctx, acc, message_id)
+
+        if not unsub_header:
+            return {"success": False, "url": "",
+                    "note": "No List-Unsubscribe header. Manual unsubscribe required."}
+
+        url_match = _UNSUB_URL_RE.search(unsub_header)
+        if not url_match:
+            mailto_match = _UNSUB_MAILTO_RE.search(unsub_header)
+            note = (f"Unsubscribe via email: {mailto_match.group(1)}" if mailto_match
+                    else f"Header found but no HTTP URL: {unsub_header}")
+            return {"success": False, "url": unsub_header, "note": note}
+
+        url = url_match.group(1)
+        try:
+            if post_data and "One-Click" in post_data:
+                resp = await ctx.http.post(url, data={"List-Unsubscribe": "One-Click"},
+                                           headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                           timeout=10.0)
+            else:
+                resp = await ctx.http.get(url, timeout=10.0)
+            success = resp.status_code < 400
+            return {"success": success, "url": url, "status": resp.status_code,
+                    "note": "Unsubscribed." if success else f"HTTP {resp.status_code}"}
+        except Exception as e:
+            return {"success": False, "url": url, "note": f"HTTP call failed: {type(e).__name__}"}
+
     except Exception as e:
-        return {"success": False, "url": url, "note": f"Request failed: {e}"}
+        return {"success": False, "url": "", "note": f"Error: {type(e).__name__}: {e}"}
 
 
 async def impl_inbox_analytics(

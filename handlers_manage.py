@@ -263,18 +263,18 @@ async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
         if "unsubscribe" in params.operations:
             unsub_query = params.query
             if not unsub_query and params.message_ids:
-                ids = _ids(params.message_ids)
-                unsub_query = f"rfc822msgid:{ids[0]}" if ids else ""
+                ids_u = _ids(params.message_ids)
+                unsub_query = f"rfc822msgid:{ids_u[0]}" if ids_u else ""
+            unsub_result: dict = {"success": False, "note": "No query provided."}
             if unsub_query:
                 unsub_result = await impl_unsubscribe_from_query(ctx, unsub_query,
                                                                   params.account)
-                unsub_note = unsub_result.get("note", "")
+            unsub_note = unsub_result.get("note", "")
             if not core_ops:
-                # Unsubscribe only — return immediately
+                n = 1 if unsub_result.get("success") else 0
                 return ActionResult.success(
                     data=build_bulk_mail_op(BulkOperationResult(operation="unsubscribe",
-                                                                 succeeded=1 if unsub_result.get("success") else 0,
-                                                                 total=1)),
+                                                                 succeeded=n, total=1)),
                     summary=unsub_note or "Unsubscribe attempted.",
                     refresh_panels=["inbox"],
                 )
