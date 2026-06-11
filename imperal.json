@@ -6500,7 +6500,7 @@
     },
     {
       "name": "apply_actions",
-      "description": "Apply MULTIPLE operations to the SAME emails in one efficient call. Use when combining actions: ['read','archive'], ['star','archive'], ['read','archive','star']. Gmail: combined into ONE batchModify call \u2014 faster than calling separately. Allowed operations: 'archive', 'read', 'unread', 'star', 'unstar', 'delete'. Single email: message_ids='<id>'. ALL matching: query='from:linkedin'. For single-operation tasks use archive/delete/mark_read/star directly.",
+      "description": "Apply MULTIPLE operations to the SAME emails in one efficient call. Use when combining actions on same set: ['read','archive'], ['unsubscribe','archive','read']. Gmail: label ops combined into ONE batchModify. Allowed: 'archive', 'read', 'unread', 'star', 'unstar', 'delete', 'unsubscribe'. 'unsubscribe': reads List-Unsubscribe header from most recent matching email and calls it. ALL matching: query='from:neil patel'. Single: message_ids='<id>'. For single-operation use archive/delete/mark_read/star directly.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -6691,7 +6691,7 @@
     },
     {
       "name": "inbox_cleanup",
-      "description": "Bulk cleanup by category or sender \u2014 no need to know the exact query. categories: 'promotions', 'social', 'newsletters', 'outreach', 'updates', 'forums', 'spam'. Gmail maps to native category: labels; Outlook/IMAP use pattern matching. Use when user says 'clean up obvious outreach', 'archive all promotions', 'delete my newsletters'. Add from_senders=['linkedin'] for specific senders. operation: 'archive' (default), 'delete', 'read', 'star'.",
+      "description": "Bulk cleanup by category or sender \u2014 no need to know the exact query. categories: 'promotions', 'social', 'newsletters', 'outreach', 'updates', 'forums', 'spam'. Gmail maps to native category: labels; Outlook/IMAP use pattern matching. Use when user says 'clean up obvious outreach', 'archive all promotions', 'delete my newsletters', 'unsubscribe from this sender'. from_senders=['neil patel'] for specific senders. operation: 'archive' (default), 'delete', 'read', 'star', 'unsubscribe' (find List-Unsubscribe header and call it).",
       "action_type": "write",
       "chain_callable": true,
       "effects": [

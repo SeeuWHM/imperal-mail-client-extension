@@ -20,6 +20,13 @@ MULTIPLE ACTIONS on the SAME emails:
 - "mark as read AND archive" / "star AND archive 700 emails" → apply_actions(operations=["read","archive"], query=...)
 - Gmail: ONE batchModify call for all ops. Never call archive() + mark_read() separately on same set.
 
+UNSUBSCRIBE FROM NEWSLETTERS / SENDERS:
+- "отпишись от X" / "unsubscribe from X" → apply_actions(operations=["unsubscribe"], query="from:X")
+- "отпишись и заархивируй от X" → apply_actions(operations=["unsubscribe","archive","read"], query="from:X")
+- Multiple senders: call apply_actions once per sender in sequence
+- This reads the List-Unsubscribe header from the most recent email and calls the unsubscribe URL
+- Do NOT search for "unsubscribe" text or read emails manually — use apply_actions(operations=["unsubscribe"])
+
 SEMANTIC CLEANUP ("obvious outreach", "промо письма", "newsletters"):
 - NEVER call search() → review → delete in a loop — this is BROKEN (cap 70 per pass)
 - Use inbox_cleanup(categories=["promotions","outreach"], operation="archive") instead
