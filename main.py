@@ -1,4 +1,4 @@
-"""Mail Client v6.1.0 — Multi-provider email for Imperal Cloud (SDK v5.2.2 / SDL)."""
+"""Mail Client v6.2.0 — Multi-provider email for Imperal Cloud (SDK v5.3.0 / SDL)."""
 from __future__ import annotations
 
 import os

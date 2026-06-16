@@ -1,5 +1,13 @@
 # Changelog
 
+## [6.2.0] — 2026-06-16 — background_task for query= bulk ops (SDK 5.3.0)
+
+### Changed
+- archive, delete, mark_read, purge, inbox_cleanup: query= path now uses ctx.background_task(long_running=True)
+  — handler returns immediate ack, platform injects final result as a new bot turn
+  — prevents session timeout when processing thousands of matching emails
+- SDK pin bumped: 5.2.2 → 5.3.0
+
 ## v5.8.0 — 2026-06-09 — admin-ticket fixes (inbox total / MS date search / routing)
 
 Three fixes from the Imperal-admin ticket, verified against the live code, our prior

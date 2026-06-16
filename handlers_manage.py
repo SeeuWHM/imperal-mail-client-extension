@@ -71,8 +71,19 @@ async def fn_archive(ctx, params: ArchiveParams) -> ActionResult:
                 result = await impl_bulk_archive(ctx, params.message_ids, account=params.account)
                 summary = f"Archived {result.succeeded} email(s)."
         elif params.query:
-            result = await impl_mark_all_matching(ctx, params.query, "archive", params.account)
-            summary = f"Archived {result.succeeded} email(s) matching '{params.query}'."
+            q, acc = params.query, params.account
+            async def _archive_bg() -> ActionResult:
+                await ctx.progress(5, f"Searching emails matching '{q}'…")
+                r = await impl_mark_all_matching(ctx, q, "archive", acc)
+                return ActionResult.success(
+                    data=build_bulk_mail_op(r),
+                    summary=f"Archived {r.succeeded} email(s) matching '{q}'.",
+                    refresh_panels=["inbox"],
+                )
+            ctx.background_task(_archive_bg(), long_running=True)
+            return ActionResult.success(
+                summary=f"Archiving emails matching '{q}'… I'll let you know when done.",
+            )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
@@ -104,8 +115,19 @@ async def fn_delete(ctx, params: DeleteParams) -> ActionResult:
                 result = await impl_bulk_delete(ctx, params.message_ids, account=params.account)
                 summary = f"Moved {result.succeeded} email(s) to Trash."
         elif params.query:
-            result = await impl_mark_all_matching(ctx, params.query, "delete", params.account)
-            summary = f"Moved {result.succeeded} email(s) to Trash (query: '{params.query}')."
+            q, acc = params.query, params.account
+            async def _delete_bg() -> ActionResult:
+                await ctx.progress(5, f"Searching emails matching '{q}'…")
+                r = await impl_mark_all_matching(ctx, q, "delete", acc)
+                return ActionResult.success(
+                    data=build_bulk_mail_op(r),
+                    summary=f"Moved {r.succeeded} email(s) to Trash (query: '{q}').",
+                    refresh_panels=["inbox"],
+                )
+            ctx.background_task(_delete_bg(), long_running=True)
+            return ActionResult.success(
+                summary=f"Moving emails matching '{q}' to Trash… I'll let you know when done.",
+            )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
@@ -143,8 +165,19 @@ async def fn_mark_read(ctx, params: MarkReadParams) -> ActionResult:
                           await impl_bulk_mark_unread(ctx, params.message_ids, account=params.account))
                 summary = f"Marked {result.succeeded} email(s) as {label}."
         elif params.query:
-            result = await impl_mark_all_matching(ctx, params.query, op, params.account)
-            summary = f"Marked {result.succeeded} email(s) as {label} (query: '{params.query}')."
+            q, acc, _op, _label = params.query, params.account, op, label
+            async def _mark_read_bg() -> ActionResult:
+                await ctx.progress(5, f"Searching emails matching '{q}'…")
+                r = await impl_mark_all_matching(ctx, q, _op, acc)
+                return ActionResult.success(
+                    data=build_bulk_mail_op(r),
+                    summary=f"Marked {r.succeeded} email(s) as {_label} (query: '{q}').",
+                    refresh_panels=["inbox"],
+                )
+            ctx.background_task(_mark_read_bg(), long_running=True)
+            return ActionResult.success(
+                summary=f"Marking emails matching '{q}' as {label}… I'll let you know when done.",
+            )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
@@ -350,21 +383,33 @@ async def fn_inbox_cleanup(ctx, params: InboxCleanupParams) -> ActionResult:
                 refresh_panels=["inbox"],
             )
 
-        result = await impl_inbox_cleanup(
-            ctx,
-            categories=params.categories,
-            from_senders=params.from_senders,
-            older_than_days=params.older_than_days,
-            operation=params.operation,
-            account=params.account,
-        )
+        cats = params.categories
+        senders = params.from_senders
+        older = params.older_than_days
+        operation = params.operation
+        account = params.account
         op_label = {"archive": "archived", "delete": "moved to Trash",
-                    "read": "marked as read", "star": "starred"}.get(params.operation,
-                                                                      params.operation)
+                    "read": "marked as read", "star": "starred"}.get(operation, operation)
+
+        async def _cleanup_bg() -> ActionResult:
+            await ctx.progress(5, "Scanning inbox for matching emails…")
+            result = await impl_inbox_cleanup(
+                ctx,
+                categories=cats,
+                from_senders=senders,
+                older_than_days=older,
+                operation=operation,
+                account=account,
+            )
+            return ActionResult.success(
+                data=build_bulk_mail_op(result),
+                summary=f"{result.succeeded} email(s) {op_label}.",
+                refresh_panels=["inbox"],
+            )
+
+        ctx.background_task(_cleanup_bg(), long_running=True)
         return ActionResult.success(
-            data=build_bulk_mail_op(result),
-            summary=f"{result.succeeded} email(s) {op_label}.",
-            refresh_panels=["inbox"],
+            summary=f"Cleaning inbox ({op_label})… I'll let you know when done.",
         )
     except ValueError as e:
         return ActionResult.error(str(e), retryable=False)
@@ -399,9 +444,19 @@ async def fn_purge(ctx, params: PurgeUnifiedParams) -> ActionResult:
                                                account=params.account)
                 summary = f"Permanently deleted {result.succeeded} email(s)."
         elif params.query:
-            result = await impl_mark_all_matching(ctx, params.query, "purge", params.account)
-            summary = (f"Permanently deleted {result.succeeded} email(s) "
-                       f"(query: '{params.query}').")
+            q, acc = params.query, params.account
+            async def _purge_bg() -> ActionResult:
+                await ctx.progress(5, f"Searching emails matching '{q}'…")
+                r = await impl_mark_all_matching(ctx, q, "purge", acc)
+                return ActionResult.success(
+                    data=build_bulk_mail_op(r),
+                    summary=f"Permanently deleted {r.succeeded} email(s) (query: '{q}').",
+                    refresh_panels=["inbox"],
+                )
+            ctx.background_task(_purge_bg(), long_running=True)
+            return ActionResult.success(
+                summary=f"Permanently deleting emails matching '{q}'… I'll let you know when done.",
+            )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
