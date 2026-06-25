@@ -101,7 +101,7 @@ async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
             summary += f" — watching: {', '.join(from_emails)}"
         return ActionResult.success(
             data=build_mail_filter(doc.id, doc.data),
-            summary=summary + ". Use apply_filter to see matching emails.",
+            summary=summary + ".",
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=False)

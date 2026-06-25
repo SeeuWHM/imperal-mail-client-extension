@@ -103,10 +103,7 @@ async def fn_create_mail_folder(ctx, params: CreateFolderParams) -> ActionResult
         await _add_custom_folder(ctx, params.folder_name)
         return ActionResult.success(
             data=build_rule_op(params.folder_name, f"Created folder '{params.folder_name}'"),
-            summary=(
-                f"Folder '{params.folder_name}' created and added to the sidebar. "
-                "Use move() or bulk_move() with to_folder='{params.folder_name}' to put emails there."
-            ),
+            summary=f"Folder '{params.folder_name}' created and added to the sidebar.",
             refresh_panels=["inbox"],
         )
     except Exception as e:

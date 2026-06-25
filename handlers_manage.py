@@ -82,7 +82,7 @@ async def fn_archive(ctx, params: ArchiveParams) -> ActionResult:
                 )
             ctx.background_task(_archive_bg(), long_running=True)
             return ActionResult.success(
-                summary=f"Archiving emails matching '{q}'… I'll let you know when done.",
+                summary=f"Started background archive of emails matching '{q}'.",
             )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
@@ -126,7 +126,7 @@ async def fn_delete(ctx, params: DeleteParams) -> ActionResult:
                 )
             ctx.background_task(_delete_bg(), long_running=True)
             return ActionResult.success(
-                summary=f"Moving emails matching '{q}' to Trash… I'll let you know when done.",
+                summary=f"Started background move to Trash of emails matching '{q}'.",
             )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
@@ -176,7 +176,7 @@ async def fn_mark_read(ctx, params: MarkReadParams) -> ActionResult:
                 )
             ctx.background_task(_mark_read_bg(), long_running=True)
             return ActionResult.success(
-                summary=f"Marking emails matching '{q}' as {label}… I'll let you know when done.",
+                summary=f"Started background mark-as-{label} of emails matching '{q}'.",
             )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)
@@ -409,7 +409,7 @@ async def fn_inbox_cleanup(ctx, params: InboxCleanupParams) -> ActionResult:
 
         ctx.background_task(_cleanup_bg(), long_running=True)
         return ActionResult.success(
-            summary=f"Cleaning inbox ({op_label})… I'll let you know when done.",
+            summary=f"Started background inbox cleanup ({op_label}).",
         )
     except ValueError as e:
         return ActionResult.error(str(e), retryable=False)
@@ -455,7 +455,7 @@ async def fn_purge(ctx, params: PurgeUnifiedParams) -> ActionResult:
                 )
             ctx.background_task(_purge_bg(), long_running=True)
             return ActionResult.success(
-                summary=f"Permanently deleting emails matching '{q}'… I'll let you know when done.",
+                summary=f"Started background permanent delete of emails matching '{q}'.",
             )
         else:
             return ActionResult.error("Provide message_ids or query.", retryable=False)

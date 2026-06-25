@@ -194,7 +194,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
         "unread_total":   int(unread_total),
         "today_total":    int(today_total),
         "total_all":      int(total_all),
-        "per_account":    pa_list,
+        "per_account":    pa_list[:5],
     }}
 
 
