@@ -82,8 +82,8 @@ async def google_oauth_callback(
 
 @ext.schedule("process_google_pending", cron="* * * * *")
 async def process_google_pending(ctx) -> None:
-    """Fan-out across all store users, exchange pending Google codes, persist accounts."""
-    async for uid in ctx.store.list_users():
+    """Fan-out across users who have pending Google OAuth codes, exchange and persist accounts."""
+    async for uid in ctx.store.list_users(_PENDING):
         uid_ctx  = ctx.as_user(uid)
         page     = await uid_ctx.store.query(_PENDING, where={"provider": "oauth"})
         if not page or not page.data:
