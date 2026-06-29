@@ -1,10 +1,10 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.3.0",
+  "sdk_version": "5.7.3",
   "app_id": "mail",
   "version": "6.3.0",
   "name": "Mail Client",
-  "description": "Multi-provider email client \u2014 Google, Microsoft, Yahoo, IMAP. Inbox, send, reply, forward, search, archive, manage emails, contacts, custom folders/labels. Gmail batchModify for instant bulk operations.",
+  "description": "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. Inbox, send, reply, forward, search, archive, manage emails, contacts, custom folders/labels. Gmail batchModify for instant bulk operations.",
   "icon": "mail.svg",
   "actions_explicit": true,
   "system": false,
@@ -24,7 +24,7 @@
     },
     {
       "name": "skeleton_alert_mail_inbox_summary",
-      "description": "Alert check for new unread emails \u2014 fires when unread count changes.",
+      "description": "Alert check for new unread emails — fires when unread count changes.",
       "scopes": [],
       "parameters": {
         "old": {
@@ -39,19 +39,19 @@
     },
     {
       "name": "connect",
-      "description": "Start Google/Gmail OAuth \u2014 returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.",
+      "description": "Start Google/Gmail OAuth — returns an authorisation URL to open in the browser. If an account is already connected, returns it without regenerating a URL.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "No parameters required \u2014 satisfies V17 for parameterless @chat.function handlers.",
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
       },
       "return_schema": {
-        "description": "OAuth authorisation result \u2014 returned by connect/connect_microsoft/connect_yahoo.",
+        "description": "OAuth authorisation result — returned by connect/connect_microsoft/connect_yahoo.",
         "properties": {
           "id": {
             "anyOf": [
@@ -170,19 +170,19 @@
     },
     {
       "name": "connect_microsoft",
-      "description": "Start Microsoft Outlook / Office 365 OAuth \u2014 returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.",
+      "description": "Start Microsoft Outlook / Office 365 OAuth — returns an authorisation URL. For on-premise Exchange or non-OAuth Microsoft accounts use connect_imap instead.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "No parameters required \u2014 satisfies V17 for parameterless @chat.function handlers.",
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
       },
       "return_schema": {
-        "description": "OAuth authorisation result \u2014 returned by connect/connect_microsoft/connect_yahoo.",
+        "description": "OAuth authorisation result — returned by connect/connect_microsoft/connect_yahoo.",
         "properties": {
           "id": {
             "anyOf": [
@@ -301,19 +301,19 @@
     },
     {
       "name": "connect_yahoo",
-      "description": "Start Yahoo or AOL OAuth \u2014 returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.",
+      "description": "Start Yahoo or AOL OAuth — returns an authorisation URL. For direct IMAP access to Yahoo/AOL use connect_imap instead.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "No parameters required \u2014 satisfies V17 for parameterless @chat.function handlers.",
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
       },
       "return_schema": {
-        "description": "OAuth authorisation result \u2014 returned by connect/connect_microsoft/connect_yahoo.",
+        "description": "OAuth authorisation result — returned by connect/connect_microsoft/connect_yahoo.",
         "properties": {
           "id": {
             "anyOf": [
@@ -432,7 +432,7 @@
     },
     {
       "name": "connect_imap",
-      "description": "Connect an email account via IMAP/SMTP credentials \u2014 iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.",
+      "description": "Connect an email account via IMAP/SMTP credentials — iCloud, Zoho, Yandex, Mail.ru, webhostmost, any custom domain. Auto-detects server settings; tests connection before saving. Use this when OAuth is unavailable.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -484,7 +484,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "IMAP/SMTP connection result \u2014 returned by connect_imap/add_imap.",
+        "description": "IMAP/SMTP connection result — returned by connect_imap/add_imap.",
         "properties": {
           "id": {
             "anyOf": [
@@ -589,13 +589,13 @@
     },
     {
       "name": "status",
-      "description": "List all connected email accounts with their actual email addresses, provider (Google/Microsoft/Yahoo/IMAP), which is active, and unread count. Use when user asks 'what email addresses do I have', '\u043f\u043e\u043a\u0430\u0436\u0438 \u043c\u043e\u0438 \u044f\u0449\u0438\u043a\u0438', '\u043a\u0430\u043a\u0438\u0435 \u0438\u043c\u0435\u0439\u043b\u044b \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u044b', 'show my accounts'. Returns exact addresses like ignat@webhostmost.com, NOT generic types.",
+      "description": "List all connected email accounts with their actual email addresses, provider (Google/Microsoft/Yahoo/IMAP), which is active, and unread count. Use when user asks 'what email addresses do I have', 'покажи мои ящики', 'какие имейлы подключены', 'show my accounts'. Returns exact addresses like ignat@webhostmost.com, NOT generic types.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "No parameters required \u2014 satisfies V17 for parameterless @chat.function handlers.",
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -603,7 +603,7 @@
       "return_schema": {
         "$defs": {
           "MailAccountEntity": {
-            "description": "Connected email account \u2014 item in AccountsPage.",
+            "description": "Connected email account — item in AccountsPage.",
             "properties": {
               "id": {
                 "anyOf": [
@@ -722,7 +722,7 @@
             "x-sdl": "entity"
           }
         },
-        "description": "All connected accounts \u2014 returned by status().",
+        "description": "All connected accounts — returned by status().",
         "properties": {
           "items": {
             "items": {
@@ -802,7 +802,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Active account change confirmation \u2014 returned by switch_account().",
+        "description": "Active account change confirmation — returned by switch_account().",
         "properties": {
           "id": {
             "anyOf": [
@@ -928,7 +928,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Account removal confirmation \u2014 returned by disconnect().",
+        "description": "Account removal confirmation — returned by disconnect().",
         "properties": {
           "id": {
             "anyOf": [
@@ -1046,7 +1046,7 @@
     },
     {
       "name": "inbox",
-      "description": "PRIMARY function to LIST recent emails (newest first). Use when the user wants to see/check their inbox or asks for recent/latest/new mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns a CAPPED PAGE of message previews (IDs, subjects, senders, dates, read state) \u2014 it is NOT the whole folder and carries no folder total; use has_more to page. ROUTING \u2014 do NOT answer these from this capped page: (a) COUNT questions ('how many / \u0441\u043a\u043e\u043b\u044c\u043a\u043e / total / all / \u0432\u0441\u0435\u0433\u043e') \u2192 call count_emails(); (b) emails for a specific DATE or period ('today / this week / since 1 June / \u0437\u0430 \u0441\u0435\u0433\u043e\u0434\u043d\u044f') \u2192 call search() with a Gmail date operator (today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/07); (c) by sender or keyword \u2192 call search(). NEVER report the length of this list as a count or total \u2014 it is a capped page.",
+      "description": "PRIMARY function to LIST recent emails (newest first). Use when the user wants to see/check their inbox or asks for recent/latest/new mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns a CAPPED PAGE of message previews (IDs, subjects, senders, dates, read state) — it is NOT the whole folder and carries no folder total; use has_more to page. ROUTING — do NOT answer these from this capped page: (a) COUNT questions ('how many / сколько / total / all / всего') → call count_emails(); (b) emails for a specific DATE or period ('today / this week / since 1 June / за сегодня') → call search() with a Gmail date operator (today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/07); (c) by sender or keyword → call search(). NEVER report the length of this list as a count or total — it is a capped page.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -1084,7 +1084,7 @@
       "return_schema": {
         "$defs": {
           "EmailPreview": {
-            "description": "Email preview row \u2014 item in inbox/folder/search list results.",
+            "description": "Email preview row — item in inbox/folder/search list results.",
             "properties": {
               "is_archived": {
                 "anyOf": [
@@ -1549,7 +1549,7 @@
             "type": "object"
           }
         },
-        "description": "Paginated inbox/folder result \u2014 returned by inbox() and folder().",
+        "description": "Paginated inbox/folder result — returned by inbox() and folder().",
         "properties": {
           "items": {
             "items": {
@@ -1696,7 +1696,7 @@
             "type": "object"
           }
         },
-        "description": "Full email message \u2014 returned by read_email().",
+        "description": "Full email message — returned by read_email().",
         "properties": {
           "excerpt": {
             "anyOf": [
@@ -2370,7 +2370,7 @@
     },
     {
       "name": "search",
-      "description": "Find and DISPLAY emails \u2014 returns a capped preview page for reading. GMAIL QUERY RULES: (1) from: by BRAND NAME \u2014 'from:reddit' not 'from:reddit.com'; 'from:linkedin' not 'from:linkedin.com'. Bare brand catches all subdomains. (2) Full address only when user gives one: from:noreply@company.com. (3) No bare keyword for sender \u2014 that's body search. (4) DATES: today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/06. COUNTING: do NOT count rows here \u2014 call count_emails() for 'how many / \u0441\u043a\u043e\u043b\u044c\u043a\u043e'. BULK ACTIONS: do NOT use search() + bulk_delete/archive loop \u2014 use archive(query=...) / delete(query=...) / apply_actions(query=...) directly. OLDEST EVER: oldest_first=true + max_results=1.",
+      "description": "Find and DISPLAY emails — returns a capped preview page for reading. GMAIL QUERY RULES: (1) from: by BRAND NAME — 'from:reddit' not 'from:reddit.com'; 'from:linkedin' not 'from:linkedin.com'. Bare brand catches all subdomains. (2) Full address only when user gives one: from:noreply@company.com. (3) No bare keyword for sender — that's body search. (4) DATES: today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/06. COUNTING: do NOT count rows here — call count_emails() for 'how many / сколько'. BULK ACTIONS: do NOT use search() + bulk_delete/archive loop — use archive(query=...) / delete(query=...) / apply_actions(query=...) directly. OLDEST EVER: oldest_first=true + max_results=1.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -2390,7 +2390,7 @@
           },
           "oldest_first": {
             "default": false,
-            "description": "Sort oldest first \u2014 use to find the first/earliest email matching the query.",
+            "description": "Sort oldest first — use to find the first/earliest email matching the query.",
             "title": "Oldest First",
             "type": "boolean"
           },
@@ -2416,7 +2416,7 @@
       "return_schema": {
         "$defs": {
           "EmailPreview": {
-            "description": "Email preview row \u2014 item in inbox/folder/search list results.",
+            "description": "Email preview row — item in inbox/folder/search list results.",
             "properties": {
               "is_archived": {
                 "anyOf": [
@@ -2881,7 +2881,7 @@
             "type": "object"
           }
         },
-        "description": "Email search results \u2014 returned by search().",
+        "description": "Email search results — returned by search().",
         "properties": {
           "items": {
             "items": {
@@ -2940,7 +2940,7 @@
     },
     {
       "name": "folder",
-      "description": "Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive). Functionally identical to inbox() with folder= \u2014 prefer inbox() unless explicit folder routing is needed.",
+      "description": "Fetch a page from a specific non-INBOX folder (sent, drafts, spam, trash, starred, archive). Functionally identical to inbox() with folder= — prefer inbox() unless explicit folder routing is needed.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -2978,7 +2978,7 @@
       "return_schema": {
         "$defs": {
           "EmailPreview": {
-            "description": "Email preview row \u2014 item in inbox/folder/search list results.",
+            "description": "Email preview row — item in inbox/folder/search list results.",
             "properties": {
               "is_archived": {
                 "anyOf": [
@@ -3443,7 +3443,7 @@
             "type": "object"
           }
         },
-        "description": "Paginated inbox/folder result \u2014 returned by inbox() and folder().",
+        "description": "Paginated inbox/folder result — returned by inbox() and folder().",
         "properties": {
           "items": {
             "items": {
@@ -3519,7 +3519,7 @@
     },
     {
       "name": "get_thread",
-      "description": "Load a complete email conversation by thread_id \u2014 all messages in chronological order. Works on Google and Microsoft; IMAP returns a single-message fallback.",
+      "description": "Load a complete email conversation by thread_id — all messages in chronological order. Works on Google and Microsoft; IMAP returns a single-message fallback.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -3547,7 +3547,7 @@
       "return_schema": {
         "$defs": {
           "EmailPreview": {
-            "description": "Email preview row \u2014 item in inbox/folder/search list results.",
+            "description": "Email preview row — item in inbox/folder/search list results.",
             "properties": {
               "is_archived": {
                 "anyOf": [
@@ -4012,7 +4012,7 @@
             "type": "object"
           }
         },
-        "description": "Full email conversation \u2014 returned by get_thread().",
+        "description": "Full email conversation — returned by get_thread().",
         "properties": {
           "thread_ref": {
             "anyOf": [
@@ -4252,7 +4252,7 @@
             "type": "object"
           }
         },
-        "description": "Sent/replied/forwarded confirmation \u2014 returned by send/reply/forward.",
+        "description": "Sent/replied/forwarded confirmation — returned by send/reply/forward.",
         "properties": {
           "sender": {
             "anyOf": [
@@ -4446,7 +4446,7 @@
     },
     {
       "name": "reply",
-      "description": "Reply to an email. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to read its content, 3) reply(message_id, body=<your response>). NEVER skip read_email() \u2014 you must know what you are replying to. Only omit message_id if read_email() was already called in this same session. Use send() for new emails, not replies.",
+      "description": "Reply to an email. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to read its content, 3) reply(message_id, body=<your response>). NEVER skip read_email() — you must know what you are replying to. Only omit message_id if read_email() was already called in this same session. Use send() for new emails, not replies.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -4541,7 +4541,7 @@
             "type": "object"
           }
         },
-        "description": "Sent/replied/forwarded confirmation \u2014 returned by send/reply/forward.",
+        "description": "Sent/replied/forwarded confirmation — returned by send/reply/forward.",
         "properties": {
           "sender": {
             "anyOf": [
@@ -4735,7 +4735,7 @@
     },
     {
       "name": "forward",
-      "description": "Forward an existing email to a new address. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to load its content, 3) forward(message_id, to=<address>). NEVER skip read_email() \u2014 the original body must be loaded before forwarding. Requires message_id and to address.",
+      "description": "Forward an existing email to a new address. REQUIRED chain: 1) inbox() or search() to find the email and get message_id, 2) read_email(message_id) to load its content, 3) forward(message_id, to=<address>). NEVER skip read_email() — the original body must be loaded before forwarding. Requires message_id and to address.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -4820,7 +4820,7 @@
             "type": "object"
           }
         },
-        "description": "Sent/replied/forwarded confirmation \u2014 returned by send/reply/forward.",
+        "description": "Sent/replied/forwarded confirmation — returned by send/reply/forward.",
         "properties": {
           "sender": {
             "anyOf": [
@@ -5014,7 +5014,7 @@
     },
     {
       "name": "inbox_analytics",
-      "description": "Analyze what's in your inbox \u2014 who writes most, which domains send most. group_by='sender' (default): top individual senders ranked by count. group_by='domain': top sending domains \u2014 useful for newsletter/outreach analysis. Use when user asks: 'who emails me most?', '\u043a\u0442\u043e \u043c\u043d\u0435 \u0431\u043e\u043b\u044c\u0448\u0435 \u0432\u0441\u0435\u0433\u043e \u043f\u0438\u0448\u0435\u0442', 'top senders', 'which domains spam me', '\u043f\u043e\u043a\u0430\u0436\u0438 \u0442\u043e\u043f \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u0435\u043b\u0435\u0439'. Default: top 10 over last 90 days.",
+      "description": "Analyze what's in your inbox — who writes most, which domains send most. group_by='sender' (default): top individual senders ranked by count. group_by='domain': top sending domains — useful for newsletter/outreach analysis. Use when user asks: 'who emails me most?', 'кто мне больше всего пишет', 'top senders', 'which domains spam me', 'покажи топ отправителей'. Default: top 10 over last 90 days.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -5052,7 +5052,7 @@
       "return_schema": {
         "$defs": {
           "EmailPreview": {
-            "description": "Email preview row \u2014 item in inbox/folder/search list results.",
+            "description": "Email preview row — item in inbox/folder/search list results.",
             "properties": {
               "is_archived": {
                 "anyOf": [
@@ -5517,7 +5517,7 @@
             "type": "object"
           }
         },
-        "description": "Email search results \u2014 returned by search().",
+        "description": "Email search results — returned by search().",
         "properties": {
           "items": {
             "items": {
@@ -5576,7 +5576,7 @@
     },
     {
       "name": "archive",
-      "description": "Archive emails \u2014 removes from INBOX, stays recoverable (Gmail: All Mail; Outlook: Archive folder; IMAP: moves to Archive). Single email: message_ids='<id>'. Multiple emails: message_ids='id1,id2,id3'. ALL matching a pattern: query='from:linkedin' \u2014 iterates until none remain. Provide message_ids OR query, not both.",
+      "description": "Archive emails — removes from INBOX, stays recoverable (Gmail: All Mail; Outlook: Archive folder; IMAP: moves to Archive). Single email: message_ids='<id>'. Multiple emails: message_ids='id1,id2,id3'. ALL matching a pattern: query='from:linkedin' — iterates until none remain. Provide message_ids OR query, not both.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -5587,7 +5587,7 @@
         "properties": {
           "message_ids": {
             "default": "",
-            "description": "ID(s) to archive \u2014 single or comma-separated list from inbox()/search(). Provide this OR query, not both.",
+            "description": "ID(s) to archive — single or comma-separated list from inbox()/search(). Provide this OR query, not both.",
             "title": "Message Ids",
             "type": "string"
           },
@@ -5608,7 +5608,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -5756,7 +5756,7 @@
     },
     {
       "name": "delete",
-      "description": "Move emails to Trash \u2014 RECOVERABLE (Gmail: 30 days; Outlook: until emptied). Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:newsletter' \u2014 iterates until none remain. Use purge() for permanent deletion. Provide message_ids OR query.",
+      "description": "Move emails to Trash — RECOVERABLE (Gmail: 30 days; Outlook: until emptied). Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:newsletter' — iterates until none remain. Use purge() for permanent deletion. Provide message_ids OR query.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -5767,7 +5767,7 @@
         "properties": {
           "message_ids": {
             "default": "",
-            "description": "ID(s) to move to Trash \u2014 single or comma-separated. Recoverable (Gmail 30 days, Outlook until emptied). Provide this OR query.",
+            "description": "ID(s) to move to Trash — single or comma-separated. Recoverable (Gmail 30 days, Outlook until emptied). Provide this OR query.",
             "title": "Message Ids",
             "type": "string"
           },
@@ -5788,7 +5788,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -5936,7 +5936,7 @@
     },
     {
       "name": "mark_read",
-      "description": "Mark emails as read (read=true, default) or unread (read=false). Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:linkedin' \u2014 processes until none remain. Provide message_ids OR query.",
+      "description": "Mark emails as read (read=true, default) or unread (read=false). Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:linkedin' — processes until none remain. Provide message_ids OR query.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -5947,7 +5947,7 @@
         "properties": {
           "message_ids": {
             "default": "",
-            "description": "ID(s) to mark \u2014 single or comma-separated. Provide this OR query.",
+            "description": "ID(s) to mark — single or comma-separated. Provide this OR query.",
             "title": "Message Ids",
             "type": "string"
           },
@@ -5974,7 +5974,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -6133,7 +6133,7 @@
         "properties": {
           "message_ids": {
             "default": "",
-            "description": "ID(s) to star/unstar \u2014 single or comma-separated. Provide this OR query.",
+            "description": "ID(s) to star/unstar — single or comma-separated. Provide this OR query.",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6160,7 +6160,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -6308,7 +6308,7 @@
     },
     {
       "name": "move",
-      "description": "Move emails to a folder. to_folder is required. Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:linkedin' \u2014 moves all until none remain. Examples: move to 'spam', 'INBOX', 'Archive', 'trash', or a custom label. Provide message_ids OR query.",
+      "description": "Move emails to a folder. to_folder is required. Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:linkedin' — moves all until none remain. Examples: move to 'spam', 'INBOX', 'Archive', 'trash', or a custom label. Provide message_ids OR query.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -6319,7 +6319,7 @@
         "properties": {
           "message_ids": {
             "default": "",
-            "description": "ID(s) to move \u2014 single or comma-separated. Provide this OR query.",
+            "description": "ID(s) to move — single or comma-separated. Provide this OR query.",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6354,7 +6354,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -6521,7 +6521,7 @@
           },
           "message_ids": {
             "default": "",
-            "description": "ID(s) \u2014 single or comma-separated. Provide this OR query.",
+            "description": "ID(s) — single or comma-separated. Provide this OR query.",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6545,7 +6545,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -6693,7 +6693,7 @@
     },
     {
       "name": "inbox_cleanup",
-      "description": "Bulk cleanup by category or sender \u2014 no need to know the exact query. categories: 'promotions', 'social', 'newsletters', 'outreach', 'updates', 'forums', 'spam'. Gmail maps to native category: labels; Outlook/IMAP use pattern matching. Use when user says 'clean up obvious outreach', 'archive all promotions', 'delete my newsletters', 'unsubscribe from this sender'. from_senders=['neil patel'] for specific senders. operation: 'archive' (default), 'delete', 'read', 'star', 'unsubscribe' (find List-Unsubscribe header and call it).",
+      "description": "Bulk cleanup by category or sender — no need to know the exact query. categories: 'promotions', 'social', 'newsletters', 'outreach', 'updates', 'forums', 'spam'. Gmail maps to native category: labels; Outlook/IMAP use pattern matching. Use when user says 'clean up obvious outreach', 'archive all promotions', 'delete my newsletters', 'unsubscribe from this sender'. from_senders=['neil patel'] for specific senders. operation: 'archive' (default), 'delete', 'read', 'star', 'unsubscribe' (find List-Unsubscribe header and call it).",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -6711,7 +6711,7 @@
             "type": "array"
           },
           "from_senders": {
-            "description": "Sender patterns to clean \u2014 e.g. ['linkedin', 'noreply@company.com']. Works on all providers. Combined with categories via OR.",
+            "description": "Sender patterns to clean — e.g. ['linkedin', 'noreply@company.com']. Works on all providers. Combined with categories via OR.",
             "items": {
               "type": "string"
             },
@@ -6741,7 +6741,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -6889,7 +6889,7 @@
     },
     {
       "name": "purge",
-      "description": "PERMANENTLY delete emails \u2014 cannot be recovered from Trash or anywhere. Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:newsletter@X.com'. Use delete() first if unsure (moves to Trash, recoverable). Provide message_ids OR query.",
+      "description": "PERMANENTLY delete emails — cannot be recovered from Trash or anywhere. Single: message_ids='<id>'. Multiple: message_ids='id1,id2'. ALL matching: query='from:newsletter@X.com'. Use delete() first if unsure (moves to Trash, recoverable). Provide message_ids OR query.",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [
@@ -6900,7 +6900,7 @@
         "properties": {
           "message_ids": {
             "default": "",
-            "description": "ID(s) to permanently delete \u2014 single or comma-separated. IRREVERSIBLE \u2014 cannot be recovered. Provide this OR query.",
+            "description": "ID(s) to permanently delete — single or comma-separated. IRREVERSIBLE — cannot be recovered. Provide this OR query.",
             "title": "Message Ids",
             "type": "string"
           },
@@ -6927,7 +6927,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Bulk email operation summary \u2014 bulk_archive/delete/mark_read/mark_unread.",
+        "description": "Bulk email operation summary — bulk_archive/delete/mark_read/mark_unread.",
         "properties": {
           "id": {
             "anyOf": [
@@ -7101,7 +7101,7 @@
       "return_schema": {
         "$defs": {
           "ContactEntity": {
-            "description": "Address book contact \u2014 item in contact lists and operation results.",
+            "description": "Address book contact — item in contact lists and operation results.",
             "properties": {
               "emails": {
                 "anyOf": [
@@ -7287,7 +7287,7 @@
             "x-sdl": "entity"
           }
         },
-        "description": "Paginated contact list \u2014 returned by contacts().",
+        "description": "Paginated contact list — returned by contacts().",
         "properties": {
           "items": {
             "items": {
@@ -7369,7 +7369,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Contact add or delete confirmation \u2014 returned by add_contact/delete_contact.",
+        "description": "Contact add or delete confirmation — returned by add_contact/delete_contact.",
         "properties": {
           "id": {
             "anyOf": [
@@ -7482,7 +7482,7 @@
     },
     {
       "name": "sync_contacts",
-      "description": "Import contacts from the connected email account \u2014 Google People API, Microsoft Graph, or sender/CC header harvest from recent messages.",
+      "description": "Import contacts from the connected email account — Google People API, Microsoft Graph, or sender/CC header harvest from recent messages.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -7504,7 +7504,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Contact sync summary \u2014 returned by sync_contacts().",
+        "description": "Contact sync summary — returned by sync_contacts().",
         "properties": {
           "id": {
             "anyOf": [
@@ -7654,7 +7654,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Contact add or delete confirmation \u2014 returned by add_contact/delete_contact.",
+        "description": "Contact add or delete confirmation — returned by add_contact/delete_contact.",
         "properties": {
           "id": {
             "anyOf": [
@@ -7767,7 +7767,7 @@
     },
     {
       "name": "compose_send",
-      "description": "Panel compose form submit \u2014 sends from the UI compose panel (mode: new/reply/forward). From LLM chat use send(), reply(), or forward() instead.",
+      "description": "Panel compose form submit — sends from the UI compose panel (mode: new/reply/forward). From LLM chat use send(), reply(), or forward() instead.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -7829,7 +7829,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Panel compose-send confirmation \u2014 returned by compose_send().",
+        "description": "Panel compose-send confirmation — returned by compose_send().",
         "properties": {
           "id": {
             "anyOf": [
@@ -7947,7 +7947,7 @@
     },
     {
       "name": "mail_action",
-      "description": "Panel UI action dispatcher \u2014 called by inbox row buttons, not LLM chat. From chat use archive(), delete(), mark_read(), star() etc. individually.",
+      "description": "Panel UI action dispatcher — called by inbox row buttons, not LLM chat. From chat use archive(), delete(), mark_read(), star() etc. individually.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -7989,7 +7989,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Panel row-action confirmation \u2014 returned by mail_action().",
+        "description": "Panel row-action confirmation — returned by mail_action().",
         "properties": {
           "id": {
             "anyOf": [
@@ -8088,7 +8088,7 @@
     },
     {
       "name": "folder_counts",
-      "description": "Get current unread message count for all 7 folders simultaneously \u2014 INBOX, sent, drafts, spam, trash, starred, archive.",
+      "description": "Get current unread message count for all 7 folders simultaneously — INBOX, sent, drafts, spam, trash, starred, archive.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -8107,7 +8107,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Unread counts for all 7 mail folders \u2014 returned by folder_counts().",
+        "description": "Unread counts for all 7 mail folders — returned by folder_counts().",
         "properties": {
           "id": {
             "anyOf": [
@@ -8210,13 +8210,13 @@
     },
     {
       "name": "count_emails",
-      "description": "Return the EXACT NUMBER of emails \u2014 use for ANY 'how many / \u0441\u043a\u043e\u043b\u044c\u043a\u043e' question. CRITICAL: never answer a count by counting the items returned by inbox()/search()/folder() \u2014 those are capped display pages, not totals. Pass folder= for a folder/state count: 'all' (whole-mailbox total), 'unread', 'spam', 'archive', 'inbox', 'today', 'sent', 'trash'. OR pass query= for a date/sender count in Gmail syntax: 'newer_than:1d' (today), 'after:2026/06/05 before:2026/06/06' (one specific day), 'from:reddit'. Counts ALL connected accounts unless account= is given. Returns a per-account breakdown plus a 'total' key.",
+      "description": "Return the EXACT NUMBER of emails — use for ANY 'how many / сколько' question. CRITICAL: never answer a count by counting the items returned by inbox()/search()/folder() — those are capped display pages, not totals. Pass folder= for a folder/state count: 'all' (whole-mailbox total), 'unread', 'spam', 'archive', 'inbox', 'today', 'sent', 'trash'. OR pass query= for a date/sender count in Gmail syntax: 'newer_than:1d' (today), 'after:2026/06/05 before:2026/06/06' (one specific day), 'from:reddit'. Counts ALL connected accounts unless account= is given. Returns a per-account breakdown plus a 'total' key.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "count_emails \u2014 exact email count by folder/state or by query.",
+        "description": "count_emails — exact email count by folder/state or by query.",
         "properties": {
           "folder": {
             "default": "",
@@ -8241,7 +8241,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Unread counts for all 7 mail folders \u2014 returned by folder_counts().",
+        "description": "Unread counts for all 7 mail folders — returned by folder_counts().",
         "properties": {
           "id": {
             "anyOf": [
@@ -8344,7 +8344,7 @@
     },
     {
       "name": "get_oauth_url",
-      "description": "Panel add-account wizard helper \u2014 returns OAuth URL for Google or Microsoft. From LLM chat use connect() or connect_microsoft() instead.",
+      "description": "Panel add-account wizard helper — returns OAuth URL for Google or Microsoft. From LLM chat use connect() or connect_microsoft() instead.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -8364,7 +8364,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "OAuth URL for the add-account panel wizard \u2014 returned by get_oauth_url().",
+        "description": "OAuth URL for the add-account panel wizard — returned by get_oauth_url().",
         "properties": {
           "id": {
             "anyOf": [
@@ -8470,7 +8470,7 @@
     },
     {
       "name": "add_imap",
-      "description": "Panel add-account wizard helper \u2014 connects an IMAP account from the UI form. From LLM chat use connect_imap() instead.",
+      "description": "Panel add-account wizard helper — connects an IMAP account from the UI form. From LLM chat use connect_imap() instead.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -8522,7 +8522,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "IMAP/SMTP connection result \u2014 returned by connect_imap/add_imap.",
+        "description": "IMAP/SMTP connection result — returned by connect_imap/add_imap.",
         "properties": {
           "id": {
             "anyOf": [
@@ -8733,7 +8733,7 @@
             "type": "object"
           }
         },
-        "description": "Smart mailbox \u2014 virtual folder defined by search criteria stored locally.",
+        "description": "Smart mailbox — virtual folder defined by search criteria stored locally.",
         "properties": {
           "is_archived": {
             "anyOf": [
@@ -9035,7 +9035,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "No parameters required \u2014 satisfies V17 for parameterless @chat.function handlers.",
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -9043,7 +9043,7 @@
       "return_schema": {
         "$defs": {
           "MailFilter": {
-            "description": "Smart mailbox \u2014 virtual folder defined by search criteria stored locally.",
+            "description": "Smart mailbox — virtual folder defined by search criteria stored locally.",
             "properties": {
               "is_archived": {
                 "anyOf": [
@@ -9375,7 +9375,7 @@
             "type": "object"
           }
         },
-        "description": "Paginated list of smart mailbox filters \u2014 returned by list_filters().",
+        "description": "Paginated list of smart mailbox filters — returned by list_filters().",
         "properties": {
           "items": {
             "items": {
@@ -9429,7 +9429,7 @@
     },
     {
       "name": "apply_filter",
-      "description": "Apply a smart filter and return matching emails. Pass filter_id OR filter name \u2014 both work. Optionally increase max_results (default 20, max 200) for deeper full-mailbox search.",
+      "description": "Apply a smart filter and return matching emails. Pass filter_id OR filter name — both work. Optionally increase max_results (default 20, max 200) for deeper full-mailbox search.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -9458,7 +9458,7 @@
       "return_schema": {
         "$defs": {
           "EmailPreview": {
-            "description": "Email preview row \u2014 item in inbox/folder/search list results.",
+            "description": "Email preview row — item in inbox/folder/search list results.",
             "properties": {
               "is_archived": {
                 "anyOf": [
@@ -9923,7 +9923,7 @@
             "type": "object"
           }
         },
-        "description": "Email search results \u2014 returned by search().",
+        "description": "Email search results — returned by search().",
         "properties": {
           "items": {
             "items": {
@@ -9982,7 +9982,7 @@
     },
     {
       "name": "update_filter",
-      "description": "Update a smart filter \u2014 rename it or change its search criteria. Pass filter_id OR filter name \u2014 both work.",
+      "description": "Update a smart filter — rename it or change its search criteria. Pass filter_id OR filter name — both work.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -10074,7 +10074,7 @@
             "type": "object"
           }
         },
-        "description": "Smart mailbox \u2014 virtual folder defined by search criteria stored locally.",
+        "description": "Smart mailbox — virtual folder defined by search criteria stored locally.",
         "properties": {
           "is_archived": {
             "anyOf": [
@@ -10370,7 +10370,7 @@
     },
     {
       "name": "delete_filter",
-      "description": "Delete a smart filter. Pass filter_id OR filter name \u2014 both work. The emails are NOT deleted, only the filter definition.",
+      "description": "Delete a smart filter. Pass filter_id OR filter name — both work. The emails are NOT deleted, only the filter definition.",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [
@@ -10512,7 +10512,7 @@
     },
     {
       "name": "set_folder_prefs",
-      "description": "Set which mail folders are shown in the inbox view. WARNING: this REPLACES the entire visible set \u2014 it does NOT add to it. When the user asks to ADD a folder (e.g. 'add starred'), you MUST first call get_folder_prefs to read the current visible folders, then pass the existing list PLUS the new one. Always include 'INBOX' unless the user explicitly asks to hide it. Pass an ordered list like ['INBOX','starred','sent']. Pass an empty list to reset to showing ALL folders. TRIGGERS (this is about PANEL VISIBILITY, NOT listing emails \u2014 do NOT call inbox()/folder() for these): 'show/display these folders in the panel', '\u043f\u043e\u043a\u0430\u0436\u0438/\u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u0439 \u043f\u0430\u043f\u043a\u0438 X \u0438 Y \u0432 \u043f\u0430\u043d\u0435\u043b\u0438', '\u0434\u043e\u0431\u0430\u0432\u044c starred \u0432 \u043c\u043e\u0438 \u044f\u0449\u0438\u043a\u0438/\u0432 \u043f\u0430\u043d\u0435\u043b\u044c', 'hide trash from the panel'.",
+      "description": "Set which mail folders are shown in the inbox view. WARNING: this REPLACES the entire visible set — it does NOT add to it. When the user asks to ADD a folder (e.g. 'add starred'), you MUST first call get_folder_prefs to read the current visible folders, then pass the existing list PLUS the new one. Always include 'INBOX' unless the user explicitly asks to hide it. Pass an ordered list like ['INBOX','starred','sent']. Pass an empty list to reset to showing ALL folders. TRIGGERS (this is about PANEL VISIBILITY, NOT listing emails — do NOT call inbox()/folder() for these): 'show/display these folders in the panel', 'покажи/отображай папки X и Y в панели', 'добавь starred в мои ящики/в панель', 'hide trash from the panel'.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -10535,7 +10535,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "User mail preferences \u2014 visible folders, display settings.",
+        "description": "User mail preferences — visible folders, display settings.",
         "properties": {
           "id": {
             "anyOf": [
@@ -10654,19 +10654,19 @@
     },
     {
       "name": "get_folder_prefs",
-      "description": "Show current folder visibility settings \u2014 which folders are visible and which are hidden in your inbox view.",
+      "description": "Show current folder visibility settings — which folders are visible and which are hidden in your inbox view.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "No parameters required \u2014 satisfies V17 for parameterless @chat.function handlers.",
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
       },
       "return_schema": {
-        "description": "User mail preferences \u2014 visible folders, display settings.",
+        "description": "User mail preferences — visible folders, display settings.",
         "properties": {
           "id": {
             "anyOf": [
@@ -10785,19 +10785,19 @@
     },
     {
       "name": "list_mail_folders",
-      "description": "List all available mail folders and custom labels, showing which are visible or hidden in the panel. Gmail shows 'All Mail' instead of 'Archive' (Gmail has no system Archive folder). Custom folders created via create_mail_folder() also appear here. Use when user asks 'what folders do I have', '\u043a\u0430\u043a\u0438\u0435 \u043f\u0430\u043f\u043a\u0438 \u0432 \u043f\u043e\u0447\u0442\u0435'.",
+      "description": "List all available mail folders and custom labels, showing which are visible or hidden in the panel. Gmail shows 'All Mail' instead of 'Archive' (Gmail has no system Archive folder). Custom folders created via create_mail_folder() also appear here. Use when user asks 'what folders do I have', 'какие папки в почте'.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "No parameters required \u2014 satisfies V17 for parameterless @chat.function handlers.",
+        "description": "No parameters required — satisfies V17 for parameterless @chat.function handlers.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
       },
       "return_schema": {
-        "description": "All available mail folders + visibility \u2014 returned by list_mail_folders().",
+        "description": "All available mail folders + visibility — returned by list_mail_folders().",
         "properties": {
           "id": {
             "anyOf": [
@@ -10932,7 +10932,7 @@
     },
     {
       "name": "create_mail_folder",
-      "description": "Create a new folder or label in the connected mail account and add it to the panel sidebar. Gmail: creates a Gmail label (labels = Gmail's folder system). Outlook: creates a real mailFolder. IMAP: creates a server-side folder. GMAIL ARCHIVE NOTE: Gmail has NO built-in system Archive folder \u2014 archiving in Gmail = removing INBOX label (email stays in All Mail, not a separate folder). If the user wants a physical folder to browse in Gmail, create it with this function first (e.g. 'Archive', 'Work', 'Receipts'), then use move() or bulk_move() to put emails there. After creation the folder appears in the sidebar.",
+      "description": "Create a new folder or label in the connected mail account and add it to the panel sidebar. Gmail: creates a Gmail label (labels = Gmail's folder system). Outlook: creates a real mailFolder. IMAP: creates a server-side folder. GMAIL ARCHIVE NOTE: Gmail has NO built-in system Archive folder — archiving in Gmail = removing INBOX label (email stays in All Mail, not a separate folder). If the user wants a physical folder to browse in Gmail, create it with this function first (e.g. 'Archive', 'Work', 'Receipts'), then use move() or bulk_move() to put emails there. After creation the folder appears in the sidebar.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -11073,7 +11073,7 @@
     },
     {
       "name": "delete_mail_folder",
-      "description": "Delete a custom folder or label and remove it from the sidebar. Gmail: deletes the Gmail label \u2014 emails inside are NOT deleted, they stay in All Mail. Outlook: deletes the mailFolder \u2014 emails are moved to Deleted Items. Cannot delete system folders (INBOX, Sent, Trash, Spam, Drafts, Starred).",
+      "description": "Delete a custom folder or label and remove it from the sidebar. Gmail: deletes the Gmail label — emails inside are NOT deleted, they stay in All Mail. Outlook: deletes the mailFolder — emails are moved to Deleted Items. Cannot delete system folders (INBOX, Sent, Trash, Spam, Drafts, Starred).",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [
@@ -11220,36 +11220,15 @@
       "cron": "* * * * *"
     }
   ],
+  "required_scopes": [],
+  "icon_size_bytes": 1015,
   "webhooks": [
     {
       "path": "callback",
-      "method": "GET"
+      "method": "GET",
+      "secret_header": ""
     }
   ],
-  "secrets": [
-    {
-      "name": "google_client_id",
-      "description": "Google OAuth Client ID — from Google Cloud Console → APIs & Services → Credentials",
-      "write_mode": "user",
-      "required": true,
-      "max_bytes": 4096
-    },
-    {
-      "name": "google_client_secret",
-      "description": "Google OAuth Client Secret — from Google Cloud Console → APIs & Services → Credentials",
-      "write_mode": "user",
-      "required": true,
-      "max_bytes": 4096
-    },
-    {
-      "name": "google_tokens",
-      "description": "Google OAuth tokens per connected account — managed automatically by the extension",
-      "write_mode": "extension",
-      "required": false,
-      "max_bytes": 65536
-    }
-  ],
-  "required_scopes": [],
   "lifecycle": {
     "on_install": true,
     "health_check": {
@@ -11260,5 +11239,66 @@
     "on_install": {
       "signature": "(ctx)"
     }
-  }
+  },
+  "secrets": [
+    {
+      "name": "google_client_id",
+      "description": "Google OAuth Client ID — from Google Cloud Console → APIs & Services → Credentials",
+      "required": true,
+      "write_mode": "user",
+      "max_bytes": 4096
+    },
+    {
+      "name": "google_client_secret",
+      "description": "Google OAuth Client Secret — from Google Cloud Console → APIs & Services → Credentials",
+      "required": true,
+      "write_mode": "user",
+      "max_bytes": 4096
+    },
+    {
+      "name": "google_tokens",
+      "description": "Google OAuth tokens per connected account — managed automatically by the extension",
+      "required": false,
+      "write_mode": "extension",
+      "max_bytes": 65536
+    }
+  ],
+  "panels": [
+    {
+      "panel_id": "secrets",
+      "slot": "right",
+      "title": "Secrets",
+      "tree": {}
+    },
+    {
+      "panel_id": "inbox",
+      "slot": "left",
+      "title": "Mail",
+      "tree": {}
+    },
+    {
+      "panel_id": "email_viewer",
+      "slot": "center",
+      "title": "Email",
+      "tree": {}
+    },
+    {
+      "panel_id": "accounts",
+      "slot": "right",
+      "title": "Mail",
+      "tree": {}
+    },
+    {
+      "panel_id": "compose",
+      "slot": "center",
+      "title": "Compose",
+      "tree": {}
+    },
+    {
+      "panel_id": "add_account",
+      "slot": "overlay",
+      "title": "Add Account",
+      "tree": {}
+    }
+  ]
 }
