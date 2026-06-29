@@ -37,9 +37,6 @@ chat = ChatExtension(
 )
 
 # ── Google OAuth secrets ──────────────────────────────────────────────────────
-# google_client_id / google_client_secret: enter once via extension Settings panel
-# using your Google Cloud Console credentials (APIs & Services → Credentials).
-# google_tokens: written by the extension after OAuth callback — do not edit manually.
 
 ext.secret(
     name="google_client_id",

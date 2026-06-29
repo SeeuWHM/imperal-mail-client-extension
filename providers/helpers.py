@@ -33,7 +33,7 @@ GMAIL_SCOPE      = ("https://www.googleapis.com/auth/gmail.modify "
                    "https://www.googleapis.com/auth/contacts.readonly")
 
 # google_client_id / google_client_secret live in ctx.secrets (write_mode="user")
-# google redirect_uri is computed at runtime via ctx.webhook_url("callback")
+# Redirect URI computed at runtime via ctx.webhook_url("callback")
 
 # ── Microsoft OAuth / Graph API ────────────────────────────────────────────
 MS_CLIENT_ID     = os.getenv("MICROSOFT_CLIENT_ID", "")

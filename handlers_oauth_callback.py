@@ -10,7 +10,7 @@ Flow:
 from __future__ import annotations
 
 import base64
-import json
+import json as _json
 import logging
 import time
 
@@ -27,7 +27,7 @@ _PENDING = "google_oauth_pending"
 def _decode_state(state_raw: str) -> dict:
     try:
         pad = state_raw + "=" * (4 - len(state_raw) % 4)
-        return json.loads(base64.urlsafe_b64decode(pad).decode())
+        return _json.loads(base64.urlsafe_b64decode(pad).decode())
     except Exception:
         return {}
 
@@ -101,15 +101,10 @@ async def process_google_pending(ctx) -> None:
 
             user_ctx = ctx.as_user(actual_user_id)
 
-            # Read client credentials from the real user's secrets
             client_id     = await user_ctx.secrets.get("google_client_id")
             client_secret = await user_ctx.secrets.get("google_client_secret")
-
             if not client_id or not client_secret:
-                log.warning(
-                    f"Google credentials not configured for user={actual_user_id}; "
-                    "ask them to enter google_client_id + google_client_secret in Settings."
-                )
+                log.warning(f"Google credentials not configured for user={actual_user_id}")
                 await uid_ctx.store.delete(_PENDING, rec_id)
                 continue
 
@@ -158,20 +153,7 @@ async def process_google_pending(ctx) -> None:
 
             expires_at = int(time.time()) + expires_in
 
-            # ── Write tokens to ctx.secrets (google_tokens = JSON dict keyed by email) ──
-            existing_raw = await user_ctx.secrets.get("google_tokens") or "{}"
-            try:
-                all_tokens = json.loads(existing_raw)
-            except Exception:
-                all_tokens = {}
-            all_tokens[email] = {
-                "access_token":  access_token,
-                "refresh_token": refresh_token,
-                "expires_at":    expires_at,
-            }
-            await user_ctx.secrets.set("google_tokens", json.dumps(all_tokens))
-
-            # ── Create or update account record in ctx.store (metadata only) ──────────
+            # ── Create or update account record in ctx.store (tokens + metadata) ──────
             existing_accs = await user_ctx.store.query(
                 COLLECTION, where={"email": email, "provider": "oauth"}
             )
@@ -179,8 +161,10 @@ async def process_google_pending(ctx) -> None:
                 acc_rec = existing_accs.data[0]
                 await user_ctx.store.update(COLLECTION, acc_rec.id, {
                     **acc_rec.data,
-                    "is_active":  True,
-                    "expires_at": expires_at,
+                    "access_token":  access_token,
+                    "refresh_token": refresh_token,
+                    "expires_at":    expires_at,
+                    "is_active":     True,
                 })
             else:
                 # Deactivate any currently active account, then create the new one
@@ -191,10 +175,12 @@ async def process_google_pending(ctx) -> None:
                             COLLECTION, acc.id, {**acc.data, "is_active": False}
                         )
                 await user_ctx.store.create(COLLECTION, {
-                    "email":      email,
-                    "provider":   "oauth",
-                    "is_active":  True,
-                    "expires_at": expires_at,
+                    "email":         email,
+                    "provider":      "oauth",
+                    "is_active":     True,
+                    "access_token":  access_token,
+                    "refresh_token": refresh_token,
+                    "expires_at":    expires_at,
                 })
 
             await uid_ctx.store.delete(_PENDING, rec_id)

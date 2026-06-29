@@ -66,7 +66,7 @@ async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
     client_id     = await ctx.secrets.get("google_client_id")
     client_secret = await ctx.secrets.get("google_client_secret")
     if not client_id or not client_secret:
-        log.warning("Google OAuth credentials not set in extension secrets — cannot refresh token")
+        log.warning("Google OAuth credentials not set in secrets — cannot refresh token")
         return acc
     resp = await ctx.http.post(GOOGLE_TOKEN_URL, data={
         "client_id":     client_id,

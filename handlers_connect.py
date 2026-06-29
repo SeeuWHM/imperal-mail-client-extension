@@ -47,10 +47,7 @@ log = logging.getLogger("mail")
 async def impl_connect(ctx) -> ConnectOAuthResult:
     client_id = await ctx.secrets.get("google_client_id")
     if not client_id:
-        raise RuntimeError(
-            "Google OAuth not configured — open extension Settings and enter "
-            "your Google Cloud Console Client ID in the 'google_client_id' field."
-        )
+        raise RuntimeError("Google OAuth not configured — enter google_client_id in extension Secrets.")
     redirect_uri = ctx.webhook_url("callback")
     url = GOOGLE_AUTH_URL + "?" + urlencode({
         "client_id":     client_id,

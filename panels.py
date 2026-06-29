@@ -12,6 +12,12 @@ from panels_compose import build_compose_panel
 import panels_inbox_panel  # noqa: F401 — registers @ext.panel("inbox")
 
 
+@ext.panel("secrets", slot="overlay", title="Secrets", icon="Key")
+async def panel_secrets(ctx, **kwargs):
+    """Force secrets panel to overlay so right slot belongs to accounts."""
+    return ui.Stack([])
+
+
 @ext.panel("email_viewer", slot="center", title="Email", icon="Mail", center_overlay=True)
 async def email_viewer_panel(ctx, message_id: str = "", account: str = "",
                               email_list_ids: str = "", current_index: int = 0,
