@@ -80,19 +80,25 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
 # ── Filters tab ───────────────────────────────────────────────────────────────
 
 async def _build_filters_tab(ctx) -> ui.UINode:
-    from providers.helpers import _active_account
+    from providers.helpers import _active_account, _all_accounts
     acc = await _active_account(ctx, "")
     active_email = acc.get("email", "") if acc else ""
+
+    # Load ALL filters for this user, show only those matching active account
     page = await ctx.store.query("mail_filters",
-                                 where={"owner_id": ctx.user.imperal_id}, limit=20)
+                                 where={"owner_id": ctx.user.imperal_id}, limit=50)
     page_data = [f for f in page.data
                  if not f.data.get("account_email") or
                  f.data.get("account_email") == active_email]
+
     if not page_data:
         return ui.Stack([
-            ui.Empty(message="No smart filters yet", icon="Filter"),
-            ui.Alert(message="Tell Webbee: 'create a filter for LinkedIn emails' or 'show emails from shop.com'",
-                     type="info"),
+            ui.Text(f"Mailbox: {active_email}", variant="caption"),
+            ui.Empty(message="No smart filters for this account", icon="Filter"),
+            ui.Alert(
+                message="Tell Webbee: 'create a filter for LinkedIn emails' or 'show emails from shop.com'",
+                type="info",
+            ),
         ], gap=2)
 
     COLOR_MAP = {"blue": "blue", "green": "green", "red": "red",
@@ -100,17 +106,27 @@ async def _build_filters_tab(ctx) -> ui.UINode:
     items = []
     for f in page_data:
         d = f.data
+        # Criteria subtitle
         parts = []
         emails = d.get("criteria_from_emails") or []
         if emails:
             parts.append(f"from: {', '.join(emails)}")
         elif d.get("criteria_from"):
             parts.append(f"from: {d['criteria_from']}")
-        if d.get("criteria_subject"): parts.append(f"subj: {d['criteria_subject']}")
-        subtitle = " · ".join(parts) if parts else "no criteria set"
+        if d.get("criteria_subject"):
+            parts.append(f"subj: {d['criteria_subject']}")
+        criteria_str = " · ".join(parts) if parts else "no criteria set"
+
+        # Show account email on the filter if it differs from active (e.g. legacy/untagged)
+        filter_account = d.get("account_email", "")
+        subtitle = criteria_str
+        if filter_account and filter_account != active_email:
+            subtitle = f"{filter_account[:28]} · {criteria_str}"
+
         color = COLOR_MAP.get(d.get("color", "blue"), "blue")
         items.append(ui.ListItem(
-            id=f.id, title=d.get("name", "filter"),
+            id=f.id,
+            title=d.get("name", "filter"),
             subtitle=subtitle,
             badge=ui.Badge("●", color=color),
             actions=[{"label": "Delete", "icon": "Trash2",
@@ -118,7 +134,8 @@ async def _build_filters_tab(ctx) -> ui.UINode:
         ))
 
     return ui.Stack([
-        ui.Text(f"{len(page_data)} smart filter(s) for {active_email[:30]}", variant="caption"),
+        ui.Text(f"Mailbox: {active_email}", variant="caption"),
+        ui.Text(f"{len(page_data)} filter(s)", variant="caption"),
         ui.List(items=items),
     ], gap=2)
 
