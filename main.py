@@ -15,6 +15,7 @@ _MODULES = (
     "schemas_sdl_rules", "schemas_sdl_builders_rules",
     "handlers_ui",
     "handlers_connect",
+    "handlers_oauth_callback",
     "handlers_inbox_impl", "handlers_inbox",
     "handlers_manage_impl", "handlers_manage",
     "handlers_cleanup_impl",
@@ -42,6 +43,7 @@ import schemas_sdl_builders_rules  # noqa: E402, F401
 import cache_models  # noqa: E402, F401
 
 import handlers_connect           # noqa: E402, F401
+import handlers_oauth_callback    # noqa: E402, F401
 import handlers_inbox_impl        # noqa: E402, F401
 import handlers_inbox             # noqa: E402, F401
 import handlers_manage_impl       # noqa: E402, F401

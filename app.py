@@ -14,7 +14,7 @@ log = logging.getLogger("mail")
 
 ext = Extension(
     "mail",
-    version="6.2.0",
+    version="6.3.0",
     display_name="Mail Client",
     description=(
         "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "
@@ -23,7 +23,7 @@ ext = Extension(
     ),
     icon="mail.svg",
     actions_explicit=True,
-    capabilities=["store:read", "store:write", "notify:push"],
+    capabilities=["store:read", "store:write", "notify:push", "secrets:read", "secrets:write"],
 )
 
 chat = ChatExtension(
@@ -35,6 +35,32 @@ chat = ChatExtension(
         "custom folder/label creation, contacts. Connect Google, Microsoft, Yahoo, IMAP."
     ),
 )
+
+# ── Google OAuth secrets ──────────────────────────────────────────────────────
+# google_client_id / google_client_secret: enter once via extension Settings panel
+# using your Google Cloud Console credentials (APIs & Services → Credentials).
+# google_tokens: written by the extension after OAuth callback — do not edit manually.
+
+ext.secret(
+    name="google_client_id",
+    description="Google OAuth Client ID — from Google Cloud Console → APIs & Services → Credentials",
+    write_mode="user",
+    required=True,
+)(lambda: None)
+
+ext.secret(
+    name="google_client_secret",
+    description="Google OAuth Client Secret — from Google Cloud Console → APIs & Services → Credentials",
+    write_mode="user",
+    required=True,
+)(lambda: None)
+
+ext.secret(
+    name="google_tokens",
+    description="Google OAuth tokens per connected account — managed automatically by the extension",
+    write_mode="extension",
+    max_bytes=65536,
+)(lambda: None)
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 

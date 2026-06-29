@@ -32,9 +32,8 @@ PEOPLE_API       = "https://people.googleapis.com/v1"
 GMAIL_SCOPE      = ("https://www.googleapis.com/auth/gmail.modify "
                    "https://www.googleapis.com/auth/contacts.readonly")
 
-GMAIL_CLIENT_ID     = os.getenv("GMAIL_CLIENT_ID", "")
-GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
-GMAIL_REDIRECT_URI  = os.getenv("GMAIL_REDIRECT_URI", "https://auth.imperal.io/v1/oauth/gmail/callback")
+# google_client_id / google_client_secret live in ctx.secrets (write_mode="user")
+# google redirect_uri is computed at runtime via ctx.webhook_url("callback")
 
 # ── Microsoft OAuth / Graph API ────────────────────────────────────────────
 MS_CLIENT_ID     = os.getenv("MICROSOFT_CLIENT_ID", "")

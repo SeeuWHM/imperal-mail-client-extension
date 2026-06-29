@@ -9,7 +9,7 @@ from imperal_sdk import Context
 
 from .helpers import (
     COLLECTION,
-    GOOGLE_TOKEN_URL, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_API,
+    GOOGLE_TOKEN_URL, GMAIL_API,
     MS_TOKEN_URL, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SCOPE, MS_GRAPH_BASE,
     YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET, YAHOO_TOKEN_URL,
 )
@@ -63,12 +63,20 @@ async def _graph_patch(ctx: Context, path: str, acc: dict, **kwargs):
 
 
 async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
+    client_id     = await ctx.secrets.get("google_client_id")
+    client_secret = await ctx.secrets.get("google_client_secret")
+    if not client_id or not client_secret:
+        log.warning("Google OAuth credentials not set in extension secrets — cannot refresh token")
+        return acc
     resp = await ctx.http.post(GOOGLE_TOKEN_URL, data={
-        "client_id": GMAIL_CLIENT_ID, "client_secret": GMAIL_CLIENT_SECRET,
-        "refresh_token": acc["refresh_token"], "grant_type": "refresh_token",
+        "client_id":     client_id,
+        "client_secret": client_secret,
+        "refresh_token": acc["refresh_token"],
+        "grant_type":    "refresh_token",
     })
     if resp.status_code != 200:
-        log.warning(f"Google token refresh failed: {resp.status_code}"); return acc
+        log.warning(f"Google token refresh failed: {resp.status_code}")
+        return acc
     tokens = resp.json()
     acc["access_token"] = tokens["access_token"]
     acc["expires_at"]   = int(time.time()) + tokens.get("expires_in", 3600)

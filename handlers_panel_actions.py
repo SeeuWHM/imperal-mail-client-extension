@@ -12,7 +12,7 @@ from providers import get_provider
 from providers.helpers import _invalidate_first_page
 from providers.helpers import (
     _all_accounts, COLLECTION,
-    GMAIL_CLIENT_ID, GMAIL_REDIRECT_URI, GOOGLE_AUTH_URL, GMAIL_SCOPE,
+    GOOGLE_AUTH_URL, GMAIL_SCOPE,
     MS_CLIENT_ID, MS_REDIRECT_URI, MS_AUTH_URL, MS_SCOPE,
     _encrypt_password, _detect_imap_settings,
 )
@@ -101,13 +101,20 @@ async def impl_folder_counts(ctx, account: str = "") -> FolderCountsResult:
 
 async def impl_get_oauth_url(ctx, provider: str) -> OAuthUrlResult:
     if provider == "google":
-        if not GMAIL_CLIENT_ID:
-            raise RuntimeError("Google OAuth not configured on this instance.")
+        client_id = await ctx.secrets.get("google_client_id")
+        if not client_id:
+            raise RuntimeError(
+                "Google OAuth not configured — enter google_client_id in extension Settings."
+            )
+        redirect_uri = ctx.webhook_url("callback")
         url = GOOGLE_AUTH_URL + "?" + urlencode({
-            "client_id": GMAIL_CLIENT_ID, "redirect_uri": GMAIL_REDIRECT_URI,
-            "response_type": "code", "scope": GMAIL_SCOPE,
-            "access_type": "offline", "prompt": "consent",
-            "state": _oauth_state(ctx, "oauth"),
+            "client_id":     client_id,
+            "redirect_uri":  redirect_uri,
+            "response_type": "code",
+            "scope":         GMAIL_SCOPE,
+            "access_type":   "offline",
+            "prompt":        "consent",
+            "state":         _oauth_state(ctx, "oauth"),
         })
     elif provider == "microsoft":
         if not MS_CLIENT_ID:
