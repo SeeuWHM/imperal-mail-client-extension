@@ -11214,7 +11214,41 @@
     }
   ],
   "signals": [],
-  "schedules": [],
+  "schedules": [
+    {
+      "name": "process_google_pending",
+      "cron": "* * * * *"
+    }
+  ],
+  "webhooks": [
+    {
+      "path": "callback",
+      "method": "GET"
+    }
+  ],
+  "secrets": [
+    {
+      "name": "google_client_id",
+      "description": "Google OAuth Client ID — from Google Cloud Console → APIs & Services → Credentials",
+      "write_mode": "user",
+      "required": true,
+      "max_bytes": 4096
+    },
+    {
+      "name": "google_client_secret",
+      "description": "Google OAuth Client Secret — from Google Cloud Console → APIs & Services → Credentials",
+      "write_mode": "user",
+      "required": true,
+      "max_bytes": 4096
+    },
+    {
+      "name": "google_tokens",
+      "description": "Google OAuth tokens per connected account — managed automatically by the extension",
+      "write_mode": "extension",
+      "required": false,
+      "max_bytes": 65536
+    }
+  ],
   "required_scopes": [],
   "lifecycle": {
     "on_install": true,
