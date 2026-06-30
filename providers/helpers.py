@@ -11,7 +11,6 @@ import base64
 import hashlib as _hashlib
 import json
 import logging
-import os
 import re as _re
 from typing import Optional
 
@@ -36,9 +35,8 @@ GMAIL_SCOPE      = ("https://www.googleapis.com/auth/gmail.modify "
 # Redirect URI computed at runtime via ctx.webhook_url("callback")
 
 # ── Microsoft OAuth / Graph API ────────────────────────────────────────────
-MS_CLIENT_ID     = os.getenv("MICROSOFT_CLIENT_ID", "")
-MS_CLIENT_SECRET = os.getenv("MICROSOFT_CLIENT_SECRET", "")
-MS_REDIRECT_URI  = os.getenv("MICROSOFT_REDIRECT_URI", "https://auth.imperal.io/v1/oauth/microsoft/callback")
+# MS_CLIENT_ID / MS_CLIENT_SECRET → ctx.secrets.get("microsoft_client_id/secret") at call-time
+MS_REDIRECT_URI  = "https://auth.imperal.io/v1/oauth/microsoft/callback"
 MS_AUTH_URL      = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
 MS_TOKEN_URL     = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 MS_GRAPH_BASE    = "https://graph.microsoft.com/v1.0"
@@ -51,9 +49,8 @@ MS_SCOPE = (
 )
 
 # ── Yahoo / AOL OAuth ──────────────────────────────────────────────────────
-YAHOO_CLIENT_ID     = os.getenv("YAHOO_CLIENT_ID", "")
-YAHOO_CLIENT_SECRET = os.getenv("YAHOO_CLIENT_SECRET", "")
-YAHOO_REDIRECT_URI  = os.getenv("YAHOO_REDIRECT_URI", "https://auth.imperal.io/v1/oauth/yahoo/callback")
+# YAHOO_CLIENT_ID / YAHOO_CLIENT_SECRET → ctx.secrets.get("yahoo_client_id/secret") at call-time
+YAHOO_REDIRECT_URI  = "https://auth.imperal.io/v1/oauth/yahoo/callback"
 YAHOO_AUTH_URL      = "https://api.login.yahoo.com/oauth2/request_auth"
 YAHOO_TOKEN_URL     = "https://api.login.yahoo.com/oauth2/get_token"
 YAHOO_SCOPE         = "mail-r mail-w"

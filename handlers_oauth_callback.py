@@ -97,19 +97,20 @@ async def process_google_pending(ctx) -> None:
             await webhook_ctx.store.delete(_PENDING, rec_id)
             continue
 
-        # Switch to the real user context to access their secrets + store
-        user_ctx = ctx.as_user(actual_user_id)
-
-        client_id     = await user_ctx.secrets.get("google_client_id")
-        client_secret = await user_ctx.secrets.get("google_client_secret")
+        # App-scope secrets readable from any ctx — no need to switch to user context for credentials
+        client_id     = await ctx.secrets.get("google_client_id")
+        client_secret = await ctx.secrets.get("google_client_secret")
 
         if not client_id or not client_secret:
-            log.warning(f"google_pending: credentials not configured for user={actual_user_id}")
+            log.warning("google_pending: google_client_id/secret not configured in Dev Portal Secrets")
             await webhook_ctx.store.delete(_PENDING, rec_id)
             continue
 
+        # Switch to real user context for store operations
+        user_ctx = ctx.as_user(actual_user_id)
+
         # Exchange authorization code for tokens
-        resp = await user_ctx.http.post(GOOGLE_TOKEN_URL, data={
+        resp = await ctx.http.post(GOOGLE_TOKEN_URL, data={
             "code":          code,
             "client_id":     client_id,
             "client_secret": client_secret,

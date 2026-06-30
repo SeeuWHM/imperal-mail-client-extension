@@ -4,7 +4,6 @@ from __future__ import annotations
 import base64
 import email.header
 import logging
-import os
 import re
 from email.mime.text import MIMEText
 
@@ -12,18 +11,16 @@ from cryptography.fernet import Fernet
 
 log = logging.getLogger(__name__)
 
-IMAP_ENC_KEY = os.getenv("IMAP_ENCRYPTION_KEY", "")
 
-
-def _encrypt_password(password: str) -> str:
-    if not IMAP_ENC_KEY: return password
-    try: return Fernet(IMAP_ENC_KEY.encode()).encrypt(password.encode()).decode()
+def _encrypt_password(password: str, enc_key: str = "") -> str:
+    if not enc_key: return password
+    try: return Fernet(enc_key.encode()).encrypt(password.encode()).decode()
     except Exception as e: log.warning(f"Encryption failed: {e}"); return password
 
 
-def _decrypt_password(value: str, is_encrypted: bool = True) -> str:
-    if not is_encrypted or not IMAP_ENC_KEY: return value
-    try: return Fernet(IMAP_ENC_KEY.encode()).decrypt(value.encode()).decode()
+def _decrypt_password(value: str, is_encrypted: bool = True, enc_key: str = "") -> str:
+    if not is_encrypted or not enc_key: return value
+    try: return Fernet(enc_key.encode()).decrypt(value.encode()).decode()
     except Exception: return value
 
 

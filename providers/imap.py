@@ -31,7 +31,7 @@ IMAP_TRASH_FOLDERS   = ["Trash", "[Gmail]/Trash", "Deleted Items", "Deleted Mess
 
 class ImapMailProvider(BaseMailProvider):
 
-    def _imap_args(self, acc: dict) -> dict:
+    async def _imap_args(self, ctx: Context, acc: dict) -> dict:
         if acc.get("provider", "imap") == "yahoo":
             return {
                 "host": acc.get("imap_host", "imap.mail.yahoo.com"),
@@ -39,7 +39,8 @@ class ImapMailProvider(BaseMailProvider):
                 "access_token": acc.get("access_token", ""),
                 "password": "",
             }
-        password = _decrypt_password(acc.get("password", ""), acc.get("password_encrypted", False))
+        enc_key  = await ctx.secrets.get("imap_encryption_key")
+        password = _decrypt_password(acc.get("password", ""), acc.get("password_encrypted", False), enc_key)
         return {"host": acc.get("imap_host", ""), "port": acc.get("imap_port", 993),
                 "password": password, "access_token": ""}
 
@@ -76,7 +77,7 @@ class ImapMailProvider(BaseMailProvider):
     async def fetch_inbox(self, ctx: Context, acc: dict, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")
         acc = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         messages = await asyncio.to_thread(
             _sync_imap_inbox, email_addr, args["host"], args["port"], max_results,
             password=args["password"], access_token=args["access_token"])
@@ -89,7 +90,7 @@ class ImapMailProvider(BaseMailProvider):
         imap_folder = "INBOX" if folder.lower() == "inbox" else folder
         email_addr = acc.get("email", "")
         acc = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         messages, new_last_uid, has_more = await asyncio.to_thread(
             _sync_imap_fetch_page, email_addr, args["host"], args["port"],
             imap_folder, limit, last_uid,
@@ -100,7 +101,7 @@ class ImapMailProvider(BaseMailProvider):
     async def get_unread_count(self, ctx: Context, acc: dict, folder: str = "inbox") -> int:
         imap_folder = "INBOX" if folder.lower() == "inbox" else folder
         acc = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         try:
             return await asyncio.to_thread(
                 _sync_imap_unread_count, acc.get("email", ""), args["host"], args["port"],
@@ -111,7 +112,7 @@ class ImapMailProvider(BaseMailProvider):
     async def get_folder_stats(self, ctx: Context, acc: dict, folder: str = "inbox") -> dict:
         imap_folder = "INBOX" if folder.lower() == "inbox" else folder
         acc = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         try:
             return await asyncio.to_thread(
                 _sync_imap_folder_stats, acc.get("email", ""), args["host"], args["port"],
@@ -122,7 +123,7 @@ class ImapMailProvider(BaseMailProvider):
     async def get_today_count(self, ctx: Context, acc: dict) -> int:
         """Messages received today in INBOX, via IMAP SEARCH SINCE (server-side count)."""
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         try:
             return await asyncio.to_thread(
                 _sync_imap_today_count, acc.get("email", ""), args["host"], args["port"],
@@ -133,7 +134,7 @@ class ImapMailProvider(BaseMailProvider):
     async def read_email(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         try:
             data = await asyncio.to_thread(
                 _sync_imap_read, email_addr, args["host"], args["port"], message_id,
@@ -152,7 +153,7 @@ class ImapMailProvider(BaseMailProvider):
                    cc: str = "", bcc: str = "") -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         ok, err, msg_bytes = await self._smtp_dispatch(acc, args, email_addr, to, subject, body, cc, bcc)
         if not ok: return self.err(f"SMTP error: {err}")
         await self._save_sent_async(email_addr, args, msg_bytes)
@@ -162,7 +163,7 @@ class ImapMailProvider(BaseMailProvider):
                     to: str = "", cc: str = "", bcc: str = "") -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         try:
             orig = await asyncio.to_thread(
                 _sync_imap_read, email_addr, args["host"], args["port"], message_id,
@@ -199,7 +200,7 @@ class ImapMailProvider(BaseMailProvider):
     async def archive(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         ok, err = await asyncio.to_thread(
             _sync_imap_move, email_addr, args["host"], args["port"],
             message_id, IMAP_ARCHIVE_FOLDERS,
@@ -212,7 +213,7 @@ class ImapMailProvider(BaseMailProvider):
     async def delete(self, ctx: Context, acc: dict, message_id: str) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         ok, err = await asyncio.to_thread(
             _sync_imap_move, email_addr, args["host"], args["port"],
             message_id, IMAP_TRASH_FOLDERS,
@@ -225,7 +226,7 @@ class ImapMailProvider(BaseMailProvider):
     async def mark_read(self, ctx: Context, acc: dict, message_id: str, read: bool = True) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         ok, err = await asyncio.to_thread(
             _sync_imap_flag_op, email_addr, args["host"], args["port"],
             message_id, "Seen", read,
@@ -237,7 +238,7 @@ class ImapMailProvider(BaseMailProvider):
 
     async def star(self, ctx: Context, acc: dict, message_id: str, starred: bool = True) -> dict:
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         ok, err = await asyncio.to_thread(
             _sync_imap_flag_op, acc.get("email", ""), args["host"], args["port"],
             message_id, "Flagged", starred,
@@ -248,7 +249,7 @@ class ImapMailProvider(BaseMailProvider):
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         results, total_found = await asyncio.to_thread(
             _sync_imap_search, email_addr, args["host"], args["port"], query, max_results,
             password=args["password"], access_token=args["access_token"])
@@ -261,7 +262,7 @@ class ImapMailProvider(BaseMailProvider):
     async def folder(self, ctx: Context, acc: dict, folder_name: str, max_results: int = 20) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         messages = await asyncio.to_thread(
             _sync_imap_folder, email_addr, args["host"], args["port"], folder_name, max_results,
             password=args["password"], access_token=args["access_token"])
@@ -275,7 +276,7 @@ class ImapMailProvider(BaseMailProvider):
         if from_folder.lower() == to_folder.lower():
             return self.err("Source and destination folders are the same.")
         acc = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         src_candidates  = IMAP_FOLDER_CANDIDATES.get(from_folder.lower(), [from_folder])
         dest_candidates = IMAP_FOLDER_CANDIDATES.get(to_folder.lower(), [to_folder])
         ok, err = await asyncio.to_thread(
@@ -293,7 +294,7 @@ class ImapMailProvider(BaseMailProvider):
                     from_folder: str = "Trash") -> dict:
         email_addr = acc.get("email", "")
         acc = await self._ensure_token(ctx, acc)
-        args = self._imap_args(acc)
+        args = await self._imap_args(ctx, acc)
         ok, err = await asyncio.to_thread(
             _sync_imap_purge, email_addr, args["host"], args["port"],
             message_id, from_folder,

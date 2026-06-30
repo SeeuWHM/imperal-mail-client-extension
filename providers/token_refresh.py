@@ -10,8 +10,8 @@ from imperal_sdk import Context
 from .helpers import (
     COLLECTION,
     GOOGLE_TOKEN_URL, GMAIL_API,
-    MS_TOKEN_URL, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SCOPE, MS_GRAPH_BASE,
-    YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET, YAHOO_TOKEN_URL,
+    MS_TOKEN_URL, MS_SCOPE, MS_GRAPH_BASE,
+    YAHOO_TOKEN_URL,
 )
 
 log = logging.getLogger(__name__)
@@ -87,9 +87,14 @@ async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
 
 
 async def _refresh_microsoft_token(ctx: Context, acc: dict) -> dict:
+    client_id     = await ctx.secrets.get("microsoft_client_id")
+    client_secret = await ctx.secrets.get("microsoft_client_secret")
+    if not client_id or not client_secret:
+        log.warning("Microsoft OAuth credentials not set in secrets — cannot refresh token")
+        return acc
     resp = await ctx.http.post(MS_TOKEN_URL, data={
-        "grant_type": "refresh_token", "client_id": MS_CLIENT_ID,
-        "client_secret": MS_CLIENT_SECRET, "refresh_token": acc["refresh_token"],
+        "grant_type": "refresh_token", "client_id": client_id,
+        "client_secret": client_secret, "refresh_token": acc["refresh_token"],
         "scope": MS_SCOPE,
     })
     if resp.status_code != 200:
@@ -119,7 +124,12 @@ async def _refresh_microsoft_token(ctx: Context, acc: dict) -> dict:
 
 
 async def _refresh_yahoo_token(ctx: Context, acc: dict) -> dict:
-    creds = base64.b64encode(f"{YAHOO_CLIENT_ID}:{YAHOO_CLIENT_SECRET}".encode()).decode()
+    client_id     = await ctx.secrets.get("yahoo_client_id")
+    client_secret = await ctx.secrets.get("yahoo_client_secret")
+    if not client_id or not client_secret:
+        log.warning("Yahoo OAuth credentials not set in secrets — cannot refresh token")
+        return acc
+    creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     resp  = await ctx.http.post(YAHOO_TOKEN_URL,
         data={"grant_type": "refresh_token", "refresh_token": acc["refresh_token"]},
         headers={"Authorization": f"Basic {creds}"},

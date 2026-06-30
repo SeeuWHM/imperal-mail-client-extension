@@ -13,7 +13,7 @@ from providers.helpers import _invalidate_first_page
 from providers.helpers import (
     _all_accounts, COLLECTION,
     GOOGLE_AUTH_URL, GMAIL_SCOPE,
-    MS_CLIENT_ID, MS_REDIRECT_URI, MS_AUTH_URL, MS_SCOPE,
+    MS_REDIRECT_URI, MS_AUTH_URL, MS_SCOPE,
     _encrypt_password, _detect_imap_settings,
 )
 from providers.imap import _sync_imap_test
@@ -115,10 +115,11 @@ async def impl_get_oauth_url(ctx, provider: str) -> OAuthUrlResult:
             "state":         _oauth_state(ctx, "oauth"),
         })
     elif provider == "microsoft":
-        if not MS_CLIENT_ID:
-            raise RuntimeError("Microsoft OAuth not configured on this instance.")
+        ms_client_id = await ctx.secrets.get("microsoft_client_id")
+        if not ms_client_id:
+            raise RuntimeError("Microsoft OAuth not configured — enter microsoft_client_id in extension Secrets.")
         url = MS_AUTH_URL + "?" + urlencode({
-            "client_id": MS_CLIENT_ID, "response_type": "code",
+            "client_id": ms_client_id, "response_type": "code",
             "redirect_uri": MS_REDIRECT_URI, "scope": MS_SCOPE,
             "response_mode": "query", "state": _oauth_state(ctx, "microsoft"),
         })
@@ -137,11 +138,12 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
     ok, err = await asyncio.to_thread(_sync_imap_test, email, password, imap_h, imap_p)
     if not ok:
         raise RuntimeError(f"IMAP connection failed: {err}")
+    enc_key = await ctx.secrets.get("imap_encryption_key")
     await ctx.store.create(COLLECTION, {
         "email": email, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p,
         "smtp_host": smtp_h, "smtp_port": smtp_p,
-        "password": _encrypt_password(password), "password_encrypted": True,
+        "password": _encrypt_password(password, enc_key), "password_encrypted": True,
     })
     accounts = await _all_accounts(ctx)
     for d in accounts:

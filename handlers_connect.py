@@ -15,8 +15,8 @@ from providers.helpers import (
     _all_accounts,
     COLLECTION,
     GOOGLE_AUTH_URL, GMAIL_SCOPE,
-    MS_CLIENT_ID, MS_REDIRECT_URI, MS_AUTH_URL, MS_SCOPE,
-    YAHOO_CLIENT_ID, YAHOO_REDIRECT_URI, YAHOO_AUTH_URL, YAHOO_SCOPE,
+    MS_REDIRECT_URI, MS_AUTH_URL, MS_SCOPE,
+    YAHOO_REDIRECT_URI, YAHOO_AUTH_URL, YAHOO_SCOPE,
     _encrypt_password, _detect_imap_settings,
     _invalidate_first_page,
     _unread_summary_key,
@@ -62,10 +62,11 @@ async def impl_connect(ctx) -> ConnectOAuthResult:
 
 
 async def impl_connect_microsoft(ctx) -> ConnectOAuthResult:
-    if not MS_CLIENT_ID:
-        raise RuntimeError("Microsoft OAuth not configured.")
+    client_id = await ctx.secrets.get("microsoft_client_id")
+    if not client_id:
+        raise RuntimeError("Microsoft OAuth not configured — enter microsoft_client_id in extension Secrets.")
     url = MS_AUTH_URL + "?" + urlencode({
-        "client_id": MS_CLIENT_ID, "response_type": "code", "redirect_uri": MS_REDIRECT_URI,
+        "client_id": client_id, "response_type": "code", "redirect_uri": MS_REDIRECT_URI,
         "scope": MS_SCOPE, "response_mode": "query", "state": _oauth_state(ctx, "microsoft"),
     })
     return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Microsoft.")
@@ -77,10 +78,11 @@ async def impl_connect_yahoo(ctx) -> ConnectOAuthResult:
     if yahoo:
         active = next((a for a in yahoo if a.get("is_active")), yahoo[0])
         return ConnectOAuthResult(already_connected=True, email=active.get("email"))
-    if not YAHOO_CLIENT_ID:
-        raise RuntimeError("Yahoo OAuth not configured.")
+    yahoo_client_id = await ctx.secrets.get("yahoo_client_id")
+    if not yahoo_client_id:
+        raise RuntimeError("Yahoo OAuth not configured — enter yahoo_client_id in extension Secrets.")
     url = YAHOO_AUTH_URL + "?" + urlencode({
-        "client_id": YAHOO_CLIENT_ID, "redirect_uri": YAHOO_REDIRECT_URI,
+        "client_id": yahoo_client_id, "redirect_uri": YAHOO_REDIRECT_URI,
         "response_type": "code", "scope": YAHOO_SCOPE, "state": _oauth_state(ctx, "yahoo"),
     })
     return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Yahoo/AOL.")
@@ -98,10 +100,11 @@ async def impl_connect_imap(
     ok, err = await asyncio.to_thread(_sync_imap_test, email_addr, password, imap_h, imap_p)
     if not ok:
         raise RuntimeError(f"IMAP failed: {err}")
+    enc_key = await ctx.secrets.get("imap_encryption_key")
     await ctx.store.create(COLLECTION, {
         "email": email_addr, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p, "smtp_host": smtp_h, "smtp_port": smtp_p,
-        "password": _encrypt_password(password), "password_encrypted": True,
+        "password": _encrypt_password(password, enc_key), "password_encrypted": True,
     })
     accounts = await _all_accounts(ctx)
     for d in accounts:
