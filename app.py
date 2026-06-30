@@ -52,7 +52,7 @@ ext.oauth("microsoft",
                   "offline_access"])
 ext.oauth("yahoo",
           collection="gmail_accounts",
-          scopes=["mail-r", "mail-w"])
+          scopes=["openid", "mail-r", "mail-w"])
 
 # ── App-scope secrets (scope="app"): shared credentials, set once by owner ───
 # Extension.secret() in SDK 5.8.1 doesn't expose scope/env_fallback yet —
