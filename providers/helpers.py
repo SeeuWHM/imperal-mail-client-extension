@@ -23,6 +23,27 @@ COLLECTION          = "gmail_accounts"   # kept for backwards compat with stored
 CONTACTS_COLLECTION = "mail_contacts"
 INBOX_FETCH_SIZE    = 25
 
+# ── Microsoft email domain detection ──────────────────────────────────────
+# Platform may save provider="oauth" for all OAuth accounts (legacy behaviour).
+# Use email domain as a reliable fallback to route Microsoft accounts correctly.
+MICROSOFT_EMAIL_DOMAINS = {
+    "outlook.com", "hotmail.com", "live.com", "msn.com",
+    "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.it", "hotmail.es",
+    "hotmail.com.ar", "hotmail.com.br", "hotmail.com.mx",
+    "live.co.uk", "live.fr", "live.de", "live.com.ar", "live.com.br", "live.com.mx",
+    "outlook.com.br", "outlook.com.ar",
+}
+
+
+def _is_microsoft_account(acc: dict) -> bool:
+    """True if the account belongs to Microsoft — by explicit provider or email domain."""
+    p = acc.get("provider", "")
+    if p == "microsoft":
+        return True
+    email = acc.get("email", "")
+    domain = email.split("@")[-1].lower() if "@" in email else ""
+    return domain in MICROSOFT_EMAIL_DOMAINS
+
 # ── Google / Gmail REST ────────────────────────────────────────────────────
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_API        = "https://gmail.googleapis.com/gmail/v1/users/me"

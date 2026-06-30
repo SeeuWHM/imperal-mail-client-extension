@@ -15,6 +15,7 @@ from providers.helpers import (
     _encrypt_password, _detect_imap_settings,
     _invalidate_first_page,
     _unread_summary_key,
+    _is_microsoft_account,
 )
 
 _ALL_FOLDER_KEYS = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
@@ -89,7 +90,7 @@ async def impl_status(ctx) -> AccountsStatus:
     accounts = await _all_accounts(ctx)
     if not accounts:
         return AccountsStatus(connected=False, accounts=[], total=0)
-    labels = {"oauth": "Google", "microsoft": "Microsoft", "yahoo": "Yahoo / AOL", "imap": "IMAP"}
+    labels = {"oauth": "Google", "google": "Google", "microsoft": "Microsoft", "yahoo": "Yahoo / AOL", "imap": "IMAP"}
     result: list[MailAccount] = []
     for a in accounts:
         email = a.get("email", "?")
@@ -99,9 +100,10 @@ async def impl_status(ctx) -> AccountsStatus:
             unread = summary.unread_count if summary else int(a.get("unread_count", 0) or 0)
         except Exception:
             unread = int(a.get("unread_count", 0) or 0)
+        provider_label = "Microsoft" if _is_microsoft_account(a) else labels.get(a.get("provider", "oauth"), "Unknown")
         result.append(MailAccount(
             email=email,
-            provider=labels.get(a.get("provider", "oauth"), "Unknown"),
+            provider=provider_label,
             is_active=bool(a.get("is_active", False)),
             unread_count=unread,
         ))

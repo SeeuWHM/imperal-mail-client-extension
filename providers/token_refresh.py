@@ -12,6 +12,7 @@ from .helpers import (
     GOOGLE_TOKEN_URL, GMAIL_API,
     MS_TOKEN_URL, MS_SCOPE, MS_GRAPH_BASE,
     YAHOO_TOKEN_URL,
+    _is_microsoft_account,
 )
 
 log = logging.getLogger(__name__)
@@ -150,7 +151,8 @@ async def _refresh_token_if_needed(ctx: Context, acc: dict) -> dict:
     if acc.get("expires_at", 0) > time.time() + 120:
         return acc
     p = acc.get("provider", "oauth")
-    if p == "oauth":      return await _refresh_google_token(ctx, acc)
-    if p == "microsoft":  return await _refresh_microsoft_token(ctx, acc)
-    if p == "yahoo":      return await _refresh_yahoo_token(ctx, acc)
-    return acc
+    if p == "yahoo":
+        return await _refresh_yahoo_token(ctx, acc)
+    if _is_microsoft_account(acc):
+        return await _refresh_microsoft_token(ctx, acc)
+    return await _refresh_google_token(ctx, acc)
