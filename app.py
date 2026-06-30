@@ -37,6 +37,23 @@ chat = ChatExtension(
     ),
 )
 
+# ── Unified platform OAuth — gateway handles code exchange, account storage ──
+
+ext.oauth("google",
+          collection="gmail_accounts",
+          scopes=["https://www.googleapis.com/auth/gmail.modify",
+                  "https://www.googleapis.com/auth/contacts.readonly"])
+ext.oauth("microsoft",
+          collection="gmail_accounts",
+          scopes=["https://graph.microsoft.com/Mail.ReadWrite",
+                  "https://graph.microsoft.com/Mail.Send",
+                  "https://graph.microsoft.com/User.Read",
+                  "https://graph.microsoft.com/Contacts.Read",
+                  "offline_access"])
+ext.oauth("yahoo",
+          collection="gmail_accounts",
+          scopes=["mail-r", "mail-w"])
+
 # ── App-scope secrets (scope="app"): shared credentials, set once by owner ───
 # Extension.secret() in SDK 5.8.1 doesn't expose scope/env_fallback yet —
 # register SecretSpec directly (manifest.py reads ext._secrets, this is stable).

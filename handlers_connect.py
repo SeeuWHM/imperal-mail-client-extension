@@ -1,22 +1,17 @@
-"""Mail Client · Connect & account handlers (SDK 5.2.0 / SDL)."""
+"""Mail Client · Connect & account handlers (SDK 5.9.1 / unified OAuth)."""
 from __future__ import annotations
 
 import asyncio
 import logging
 
-from urllib.parse import urlencode
-
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
-from ctx_helpers import _get_acc, _oauth_state
+from ctx_helpers import _get_acc
 
 from providers import get_provider  # noqa: F401
 from providers.helpers import (
     _all_accounts,
     COLLECTION,
-    GOOGLE_AUTH_URL, GMAIL_SCOPE,
-    MS_REDIRECT_URI, MS_AUTH_URL, MS_SCOPE,
-    YAHOO_REDIRECT_URI, YAHOO_AUTH_URL, YAHOO_SCOPE,
     _encrypt_password, _detect_imap_settings,
     _invalidate_first_page,
     _unread_summary_key,
@@ -45,30 +40,12 @@ log = logging.getLogger("mail")
 
 
 async def impl_connect(ctx) -> ConnectOAuthResult:
-    client_id = await ctx.secrets.get("google_client_id")
-    if not client_id:
-        raise RuntimeError("Google OAuth not configured — enter google_client_id in extension Secrets.")
-    redirect_uri = ctx.webhook_url("callback")
-    url = GOOGLE_AUTH_URL + "?" + urlencode({
-        "client_id":     client_id,
-        "redirect_uri":  redirect_uri,
-        "response_type": "code",
-        "scope":         GMAIL_SCOPE,
-        "access_type":   "offline",
-        "prompt":        "consent",
-        "state":         _oauth_state(ctx, "oauth"),
-    })
+    url = await ctx.oauth_authorize_url("google")
     return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Google.")
 
 
 async def impl_connect_microsoft(ctx) -> ConnectOAuthResult:
-    client_id = await ctx.secrets.get("microsoft_client_id")
-    if not client_id:
-        raise RuntimeError("Microsoft OAuth not configured — enter microsoft_client_id in extension Secrets.")
-    url = MS_AUTH_URL + "?" + urlencode({
-        "client_id": client_id, "response_type": "code", "redirect_uri": MS_REDIRECT_URI,
-        "scope": MS_SCOPE, "response_mode": "query", "state": _oauth_state(ctx, "microsoft"),
-    })
+    url = await ctx.oauth_authorize_url("microsoft")
     return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Microsoft.")
 
 
@@ -78,13 +55,7 @@ async def impl_connect_yahoo(ctx) -> ConnectOAuthResult:
     if yahoo:
         active = next((a for a in yahoo if a.get("is_active")), yahoo[0])
         return ConnectOAuthResult(already_connected=True, email=active.get("email"))
-    yahoo_client_id = await ctx.secrets.get("yahoo_client_id")
-    if not yahoo_client_id:
-        raise RuntimeError("Yahoo OAuth not configured — enter yahoo_client_id in extension Secrets.")
-    url = YAHOO_AUTH_URL + "?" + urlencode({
-        "client_id": yahoo_client_id, "redirect_uri": YAHOO_REDIRECT_URI,
-        "response_type": "code", "scope": YAHOO_SCOPE, "state": _oauth_state(ctx, "yahoo"),
-    })
+    url = await ctx.oauth_authorize_url("yahoo")
     return ConnectOAuthResult(auth_url=url, instruction="Open link to authorise Yahoo/AOL.")
 
 

@@ -1,19 +1,16 @@
-"""Mail Client · Panel action handlers (SDK 5.2.0 / SDL)."""
+"""Mail Client · Panel action handlers (SDK 5.9.1 / unified OAuth)."""
 from __future__ import annotations
 
 import asyncio
 import logging
-from urllib.parse import urlencode
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
-from ctx_helpers import _get_acc, _oauth_state
+from ctx_helpers import _get_acc
 from providers import get_provider
 from providers.helpers import _invalidate_first_page
 from providers.helpers import (
     _all_accounts, COLLECTION,
-    GOOGLE_AUTH_URL, GMAIL_SCOPE,
-    MS_REDIRECT_URI, MS_AUTH_URL, MS_SCOPE,
     _encrypt_password, _detect_imap_settings,
 )
 from providers.imap import _sync_imap_test
@@ -100,31 +97,9 @@ async def impl_folder_counts(ctx, account: str = "") -> FolderCountsResult:
 
 
 async def impl_get_oauth_url(ctx, provider: str) -> OAuthUrlResult:
-    if provider == "google":
-        client_id = await ctx.secrets.get("google_client_id")
-        if not client_id:
-            raise RuntimeError("Google OAuth not configured — enter google_client_id in extension Secrets.")
-        redirect_uri = ctx.webhook_url("callback")
-        url = GOOGLE_AUTH_URL + "?" + urlencode({
-            "client_id":     client_id,
-            "redirect_uri":  redirect_uri,
-            "response_type": "code",
-            "scope":         GMAIL_SCOPE,
-            "access_type":   "offline",
-            "prompt":        "consent",
-            "state":         _oauth_state(ctx, "oauth"),
-        })
-    elif provider == "microsoft":
-        ms_client_id = await ctx.secrets.get("microsoft_client_id")
-        if not ms_client_id:
-            raise RuntimeError("Microsoft OAuth not configured — enter microsoft_client_id in extension Secrets.")
-        url = MS_AUTH_URL + "?" + urlencode({
-            "client_id": ms_client_id, "response_type": "code",
-            "redirect_uri": MS_REDIRECT_URI, "scope": MS_SCOPE,
-            "response_mode": "query", "state": _oauth_state(ctx, "microsoft"),
-        })
-    else:
+    if provider not in ("google", "microsoft", "yahoo"):
         raise RuntimeError(f"Unknown OAuth provider: {provider}")
+    url = await ctx.oauth_authorize_url(provider)
     return OAuthUrlResult(auth_url=url, provider=provider)
 
 

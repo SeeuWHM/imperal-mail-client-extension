@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.8.2",
+  "sdk_version": "5.9.1",
   "app_id": "mail",
   "version": "6.3.0",
   "name": "Mail Client",
@@ -11214,19 +11214,39 @@
     }
   ],
   "signals": [],
-  "schedules": [
-    {
-      "name": "process_google_pending",
-      "cron": "* * * * *"
-    }
-  ],
+  "schedules": [],
   "required_scopes": [],
   "icon_size_bytes": 1015,
-  "webhooks": [
+  "oauth": [
     {
-      "path": "/callback",
-      "method": "GET",
-      "secret_header": ""
+      "provider": "google",
+      "collection": "gmail_accounts",
+      "scopes": [
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/contacts.readonly"
+      ],
+      "has_hook": false
+    },
+    {
+      "provider": "microsoft",
+      "collection": "gmail_accounts",
+      "scopes": [
+        "https://graph.microsoft.com/Mail.ReadWrite",
+        "https://graph.microsoft.com/Mail.Send",
+        "https://graph.microsoft.com/User.Read",
+        "https://graph.microsoft.com/Contacts.Read",
+        "offline_access"
+      ],
+      "has_hook": false
+    },
+    {
+      "provider": "yahoo",
+      "collection": "gmail_accounts",
+      "scopes": [
+        "mail-r",
+        "mail-w"
+      ],
+      "has_hook": false
     }
   ],
   "lifecycle": {

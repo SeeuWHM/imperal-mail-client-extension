@@ -23,23 +23,16 @@ COLLECTION          = "gmail_accounts"   # kept for backwards compat with stored
 CONTACTS_COLLECTION = "mail_contacts"
 INBOX_FETCH_SIZE    = 25
 
-# ── Google OAuth / Gmail REST ──────────────────────────────────────────────
-GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
+# ── Google / Gmail REST ────────────────────────────────────────────────────
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_API        = "https://gmail.googleapis.com/gmail/v1/users/me"
 PEOPLE_API       = "https://people.googleapis.com/v1"
-GMAIL_SCOPE      = ("https://www.googleapis.com/auth/gmail.modify "
-                   "https://www.googleapis.com/auth/contacts.readonly")
+# OAuth connect is platform-managed (ext.oauth "google") — no manual auth URL/scope needed
 
-# google_client_id / google_client_secret live in ctx.secrets (write_mode="user")
-# Redirect URI computed at runtime via ctx.webhook_url("callback")
-
-# ── Microsoft OAuth / Graph API ────────────────────────────────────────────
-# MS_CLIENT_ID / MS_CLIENT_SECRET → ctx.secrets.get("microsoft_client_id/secret") at call-time
-MS_REDIRECT_URI  = "https://auth.imperal.io/v1/oauth/microsoft/callback"
-MS_AUTH_URL      = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
-MS_TOKEN_URL     = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
-MS_GRAPH_BASE    = "https://graph.microsoft.com/v1.0"
+# ── Microsoft Graph API ────────────────────────────────────────────────────
+# OAuth connect is platform-managed (ext.oauth "microsoft") — no manual auth URL needed
+MS_TOKEN_URL  = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+MS_GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 MS_SCOPE = (
     "https://graph.microsoft.com/Mail.ReadWrite "
     "https://graph.microsoft.com/Mail.Send "
@@ -49,11 +42,8 @@ MS_SCOPE = (
 )
 
 # ── Yahoo / AOL OAuth ──────────────────────────────────────────────────────
-# YAHOO_CLIENT_ID / YAHOO_CLIENT_SECRET → ctx.secrets.get("yahoo_client_id/secret") at call-time
-YAHOO_REDIRECT_URI  = "https://auth.imperal.io/v1/oauth/yahoo/callback"
-YAHOO_AUTH_URL      = "https://api.login.yahoo.com/oauth2/request_auth"
-YAHOO_TOKEN_URL     = "https://api.login.yahoo.com/oauth2/get_token"
-YAHOO_SCOPE         = "mail-r mail-w"
+# OAuth connect is platform-managed (ext.oauth "yahoo") — no manual auth URL needed
+YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
 
 
 # ── Re-exports for backward compatibility ─────────────────────────────────
