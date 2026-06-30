@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 from app import chat
@@ -12,7 +13,7 @@ from providers import get_provider  # noqa: F401
 from providers.helpers import (
     _all_accounts,
     COLLECTION,
-    _encrypt_password, _detect_imap_settings,
+    _detect_imap_settings,
     _invalidate_first_page,
     _unread_summary_key,
     _is_microsoft_account,
@@ -72,11 +73,17 @@ async def impl_connect_imap(
     ok, err = await asyncio.to_thread(_sync_imap_test, email_addr, password, imap_h, imap_p)
     if not ok:
         raise RuntimeError(f"IMAP failed: {err}")
-    enc_key = await ctx.secrets.get("imap_encryption_key")
+    # Store password in secrets (platform-encrypted), not in the collection
+    creds_raw = await ctx.secrets.get("imap_credentials") or "{}"
+    try:
+        creds = json.loads(creds_raw)
+    except Exception:
+        creds = {}
+    creds[email_addr] = password
+    await ctx.secrets.set("imap_credentials", json.dumps(creds))
     await ctx.store.create(COLLECTION, {
         "email": email_addr, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p, "smtp_host": smtp_h, "smtp_port": smtp_p,
-        "password": _encrypt_password(password, enc_key), "password_encrypted": True,
     })
     accounts = await _all_accounts(ctx)
     for d in accounts:
@@ -135,6 +142,14 @@ async def impl_disconnect(ctx, account: str) -> AccountDisconnected:
         raise RuntimeError("Account not found.")
     email = target.get("email", "")
     await ctx.store.delete(COLLECTION, target.id)
+    if target.get("provider") == "imap":
+        try:
+            creds_raw = await ctx.secrets.get("imap_credentials") or "{}"
+            creds = json.loads(creds_raw)
+            creds.pop(email, None)
+            await ctx.secrets.set("imap_credentials", json.dumps(creds))
+        except Exception:
+            pass
     await _invalidate_first_page(ctx, email, "INBOX")
     return AccountDisconnected(disconnected=True, email=email, remaining=len(docs.data) - 1)
 

@@ -214,3 +214,117 @@ def _sync_imap_purge(email_addr: str, host: str, port: int, message_id: str,
         return True, ""
     except Exception as e:
         return False, str(e)
+
+
+# ── Native IMAP bulk operations (one IMAP command for N messages) ────────────
+
+def _sync_imap_bulk_flag(email_addr: str, host: str, port: int, message_ids: list,
+                         flag: str, add: bool, folder: str = "INBOX", *,
+                         password: str = "", access_token: str = "") -> tuple[bool, int]:
+    """Set or clear an IMAP flag for multiple UIDs in ONE STORE command."""
+    if not message_ids:
+        return True, 0
+    uid_set   = ",".join(str(uid) for uid in message_ids).encode()
+    flag_cmd  = "+FLAGS" if add else "-FLAGS"
+    flag_str  = f"\\{flag}"
+    try:
+        imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        imap.select(f'"{folder}"')
+        imap.uid("STORE", uid_set, flag_cmd, flag_str)
+        imap.logout()
+        return True, len(message_ids)
+    except Exception as e:
+        log.warning("imap bulk_flag failed: %s", e)
+        return False, 0
+
+
+def _sync_imap_bulk_move(email_addr: str, host: str, port: int, message_ids: list,
+                         dest_folders: list, src_folder: str = "INBOX", *,
+                         password: str = "", access_token: str = "") -> tuple[bool, int]:
+    """Copy multiple UIDs to dest then mark as deleted — one COPY + one STORE + EXPUNGE."""
+    if not message_ids:
+        return True, 0
+    uid_set = ",".join(str(uid) for uid in message_ids).encode()
+    try:
+        imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        dest = None
+        for folder in dest_folders:
+            try:
+                r, _ = imap.select(f'"{folder}"')
+                if r == "OK":
+                    dest = folder
+                    break
+            except Exception:
+                continue
+        if dest is None:
+            imap.logout()
+            return False, 0
+        imap.select(f'"{src_folder}"')
+        imap.uid("COPY", uid_set, f'"{dest}"')
+        imap.uid("STORE", uid_set, "+FLAGS", "\\Deleted")
+        imap.expunge()
+        imap.logout()
+        return True, len(message_ids)
+    except Exception as e:
+        log.warning("imap bulk_move failed: %s", e)
+        return False, 0
+
+
+def _sync_imap_bulk_read_and_move(email_addr: str, host: str, port: int, message_ids: list,
+                                   dest_folders: list, src_folder: str = "INBOX", *,
+                                   password: str = "", access_token: str = "") -> tuple[bool, int]:
+    """Mark as read AND move in one open connection: STORE Seen + COPY + STORE Deleted + EXPUNGE."""
+    if not message_ids:
+        return True, 0
+    uid_set = ",".join(str(uid) for uid in message_ids).encode()
+    try:
+        imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        dest = None
+        for folder in dest_folders:
+            try:
+                r, _ = imap.select(f'"{folder}"')
+                if r == "OK":
+                    dest = folder
+                    break
+            except Exception:
+                continue
+        if dest is None:
+            imap.logout()
+            return False, 0
+        imap.select(f'"{src_folder}"')
+        imap.uid("STORE", uid_set, "+FLAGS", "\\Seen")
+        imap.uid("COPY", uid_set, f'"{dest}"')
+        imap.uid("STORE", uid_set, "+FLAGS", "\\Deleted")
+        imap.expunge()
+        imap.logout()
+        return True, len(message_ids)
+    except Exception as e:
+        log.warning("imap bulk_read_and_move failed: %s", e)
+        return False, 0
+
+
+def _sync_imap_bulk_purge(email_addr: str, host: str, port: int, message_ids: list,
+                           src_folder: str = "Trash", *,
+                           password: str = "", access_token: str = "") -> tuple[bool, int]:
+    """Permanently delete multiple UIDs: STORE Deleted + EXPUNGE."""
+    if not message_ids:
+        return True, 0
+    uid_set = ",".join(str(uid) for uid in message_ids).encode()
+    candidates = [src_folder, "Trash", "Deleted Items", "[Gmail]/Trash"]
+    try:
+        imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+        for folder in candidates:
+            try:
+                r, _ = imap.select(f'"{folder}"')
+                if r == "OK":
+                    imap.uid("STORE", uid_set, "+FLAGS", "\\Deleted")
+                    imap.expunge()
+                    imap.logout()
+                    return True, len(message_ids)
+            except Exception:
+                continue
+        imap.logout()
+        return False, 0
+    except Exception as e:
+        log.warning("imap bulk_purge failed: %s", e)
+        return False, 0

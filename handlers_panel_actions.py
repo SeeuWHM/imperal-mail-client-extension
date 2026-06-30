@@ -8,10 +8,12 @@ from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 from providers import get_provider
+import json
+
 from providers.helpers import _invalidate_first_page
 from providers.helpers import (
     _all_accounts, COLLECTION,
-    _encrypt_password, _detect_imap_settings,
+    _detect_imap_settings,
 )
 from providers.imap import _sync_imap_test
 
@@ -113,12 +115,17 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
     ok, err = await asyncio.to_thread(_sync_imap_test, email, password, imap_h, imap_p)
     if not ok:
         raise RuntimeError(f"IMAP connection failed: {err}")
-    enc_key = await ctx.secrets.get("imap_encryption_key")
+    creds_raw = await ctx.secrets.get("imap_credentials") or "{}"
+    try:
+        creds = json.loads(creds_raw)
+    except Exception:
+        creds = {}
+    creds[email] = password
+    await ctx.secrets.set("imap_credentials", json.dumps(creds))
     await ctx.store.create(COLLECTION, {
         "email": email, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p,
         "smtp_host": smtp_h, "smtp_port": smtp_p,
-        "password": _encrypt_password(password, enc_key), "password_encrypted": True,
     })
     accounts = await _all_accounts(ctx)
     for d in accounts:

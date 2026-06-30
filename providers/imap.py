@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 from imperal_sdk import Context
 
 from .base import BaseMailProvider
+from .imap_bulk import ImapBulkMixin
 from .helpers import (
     _refresh_token_if_needed, _decrypt_password,
     _remove_from_cache, _update_read_in_cache, _save_last_read,
@@ -29,7 +31,7 @@ IMAP_ARCHIVE_FOLDERS = ["Archive", "[Gmail]/All Mail", "Archives", "All Messages
 IMAP_TRASH_FOLDERS   = ["Trash", "[Gmail]/Trash", "Deleted Items", "Deleted Messages"]
 
 
-class ImapMailProvider(BaseMailProvider):
+class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
 
     async def _imap_args(self, ctx: Context, acc: dict) -> dict:
         if acc.get("provider", "imap") == "yahoo":
@@ -39,8 +41,23 @@ class ImapMailProvider(BaseMailProvider):
                 "access_token": acc.get("access_token", ""),
                 "password": "",
             }
-        enc_key  = await ctx.secrets.get("imap_encryption_key")
-        password = _decrypt_password(acc.get("password", ""), acc.get("password_encrypted", False), enc_key)
+        email = acc.get("email", "")
+        # New: password stored in secrets (platform-encrypted)
+        creds_raw = await ctx.secrets.get("imap_credentials")
+        if creds_raw:
+            try:
+                password = json.loads(creds_raw).get(email, "")
+                if password:
+                    return {"host": acc.get("imap_host", ""), "port": acc.get("imap_port", 993),
+                            "password": password, "access_token": ""}
+            except Exception:
+                pass
+        # Migration fallback: old Fernet-encrypted password in store
+        if acc.get("password") and acc.get("password_encrypted"):
+            enc_key = await ctx.secrets.get("imap_encryption_key")
+            password = _decrypt_password(acc.get("password", ""), True, enc_key)
+        else:
+            password = acc.get("password", "")
         return {"host": acc.get("imap_host", ""), "port": acc.get("imap_port", 993),
                 "password": password, "access_token": ""}
 

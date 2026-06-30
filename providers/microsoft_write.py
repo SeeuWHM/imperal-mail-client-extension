@@ -12,6 +12,9 @@ from .helpers import (
     _remove_from_cache, _update_read_in_cache, _save_last_read,
 )
 
+_MS_BATCH_URL = f"{MS_GRAPH_BASE}/$batch"
+_MS_BATCH_SIZE = 20  # Graph JSON batching limit
+
 log = logging.getLogger(__name__)
 
 _MS_DEST_MAP: dict = {
@@ -133,3 +136,84 @@ class MicrosoftWriteMixin:
             return self.err(f"Purge failed ({resp.status_code}): {resp.text[:200]}")
         except Exception as e:
             return self.err(f"Purge failed: {e}")
+
+    # ── Microsoft Graph JSON Batching (up to 20 requests per call) ──────────
+
+    async def _ms_batch(self, ctx: Context, acc: dict, requests: list) -> list:
+        """Send requests in chunks of 20 via Graph $batch. Returns all responses."""
+        acc = await _refresh_token_if_needed(ctx, acc)
+        responses = []
+        for i in range(0, len(requests), _MS_BATCH_SIZE):
+            chunk = requests[i:i + _MS_BATCH_SIZE]
+            batch_body = {"requests": [{"id": str(j), **r} for j, r in enumerate(chunk)]}
+            try:
+                resp = await ctx.http.post(
+                    _MS_BATCH_URL,
+                    headers={"Authorization": f"Bearer {acc['access_token']}",
+                             "Content-Type": "application/json"},
+                    json=batch_body,
+                )
+                if resp.status_code == 200:
+                    responses.extend(resp.json().get("responses", []))
+            except Exception as e:
+                log.warning("ms_batch chunk failed: %s", e)
+        return responses
+
+    async def bulk_mark_read(self, ctx: Context, acc: dict,
+                              message_ids: list, read: bool = True) -> dict:
+        reqs = [{"method": "PATCH", "url": f"/me/messages/{mid}",
+                 "headers": {"Content-Type": "application/json"},
+                 "body": {"isRead": read}} for mid in message_ids]
+        responses = await self._ms_batch(ctx, acc, reqs)
+        ok = sum(1 for r in responses if r.get("status") in (200, 204))
+        return self.ok(succeeded=ok, total=len(message_ids))
+
+    async def bulk_archive_messages(self, ctx: Context, acc: dict,
+                                     message_ids: list) -> dict:
+        reqs = [{"method": "POST", "url": f"/me/messages/{mid}/move",
+                 "headers": {"Content-Type": "application/json"},
+                 "body": {"destinationId": "archive"}} for mid in message_ids]
+        responses = await self._ms_batch(ctx, acc, reqs)
+        ok = sum(1 for r in responses if r.get("status") in (200, 201))
+        return self.ok(succeeded=ok, total=len(message_ids))
+
+    async def bulk_trash_messages(self, ctx: Context, acc: dict,
+                                   message_ids: list) -> dict:
+        reqs = [{"method": "POST", "url": f"/me/messages/{mid}/move",
+                 "headers": {"Content-Type": "application/json"},
+                 "body": {"destinationId": "deleteditems"}} for mid in message_ids]
+        responses = await self._ms_batch(ctx, acc, reqs)
+        ok = sum(1 for r in responses if r.get("status") in (200, 201))
+        return self.ok(succeeded=ok, total=len(message_ids))
+
+    async def bulk_star_messages(self, ctx: Context, acc: dict,
+                                  message_ids: list, starred: bool = True) -> dict:
+        flag_status = "flagged" if starred else "notFlagged"
+        reqs = [{"method": "PATCH", "url": f"/me/messages/{mid}",
+                 "headers": {"Content-Type": "application/json"},
+                 "body": {"flag": {"flagStatus": flag_status}}} for mid in message_ids]
+        responses = await self._ms_batch(ctx, acc, reqs)
+        ok = sum(1 for r in responses if r.get("status") in (200, 204))
+        return self.ok(succeeded=ok, total=len(message_ids))
+
+    async def bulk_read_and_archive(self, ctx: Context, acc: dict,
+                                     message_ids: list) -> dict:
+        # Mark read then archive — two rounds of batching
+        read_reqs = [{"method": "PATCH", "url": f"/me/messages/{mid}",
+                      "headers": {"Content-Type": "application/json"},
+                      "body": {"isRead": True}} for mid in message_ids]
+        await self._ms_batch(ctx, acc, read_reqs)
+        arch_reqs = [{"method": "POST", "url": f"/me/messages/{mid}/move",
+                      "headers": {"Content-Type": "application/json"},
+                      "body": {"destinationId": "archive"}} for mid in message_ids]
+        responses = await self._ms_batch(ctx, acc, arch_reqs)
+        ok = sum(1 for r in responses if r.get("status") in (200, 201))
+        return self.ok(succeeded=ok, total=len(message_ids))
+
+    async def bulk_purge_messages(self, ctx: Context, acc: dict,
+                                   message_ids: list) -> dict:
+        acc = await _refresh_token_if_needed(ctx, acc)
+        reqs = [{"method": "DELETE", "url": f"/me/messages/{mid}"} for mid in message_ids]
+        responses = await self._ms_batch(ctx, acc, reqs)
+        ok = sum(1 for r in responses if r.get("status") in (204, 404))
+        return self.ok(succeeded=ok, total=len(message_ids))

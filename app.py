@@ -65,7 +65,6 @@ _APP_SECRETS = [
     ("microsoft_client_secret", "Shared Microsoft OAuth Client Secret — from Azure AD App Registration",         "IMPERAL_APPSECRET_MAIL_MICROSOFT_CLIENT_SECRET"),
     ("yahoo_client_id",         "Shared Yahoo OAuth Client ID — from Yahoo Developer Console",                   "IMPERAL_APPSECRET_MAIL_YAHOO_CLIENT_ID"),
     ("yahoo_client_secret",     "Shared Yahoo OAuth Client Secret — from Yahoo Developer Console",               "IMPERAL_APPSECRET_MAIL_YAHOO_CLIENT_SECRET"),
-    ("imap_encryption_key",     "Fernet key for encrypting stored IMAP passwords (set to current IMAP_ENCRYPTION_KEY value)", "IMPERAL_APPSECRET_MAIL_IMAP_ENCRYPTION_KEY"),
 ]
 for _name, _desc, _fb in _APP_SECRETS:
     ext._secrets[_name] = SecretSpec(
@@ -77,6 +76,13 @@ for _name, _desc, _fb in _APP_SECRETS:
 ext.secret(
     name="google_tokens",
     description="Google OAuth tokens per connected account — managed automatically by the extension",
+    write_mode="extension",
+    max_bytes=65536,
+)(lambda: None)
+
+ext.secret(
+    name="imap_credentials",
+    description="IMAP account passwords — JSON dict keyed by email, managed automatically by the extension",
     write_mode="extension",
     max_bytes=65536,
 )(lambda: None)
