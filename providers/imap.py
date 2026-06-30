@@ -6,6 +6,8 @@ import logging
 
 from imperal_sdk import Context
 
+import os
+
 from .base import BaseMailProvider
 from .helpers import (
     _refresh_token_if_needed, _decrypt_password,
@@ -39,7 +41,7 @@ class ImapMailProvider(BaseMailProvider):
                 "access_token": acc.get("access_token", ""),
                 "password": "",
             }
-        enc_key  = await ctx.secrets.get("imap_encryption_key")
+        enc_key  = await ctx.secrets.get("imap_encryption_key") or os.getenv("IMAP_ENCRYPTION_KEY", "")
         password = _decrypt_password(acc.get("password", ""), acc.get("password_encrypted", False), enc_key)
         return {"host": acc.get("imap_host", ""), "port": acc.get("imap_port", 993),
                 "password": password, "access_token": ""}

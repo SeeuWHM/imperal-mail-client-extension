@@ -36,63 +36,58 @@ chat = ChatExtension(
     ),
 )
 
-# ── App-scope OAuth secrets (shared, developer-owned) ────────────────────────
+# ── Developer-owned shared secrets (set once in Dev Portal, used by all users) ─
 
 ext.secret(
     name="google_client_id",
     description="Google OAuth Client ID — from Google Cloud Console → APIs & Services → Credentials",
-    scope="app",
+    write_mode="extension",
     required=True,
 )(lambda: None)
 
 ext.secret(
     name="google_client_secret",
     description="Google OAuth Client Secret — from Google Cloud Console → APIs & Services → Credentials",
-    scope="app",
+    write_mode="extension",
     required=True,
 )(lambda: None)
 
 ext.secret(
     name="microsoft_client_id",
     description="Microsoft OAuth Client ID — from Azure AD App Registration",
-    scope="app",
-    env_fallback="MICROSOFT_CLIENT_ID",
+    write_mode="extension",
     required=True,
 )(lambda: None)
 
 ext.secret(
     name="microsoft_client_secret",
     description="Microsoft OAuth Client Secret — from Azure AD App Registration",
-    scope="app",
-    env_fallback="MICROSOFT_CLIENT_SECRET",
+    write_mode="extension",
     required=True,
 )(lambda: None)
 
 ext.secret(
     name="yahoo_client_id",
     description="Yahoo OAuth Client ID — from Yahoo Developer Console",
-    scope="app",
-    env_fallback="YAHOO_CLIENT_ID",
+    write_mode="extension",
     required=True,
 )(lambda: None)
 
 ext.secret(
     name="yahoo_client_secret",
     description="Yahoo OAuth Client Secret — from Yahoo Developer Console",
-    scope="app",
-    env_fallback="YAHOO_CLIENT_SECRET",
+    write_mode="extension",
     required=True,
 )(lambda: None)
 
 ext.secret(
     name="imap_encryption_key",
     description="Fernet key for encrypting IMAP passwords at rest — generate with Fernet.generate_key()",
-    scope="app",
-    env_fallback="IMAP_ENCRYPTION_KEY",
+    write_mode="extension",
     required=True,
 )(lambda: None)
 
-# ── User-scope secrets (per-account, managed by extension) ───────────────────
+# ── Extension-managed per-user secrets ────────────────────────────────────────
 
 ext.secret(
     name="google_tokens",

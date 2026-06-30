@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 import time
 
 from imperal_sdk import Context
@@ -87,8 +88,8 @@ async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
 
 
 async def _refresh_microsoft_token(ctx: Context, acc: dict) -> dict:
-    client_id     = await ctx.secrets.get("microsoft_client_id")
-    client_secret = await ctx.secrets.get("microsoft_client_secret")
+    client_id     = await ctx.secrets.get("microsoft_client_id") or os.getenv("MICROSOFT_CLIENT_ID", "")
+    client_secret = await ctx.secrets.get("microsoft_client_secret") or os.getenv("MICROSOFT_CLIENT_SECRET", "")
     if not client_id or not client_secret:
         log.warning("Microsoft OAuth credentials not set in secrets — cannot refresh token")
         return acc
@@ -124,8 +125,8 @@ async def _refresh_microsoft_token(ctx: Context, acc: dict) -> dict:
 
 
 async def _refresh_yahoo_token(ctx: Context, acc: dict) -> dict:
-    client_id     = await ctx.secrets.get("yahoo_client_id")
-    client_secret = await ctx.secrets.get("yahoo_client_secret")
+    client_id     = await ctx.secrets.get("yahoo_client_id") or os.getenv("YAHOO_CLIENT_ID", "")
+    client_secret = await ctx.secrets.get("yahoo_client_secret") or os.getenv("YAHOO_CLIENT_SECRET", "")
     if not client_id or not client_secret:
         log.warning("Yahoo OAuth credentials not set in secrets — cannot refresh token")
         return acc
