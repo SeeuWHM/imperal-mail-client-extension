@@ -97,6 +97,13 @@ async def process_google_pending(ctx) -> None:
             await webhook_ctx.store.delete(_PENDING, rec_id)
             continue
 
+        # Expire stale records — OAuth code is only valid ~10 minutes
+        received_at = rec.get("received_at", 0)
+        if int(time.time()) - received_at > 600:
+            log.warning(f"google_pending: record expired for user={actual_user_id}, deleting")
+            await webhook_ctx.store.delete(_PENDING, rec_id)
+            continue
+
         # App-scope secrets readable from any ctx — no need to switch to user context for credentials
         client_id     = await ctx.secrets.get("google_client_id")
         client_secret = await ctx.secrets.get("google_client_secret")
@@ -109,7 +116,7 @@ async def process_google_pending(ctx) -> None:
         # Switch to real user context for store operations
         user_ctx = ctx.as_user(actual_user_id)
 
-        # Exchange authorization code for tokens
+        # Exchange authorization code for tokens (permanent failure — delete on any non-200)
         resp = await ctx.http.post(GOOGLE_TOKEN_URL, data={
             "code":          code,
             "client_id":     client_id,
@@ -119,7 +126,7 @@ async def process_google_pending(ctx) -> None:
         })
 
         if resp.status_code != 200:
-            log.warning(f"google_pending: token exchange failed {resp.status_code} for user={actual_user_id}")
+            log.warning(f"google_pending: token exchange failed HTTP {resp.status_code} for user={actual_user_id}")
             await webhook_ctx.store.delete(_PENDING, rec_id)
             continue
 
@@ -129,23 +136,26 @@ async def process_google_pending(ctx) -> None:
         expires_in    = tokens.get("expires_in", 3600)
 
         if not access_token:
-            log.warning(f"google_pending: no access_token for user={actual_user_id}")
+            log.warning(f"google_pending: no access_token in response for user={actual_user_id}")
             await webhook_ctx.store.delete(_PENDING, rec_id)
             continue
 
-        # Fetch email from Google
-        info_resp = await user_ctx.http.get(
-            "https://www.googleapis.com/oauth2/v1/userinfo",
+        # Fetch email via Gmail profile API — uses existing gmail.modify scope, no re-consent needed
+        profile_resp = await ctx.http.get(
+            "https://gmail.googleapis.com/gmail/v1/users/me/profile",
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        if info_resp.status_code != 200:
-            log.warning(f"google_pending: userinfo failed for user={actual_user_id}")
-            await webhook_ctx.store.delete(_PENDING, rec_id)
+        if profile_resp.status_code != 200:
+            # Transient failure (5xx / rate-limit) — keep record, retry next cron run
+            log.warning(
+                f"google_pending: profile fetch HTTP {profile_resp.status_code} "
+                f"for user={actual_user_id} — will retry next run"
+            )
             continue
 
-        email = info_resp.json().get("email", "")
+        email = profile_resp.json().get("emailAddress", "")
         if not email:
-            log.warning(f"google_pending: no email for user={actual_user_id}")
+            log.warning(f"google_pending: empty emailAddress in profile for user={actual_user_id}")
             await webhook_ctx.store.delete(_PENDING, rec_id)
             continue
 
