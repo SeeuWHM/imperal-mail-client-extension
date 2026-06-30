@@ -5,6 +5,7 @@ import logging
 
 from imperal_sdk import Extension
 from imperal_sdk.chat import ChatExtension
+from imperal_sdk.secrets.spec import SecretSpec
 
 from providers.helpers import _all_accounts
 
@@ -36,58 +37,25 @@ chat = ChatExtension(
     ),
 )
 
-# ── Developer-owned shared secrets (set once in Dev Portal, used by all users) ─
+# ── App-scope secrets (scope="app"): shared credentials, set once by owner ───
+# Extension.secret() in SDK 5.8.1 doesn't expose scope/env_fallback yet —
+# register SecretSpec directly (manifest.py reads ext._secrets, this is stable).
 
-ext.secret(
-    name="google_client_id",
-    description="Google OAuth Client ID — from Google Cloud Console → APIs & Services → Credentials",
-    write_mode="extension",
-    required=True,
-)(lambda: None)
+_APP_SECRETS = [
+    ("google_client_id",        "Shared Google OAuth Client ID (developer-owned; one OAuth app for all users)",  "IMPERAL_APPSECRET_MAIL_GOOGLE_CLIENT_ID"),
+    ("google_client_secret",    "Shared Google OAuth Client Secret (developer-owned)",                           "IMPERAL_APPSECRET_MAIL_GOOGLE_CLIENT_SECRET"),
+    ("microsoft_client_id",     "Shared Microsoft OAuth Client ID — from Azure AD App Registration",             "IMPERAL_APPSECRET_MAIL_MICROSOFT_CLIENT_ID"),
+    ("microsoft_client_secret", "Shared Microsoft OAuth Client Secret — from Azure AD App Registration",         "IMPERAL_APPSECRET_MAIL_MICROSOFT_CLIENT_SECRET"),
+    ("yahoo_client_id",         "Shared Yahoo OAuth Client ID — from Yahoo Developer Console",                   "IMPERAL_APPSECRET_MAIL_YAHOO_CLIENT_ID"),
+    ("yahoo_client_secret",     "Shared Yahoo OAuth Client Secret — from Yahoo Developer Console",               "IMPERAL_APPSECRET_MAIL_YAHOO_CLIENT_SECRET"),
+    ("imap_encryption_key",     "Fernet key for encrypting stored IMAP passwords (set to current IMAP_ENCRYPTION_KEY value)", "IMPERAL_APPSECRET_MAIL_IMAP_ENCRYPTION_KEY"),
+]
+for _name, _desc, _fb in _APP_SECRETS:
+    ext._secrets[_name] = SecretSpec(
+        name=_name, description=_desc, scope="app", env_fallback=_fb, required=True,
+    )
 
-ext.secret(
-    name="google_client_secret",
-    description="Google OAuth Client Secret — from Google Cloud Console → APIs & Services → Credentials",
-    write_mode="extension",
-    required=True,
-)(lambda: None)
-
-ext.secret(
-    name="microsoft_client_id",
-    description="Microsoft OAuth Client ID — from Azure AD App Registration",
-    write_mode="extension",
-    required=True,
-)(lambda: None)
-
-ext.secret(
-    name="microsoft_client_secret",
-    description="Microsoft OAuth Client Secret — from Azure AD App Registration",
-    write_mode="extension",
-    required=True,
-)(lambda: None)
-
-ext.secret(
-    name="yahoo_client_id",
-    description="Yahoo OAuth Client ID — from Yahoo Developer Console",
-    write_mode="extension",
-    required=True,
-)(lambda: None)
-
-ext.secret(
-    name="yahoo_client_secret",
-    description="Yahoo OAuth Client Secret — from Yahoo Developer Console",
-    write_mode="extension",
-    required=True,
-)(lambda: None)
-
-ext.secret(
-    name="imap_encryption_key",
-    description="Fernet key for encrypting IMAP passwords at rest — generate with Fernet.generate_key()",
-    write_mode="extension",
-    required=True,
-)(lambda: None)
-
-# ── Extension-managed per-user secrets ────────────────────────────────────────
+# ── Per-user secret — written by extension after OAuth authorize ──────────────
 
 ext.secret(
     name="google_tokens",

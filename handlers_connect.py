@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
 from urllib.parse import urlencode
 
@@ -63,7 +62,7 @@ async def impl_connect(ctx) -> ConnectOAuthResult:
 
 
 async def impl_connect_microsoft(ctx) -> ConnectOAuthResult:
-    client_id = await ctx.secrets.get("microsoft_client_id") or os.getenv("MICROSOFT_CLIENT_ID", "")
+    client_id = await ctx.secrets.get("microsoft_client_id")
     if not client_id:
         raise RuntimeError("Microsoft OAuth not configured — enter microsoft_client_id in extension Secrets.")
     url = MS_AUTH_URL + "?" + urlencode({
@@ -79,7 +78,7 @@ async def impl_connect_yahoo(ctx) -> ConnectOAuthResult:
     if yahoo:
         active = next((a for a in yahoo if a.get("is_active")), yahoo[0])
         return ConnectOAuthResult(already_connected=True, email=active.get("email"))
-    yahoo_client_id = await ctx.secrets.get("yahoo_client_id") or os.getenv("YAHOO_CLIENT_ID", "")
+    yahoo_client_id = await ctx.secrets.get("yahoo_client_id")
     if not yahoo_client_id:
         raise RuntimeError("Yahoo OAuth not configured — enter yahoo_client_id in extension Secrets.")
     url = YAHOO_AUTH_URL + "?" + urlencode({
@@ -101,7 +100,7 @@ async def impl_connect_imap(
     ok, err = await asyncio.to_thread(_sync_imap_test, email_addr, password, imap_h, imap_p)
     if not ok:
         raise RuntimeError(f"IMAP failed: {err}")
-    enc_key = await ctx.secrets.get("imap_encryption_key") or os.getenv("IMAP_ENCRYPTION_KEY", "")
+    enc_key = await ctx.secrets.get("imap_encryption_key")
     await ctx.store.create(COLLECTION, {
         "email": email_addr, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p, "smtp_host": smtp_h, "smtp_port": smtp_p,

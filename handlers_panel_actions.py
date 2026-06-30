@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from urllib.parse import urlencode
 
 from app import chat
@@ -116,7 +115,7 @@ async def impl_get_oauth_url(ctx, provider: str) -> OAuthUrlResult:
             "state":         _oauth_state(ctx, "oauth"),
         })
     elif provider == "microsoft":
-        ms_client_id = await ctx.secrets.get("microsoft_client_id") or os.getenv("MICROSOFT_CLIENT_ID", "")
+        ms_client_id = await ctx.secrets.get("microsoft_client_id")
         if not ms_client_id:
             raise RuntimeError("Microsoft OAuth not configured — enter microsoft_client_id in extension Secrets.")
         url = MS_AUTH_URL + "?" + urlencode({
@@ -139,7 +138,7 @@ async def impl_add_imap(ctx, email: str, password: str, imap_host: str = "",
     ok, err = await asyncio.to_thread(_sync_imap_test, email, password, imap_h, imap_p)
     if not ok:
         raise RuntimeError(f"IMAP connection failed: {err}")
-    enc_key = await ctx.secrets.get("imap_encryption_key") or os.getenv("IMAP_ENCRYPTION_KEY", "")
+    enc_key = await ctx.secrets.get("imap_encryption_key")
     await ctx.store.create(COLLECTION, {
         "email": email, "provider": "imap", "is_active": True,
         "imap_host": imap_h, "imap_port": imap_p,
