@@ -4,12 +4,12 @@ from __future__ import annotations
 import logging
 
 from imperal_sdk import ui
-from providers.helpers import _all_accounts
+from providers.helpers import _all_accounts, _is_microsoft_account
 
 log = logging.getLogger(__name__)
 
 PROVIDER_LABELS = {
-    "oauth": "Google", "microsoft": "Microsoft",
+    "oauth": "Google", "google": "Google", "microsoft": "Microsoft",
     "yahoo": "Yahoo",  "imap": "IMAP",
 }
 
@@ -50,7 +50,10 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
         provider  = acc.get("provider", "oauth")
         is_active = acc.get("is_active", False)
         unread    = int(acc.get("unread_count", 0) or 0)
-        subtitle_text = PROVIDER_LABELS.get(provider, "Unknown")
+        if _is_microsoft_account(acc):
+            subtitle_text = "Microsoft"
+        else:
+            subtitle_text = PROVIDER_LABELS.get(provider, "Unknown")
         if is_active:
             subtitle_text = f"✓ Active — {subtitle_text}"
         items.append(ui.ListItem(
