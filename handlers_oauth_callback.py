@@ -32,7 +32,7 @@ def _decode_state(state_raw: str) -> dict:
 
 # ── Webhook — stores raw code for schedule to process ────────────────────────
 
-@ext.webhook("callback", method="GET")
+@ext.webhook("/callback", method="GET")
 async def google_oauth_callback(
     ctx, headers: dict, body: str, query_params: dict
 ) -> dict:
