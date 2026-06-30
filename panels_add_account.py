@@ -29,6 +29,8 @@ def _step_providers() -> ui.UINode:
                   on_click=ui.Call("connect")),
         ui.Button("Connect Microsoft", icon="Mail", variant="outline",
                   on_click=ui.Call("connect_microsoft")),
+        ui.Button("Connect Yahoo", icon="Mail", variant="outline",
+                  on_click=ui.Call("connect_yahoo")),
         ui.Divider(label="or connect manually"),
         ui.Form(
             children=[ui.Input(placeholder="Enter email address", param_name="email")],
