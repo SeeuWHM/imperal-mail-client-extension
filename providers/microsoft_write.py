@@ -110,9 +110,33 @@ class MicrosoftWriteMixin:
             return self.ok(**{"starred" if starred else "unstarred": True, "message_id": message_id})
         return self.err(f"Star failed {resp.status_code}")
 
+    async def _find_folder_id(self, ctx: Context, acc: dict, name: str) -> str | None:
+        """Look up a mail folder ID by display name."""
+        try:
+            acc = await _refresh_token_if_needed(ctx, acc)
+            resp = await ctx.http.get(
+                f"{MS_GRAPH_BASE}/me/mailFolders",
+                headers={"Authorization": f"Bearer {acc['access_token']}"},
+                params={"$select": "id,displayName", "$top": "100"},
+            )
+            if resp.status_code == 200:
+                for folder in resp.json().get("value", []):
+                    if folder.get("displayName", "").lower() == name.lower():
+                        return folder.get("id")
+        except Exception:
+            pass
+        return None
+
     async def move(self, ctx: Context, acc: dict, message_id: str,
                    from_folder: str = "INBOX", to_folder: str = "INBOX") -> dict:
-        dest_id = _MS_DEST_MAP.get(to_folder.lower(), to_folder)
+        dest_id = _MS_DEST_MAP.get(to_folder.lower())
+        if not dest_id:
+            dest_id = await self._find_folder_id(ctx, acc, to_folder)
+            if not dest_id:
+                return self.err(
+                    f"Outlook folder '{to_folder}' not found. "
+                    "Check the exact name or create it first."
+                )
         try:
             resp = await _graph_post(ctx, f"/me/messages/{message_id}/move", acc,
                                      json={"destinationId": dest_id})
@@ -122,6 +146,19 @@ class MicrosoftWriteMixin:
             return self.err(f"Move failed ({resp.status_code}): {resp.text[:200]}")
         except Exception as e:
             return self.err(f"Move failed: {e}")
+
+    async def bulk_apply_label(self, ctx: Context, acc: dict,
+                                message_ids: list, label_name: str) -> dict:
+        """Move multiple messages to a custom Outlook folder — one Graph $batch call per 20."""
+        folder_id = _MS_DEST_MAP.get(label_name.lower()) or await self._find_folder_id(ctx, acc, label_name)
+        if not folder_id:
+            return self.err(f"Outlook folder '{label_name}' not found.")
+        reqs = [{"method": "POST", "url": f"/me/messages/{mid}/move",
+                 "headers": {"Content-Type": "application/json"},
+                 "body": {"destinationId": folder_id}} for mid in message_ids]
+        responses = await self._ms_batch(ctx, acc, reqs)
+        ok = sum(1 for r in responses if r.get("status") in (200, 201))
+        return self.ok(succeeded=ok, total=len(message_ids))
 
     async def purge(self, ctx: Context, acc: dict, message_id: str,
                     from_folder: str = "DeletedItems") -> dict:

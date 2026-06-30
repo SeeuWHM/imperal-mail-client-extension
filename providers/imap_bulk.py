@@ -90,3 +90,16 @@ class ImapBulkMixin:
         if ok:
             return self.ok(succeeded=count, total=len(message_ids))
         return self.err("IMAP bulk purge failed")
+
+    async def bulk_apply_label(self, ctx: Context, acc: dict,
+                                message_ids: list, label_name: str) -> dict:
+        """Move multiple messages to a custom IMAP folder — one UID COPY + STORE + EXPUNGE."""
+        args = await self._imap_args(ctx, acc)
+        ok, count = await asyncio.to_thread(
+            _sync_imap_bulk_move, acc.get("email", ""), args["host"], args["port"],
+            message_ids, [label_name],
+            password=args["password"], access_token=args["access_token"],
+        )
+        if ok:
+            return self.ok(succeeded=count, total=len(message_ids))
+        return self.err(f"IMAP folder '{label_name}' not found or move failed.")
