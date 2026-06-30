@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.8.1",
+  "sdk_version": "5.8.2",
   "app_id": "mail",
   "version": "6.3.0",
   "name": "Mail Client",
@@ -11224,7 +11224,7 @@
   "icon_size_bytes": 1015,
   "webhooks": [
     {
-      "path": "callback",
+      "path": "/callback",
       "method": "GET",
       "secret_header": ""
     }
