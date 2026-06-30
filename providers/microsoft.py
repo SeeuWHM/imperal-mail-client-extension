@@ -289,13 +289,17 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
         }
         date_clause, residual = _split_date_filter(query)
 
-        # No date operators → original full-text $search path (unchanged).
+        # No date operators → KQL $search path.
+        # Graph supports KQL operators: from:X subject:Y in the $search value.
+        # Strip outer quotes from individual operator values to avoid double-quoting:
+        # subject:"WHMCS Order" → subject:WHMCS Order (KQL handles multi-word natively).
         if not date_clause:
+            kql_query = re.sub(r'(\w+:)"([^"]+)"', r'\1\2', query)
             resp = await ctx.http.get(
                 f"{MS_GRAPH_BASE}/me/messages",
                 headers=headers,
                 params={
-                    "$search": f'"{query}"',
+                    "$search": f'"{kql_query}"',
                     "$top": min(max_results, 250),
                     "$count": "true",
                     "$select": "id,subject,from,receivedDateTime,isRead",

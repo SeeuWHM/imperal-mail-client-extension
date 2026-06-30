@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import email as email_lib
 import logging
+import re
 
 from .text_utils import _decode_header
 from .helpers import IMAP_FOLDER_CANDIDATES
@@ -99,16 +100,70 @@ def _sync_imap_read(email_addr: str, host: str, port: int, message_id: str,
     return {}
 
 
+def _gmail_to_imap(query: str) -> str:
+    """Translate a Gmail-style search query to an IMAP SEARCH criteria string.
+
+    Handles compound queries (from:X subject:Y → AND), quoted values, and
+    the {term1 OR term2} OR-block syntax produced by _build_filter_query.
+    Multiple clauses are AND-ed (IMAP implicit AND = space-separated criteria).
+    """
+    import shlex
+
+    query = query.strip()
+    if not query:
+        return "ALL"
+
+    # Handle Gmail OR-block: {from:a OR from:b} → OR FROM "a" FROM "b"
+    if query.startswith("{") and query.endswith("}"):
+        inner = query[1:-1].strip()
+        clauses = [c.strip() for c in re.split(r"\bOR\b", inner, flags=re.IGNORECASE)]
+        imap_clauses = [_gmail_to_imap(c) for c in clauses if c.strip()]
+        if len(imap_clauses) == 1:
+            return imap_clauses[0]
+        if len(imap_clauses) == 2:
+            return f"OR {imap_clauses[0]} {imap_clauses[1]}"
+        # Nest OR pairs: OR A (OR B C) etc.
+        result = imap_clauses[-1]
+        for c in reversed(imap_clauses[:-1]):
+            result = f"OR {c} {result}"
+        return result
+
+    # Tokenize respecting quoted strings (shlex strips surrounding quotes)
+    try:
+        tokens = shlex.split(query)
+    except ValueError:
+        tokens = query.split()
+
+    parts = []
+    for token in tokens:
+        tl = token.lower()
+        if tl in ("and", "or"):
+            continue
+        if tl.startswith("from:"):
+            val = token[5:].strip('"')
+            parts.append(f'FROM "{val}"')
+        elif tl.startswith("to:"):
+            val = token[3:].strip('"')
+            parts.append(f'TO "{val}"')
+        elif tl.startswith("subject:"):
+            val = token[8:].strip('"')
+            parts.append(f'SUBJECT "{val}"')
+        elif tl in ("is:unread", "unread"):
+            parts.append("UNSEEN")
+        elif tl in ("is:read", "read"):
+            parts.append("SEEN")
+        elif tl.startswith(("in:", "newer_than:", "older_than:", "after:", "before:", "has:", "label:")):
+            pass  # skip Gmail-only operators
+        else:
+            val = token.strip('"')
+            if val:
+                parts.append(f'TEXT "{val}"')
+
+    return " ".join(parts) if parts else "ALL"
+
+
 def _sync_imap_search(email_addr: str, host: str, port: int, query: str, max_results: int = 10,
                       *, password: str = "", access_token: str = "") -> list[dict] | None:
-    def _map_query(q: str) -> str:
-        ql = q.strip().lower()
-        if ql.startswith("from:"):    return f'FROM "{q[5:].strip()}"'
-        if ql.startswith("to:"):      return f'TO "{q[3:].strip()}"'
-        if ql.startswith("subject:"): return f'SUBJECT "{q[8:].strip()}"'
-        if ql in ("is:unread", "unread"): return "UNSEEN"
-        if ql in ("is:read",   "read"):   return "SEEN"
-        return f'TEXT "{q.strip()}"'
 
     # Search across INBOX + common Sent/Archive folders for full coverage
     _SEARCH_FOLDERS = [
@@ -119,7 +174,7 @@ def _sync_imap_search(email_addr: str, host: str, port: int, query: str, max_res
 
     try:
         imap    = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
-        imap_q  = _map_query(query)
+        imap_q  = _gmail_to_imap(query)
         all_hits: list[tuple[str, bytes]] = []  # (folder, uid_bytes)
         seen_subjects: set[str] = set()
 
