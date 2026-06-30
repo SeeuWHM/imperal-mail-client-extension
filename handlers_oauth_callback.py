@@ -169,11 +169,19 @@ async def google_oauth_callback(
 
 @ext.schedule("process_google_pending", cron="* * * * *")
 async def process_google_pending(ctx) -> None:
-    """Fallback: process pending Google OAuth records that webhook couldn't write directly."""
-    # Scan users who have a pending record in THEIR OWN store
+    """Process pending Google OAuth records — checks __webhook__ store directly + real users."""
+    # Always check __webhook__'s store directly (list_users may not include it)
+    sources = ["__webhook__"]
     async for uid in ctx.store.list_users(_PENDING):
+        if uid not in sources:
+            sources.append(uid)
+
+    for uid in sources:
         uid_ctx = ctx.as_user(uid)
-        page    = await uid_ctx.store.query(_PENDING, where={"provider": "oauth"})
+        try:
+            page = await uid_ctx.store.query(_PENDING, where={"provider": "oauth"})
+        except Exception:
+            continue
         if not page or not page.data:
             continue
 
