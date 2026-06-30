@@ -113,8 +113,25 @@ class GoogleWriteMixin:
             return self.ok(**{"starred" if starred else "unstarred": True, "message_id": message_id})
         return self.err(f"Star failed {resp.status_code}")
 
+    async def _find_label_id(self, ctx: Context, acc: dict, name: str) -> str | None:
+        """Look up a Gmail label ID by display name (case-insensitive)."""
+        try:
+            acc = await _refresh_token_if_needed(ctx, acc)
+            resp = await ctx.http.get(
+                f"{GMAIL_API}/labels",
+                headers={"Authorization": f"Bearer {acc['access_token']}"},
+            )
+            if resp.status_code == 200:
+                for label in resp.json().get("labels", []):
+                    if label.get("name", "").lower() == name.lower():
+                        return label.get("id")
+        except Exception:
+            pass
+        return None
+
     async def move(self, ctx: Context, acc: dict, message_id: str,
                    from_folder: str = "INBOX", to_folder: str = "INBOX") -> dict:
+        email_addr = acc.get("email", "")
         to = to_folder.lower()
         try:
             if to == "inbox":
@@ -132,12 +149,28 @@ class GoogleWriteMixin:
                 resp = await _api_post(ctx, f"messages/{message_id}/modify", acc,
                                        json={"removeLabelIds": ["INBOX"]})
             else:
-                return self.err(f"Gmail move: unsupported destination '{to_folder}'.")
+                label_id = await self._find_label_id(ctx, acc, to_folder)
+                if not label_id:
+                    return self.err(
+                        f"Gmail label '{to_folder}' not found. "
+                        "Use create_folder() to create it first, or check the exact name."
+                    )
+                resp = await _api_post(ctx, f"messages/{message_id}/modify", acc,
+                                       json={"addLabelIds": [label_id]})
             resp.raise_for_status()
+            await _remove_from_cache(ctx, email_addr, message_id)
             return self.ok(moved=True, message_id=message_id,
                            from_folder=from_folder, to_folder=to_folder)
         except Exception as e:
             return self.err(f"Gmail move error: {e}")
+
+    async def bulk_apply_label(self, ctx: Context, acc: dict,
+                                message_ids: list, label_name: str) -> dict:
+        """Add a Gmail label to N messages in ONE batchModify call."""
+        label_id = await self._find_label_id(ctx, acc, label_name)
+        if not label_id:
+            return self.err(f"Gmail label '{label_name}' not found.")
+        return await self._batch_modify(ctx, acc, message_ids, add_labels=[label_id])
 
     async def purge(self, ctx: Context, acc: dict, message_id: str,
                     from_folder: str = "Trash") -> dict:

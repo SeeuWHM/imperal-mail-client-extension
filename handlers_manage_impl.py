@@ -147,7 +147,8 @@ def _combined_state_filter(operations: list[str]) -> str:
     return ""
 
 
-async def _batch_direct(provider, ctx, acc, ids_list: list, operation: str) -> dict:
+async def _batch_direct(provider, ctx, acc, ids_list: list, operation: str,
+                        to_folder: str = "") -> dict:
     """Call provider batch methods directly, bypassing MAX_BULK_IDS user-facing limit.
     Used internally by impl_mark_all_matching which controls chunking itself.
     """
@@ -159,6 +160,8 @@ async def _batch_direct(provider, ctx, acc, ids_list: list, operation: str) -> d
         return await provider.bulk_archive_messages(ctx, acc, ids_list)
     if operation == "read_and_archive" and hasattr(provider, "bulk_read_and_archive"):
         return await provider.bulk_read_and_archive(ctx, acc, ids_list)
+    if operation == "move" and to_folder and hasattr(provider, "bulk_apply_label"):
+        return await provider.bulk_apply_label(ctx, acc, ids_list, to_folder)
     # Comma-separated multi-op: combine into one batchModify for Gmail
     if "," in operation and hasattr(provider, "_batch_modify"):
         ops = [o.strip() for o in operation.split(",") if o.strip()]
@@ -318,6 +321,12 @@ async def impl_bulk_move(ctx, message_ids: str, from_folder: str, to_folder: str
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected.")
+    # Gmail custom labels: one batchModify call for all IDs
+    if to_folder and hasattr(provider, "bulk_apply_label"):
+        r = await provider.bulk_apply_label(ctx, acc, ids, to_folder)
+        if r.get("RESULT") == "SUCCESS":
+            return _make_bulk_result("move", r.get("succeeded", len(ids)), len(ids))
+    # Fallback: parallel single move (built-in folders or non-Gmail)
     sem = asyncio.Semaphore(_BULK_CONCURRENCY)
     async def _do(mid):
         async with sem:
@@ -409,7 +418,7 @@ async def impl_mark_all_matching(ctx, query: str, operation: str,
             if not ids_list:
                 break
             total_attempted += len(ids_list)
-            result = await _batch_direct(provider, ctx, acc, ids_list, operation)
+            result = await _batch_direct(provider, ctx, acc, ids_list, operation, to_folder=to_folder)
             succeeded = result.get("succeeded", 0) if result.get("RESULT") == "SUCCESS" else 0
             total_succeeded += succeeded
             if succeeded == 0:

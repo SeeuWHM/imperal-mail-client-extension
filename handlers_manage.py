@@ -271,20 +271,41 @@ async def fn_move(ctx, params: MoveUnifiedParams) -> ActionResult:
                    "Apply MULTIPLE operations to the SAME emails in one efficient call. "
                    "Use when combining actions on same set: ['read','archive'], ['unsubscribe','archive','read']. "
                    "Gmail: label ops combined into ONE batchModify. "
-                   "Allowed: 'archive', 'read', 'unread', 'star', 'unstar', 'delete', 'unsubscribe'. "
+                   "Allowed: 'archive', 'read', 'unread', 'star', 'unstar', 'delete', 'unsubscribe', 'move_to_label:LABEL_NAME'. "
+                   "'move_to_label:LABEL_NAME': apply a Gmail label/folder by exact name, e.g. 'move_to_label:Work'. "
                    "'unsubscribe': reads List-Unsubscribe header from most recent matching email and calls it. "
                    "ALL matching: query='from:neil patel'. Single: message_ids='<id>'. "
                    "For single-operation use archive/delete/mark_read/star directly."
                ))
 async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
     allowed = {"archive", "read", "unread", "star", "unstar", "delete", "unsubscribe"}
-    bad = [o for o in params.operations if o not in allowed]
+    move_label_ops = [o for o in params.operations if o.startswith("move_to_label:")]
+    bad = [o for o in params.operations if o not in allowed and not o.startswith("move_to_label:")]
     if bad:
         return ActionResult.error(
-            f"Invalid operation(s): {bad}. Allowed: {sorted(allowed)}", retryable=False
+            f"Invalid operation(s): {bad}. Allowed: {sorted(allowed)} or 'move_to_label:LABEL_NAME'",
+            retryable=False
         )
     if not params.operations:
         return ActionResult.error("operations list is empty.", retryable=False)
+
+    # move_to_label handled separately — maps to bulk_apply_label / impl_bulk_move
+    if move_label_ops:
+        label_name = move_label_ops[0].split(":", 1)[1]
+        try:
+            if params.query:
+                r = await impl_mark_all_matching(ctx, params.query, "move",
+                                                 params.account, to_folder=label_name)
+            else:
+                ids_str = ",".join(_ids(params.message_ids))
+                r = await impl_bulk_move(ctx, ids_str, "INBOX", label_name, params.account)
+            return ActionResult.success(
+                data=build_bulk_mail_op(r),
+                summary=f"Applied label '{label_name}' to {r.succeeded} email(s).",
+                refresh_panels=["inbox"],
+            )
+        except Exception as e:
+            return ActionResult.error(str(e), retryable=False)
 
     # Unsubscribe is handled separately — it's a one-shot HTTP call, not a batch label op.
     unsub_note = ""
