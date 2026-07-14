@@ -7,8 +7,6 @@ from imperal_sdk import Extension
 from imperal_sdk.chat import ChatExtension
 from imperal_sdk.secrets.spec import SecretSpec
 
-from providers.helpers import _all_accounts
-
 log = logging.getLogger("mail")
 
 # ── Extension + ChatExtension ─────────────────────────────────────────────────
@@ -91,8 +89,9 @@ ext.secret(
 
 @ext.health_check
 async def health(ctx) -> dict:
-    accounts = await _all_accounts(ctx)
-    return {"status": "ok", "version": ext.version, "accounts_connected": len(accounts)}
+    # App-level probe, no user context — ctx.store is per-user and raises here
+    # (kernel I-HEALTH-CTX-HONEST, 2026-07-13). Static liveness only.
+    return {"status": "ok", "version": ext.version}
 
 
 @ext.on_install
