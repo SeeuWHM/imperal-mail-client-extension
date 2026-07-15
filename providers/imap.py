@@ -69,16 +69,16 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
     async def _smtp_dispatch(self, acc: dict, args: dict, email_addr: str,
                              to: str, subject: str, body: str,
                              cc: str = "", bcc: str = "",
-                             reply_to_mid: str = "") -> tuple[bool, str, bytes]:
+                             reply_to_mid: str = "", is_html: bool = False) -> tuple[bool, str, bytes]:
         smtp_host = acc.get("smtp_host", "")
         smtp_port = acc.get("smtp_port", 587)
         if acc.get("provider") == "yahoo":
             return await asyncio.to_thread(
                 _sync_smtp_xoauth2_send, email_addr, args["access_token"],
-                smtp_host, smtp_port, to, subject, body, cc, bcc, reply_to_mid)
+                smtp_host, smtp_port, to, subject, body, cc, bcc, reply_to_mid, is_html)
         return await asyncio.to_thread(
             _sync_smtp_send, email_addr, args["password"],
-            smtp_host, smtp_port, to, subject, body, cc, bcc, reply_to_mid)
+            smtp_host, smtp_port, to, subject, body, cc, bcc, reply_to_mid, is_html)
 
     async def _save_sent_async(self, email_addr: str, args: dict, msg_bytes: bytes) -> None:
         """Save sent copy to IMAP Sent folder.
@@ -167,17 +167,18 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
         return self.ok(**data, message_id=message_id)
 
     async def send(self, ctx: Context, acc: dict, to: str, subject: str, body: str,
-                   cc: str = "", bcc: str = "") -> dict:
+                   cc: str = "", bcc: str = "", is_html: bool = False) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
         args = await self._imap_args(ctx, acc)
-        ok, err, msg_bytes = await self._smtp_dispatch(acc, args, email_addr, to, subject, body, cc, bcc)
+        ok, err, msg_bytes = await self._smtp_dispatch(
+            acc, args, email_addr, to, subject, body, cc, bcc, is_html=is_html)
         if not ok: return self.err(f"SMTP error: {err}")
         await self._save_sent_async(email_addr, args, msg_bytes)
         return self.ok(sent=True, to=to, subject=subject, from_=email_addr)
 
     async def reply(self, ctx: Context, acc: dict, message_id: str, body: str,
-                    to: str = "", cc: str = "", bcc: str = "") -> dict:
+                    to: str = "", cc: str = "", bcc: str = "", is_html: bool = False) -> dict:
         email_addr = acc.get("email", "")
         acc  = await self._ensure_token(ctx, acc)
         args = await self._imap_args(ctx, acc)
@@ -194,7 +195,7 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
         reply_to   = to.split(",")[0].strip() if to else orig_from
         reply_subj = orig_subj if orig_subj.lower().startswith("re:") else f"Re: {orig_subj}"
         ok, err, msg_bytes = await self._smtp_dispatch(
-            acc, args, email_addr, reply_to, reply_subj, body, cc, bcc, mid_header)
+            acc, args, email_addr, reply_to, reply_subj, body, cc, bcc, mid_header, is_html)
         if not ok: return self.err(f"SMTP reply error: {err}")
         await self._save_sent_async(email_addr, args, msg_bytes)
         return self.ok(sent=True, to=reply_to, subject=reply_subj,

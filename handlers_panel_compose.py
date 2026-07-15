@@ -34,15 +34,21 @@ async def impl_compose_send(ctx, mode: str = "new", message_id: str = "", to: st
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
     try:
+        # This panel's compose form uses ui.RichEditor for the body (see
+        # panels_compose.py) — its content is ALWAYS an HTML string, never
+        # plain text, so is_html=True unconditionally for these two paths.
+        # (forward's `comment` still goes through the plain-text quoting
+        # path in provider.forward — out of scope here.)
         if mode == "reply" and message_id:
             result = await provider.reply(ctx, acc, message_id=message_id, body=body,
-                                          to=to, cc=cc, bcc=bcc)
+                                          to=to, cc=cc, bcc=bcc, is_html=True)
         elif mode == "forward" and message_id:
             result = await provider.forward(ctx, acc, message_id=message_id, to=to, comment=body)
         else:
             if not subject:
                 raise RuntimeError("Subject is required for new emails.")
-            result = await provider.send(ctx, acc, to=to, subject=subject, body=body, cc=cc, bcc=bcc)
+            result = await provider.send(ctx, acc, to=to, subject=subject, body=body, cc=cc, bcc=bcc,
+                                         is_html=True)
     except RuntimeError:
         raise
     except Exception as e:

@@ -15,15 +15,16 @@ from .helpers import (
 class GoogleWriteMixin:
 
     async def send(self, ctx: Context, acc: dict, to: str, subject: str, body: str,
-                   cc: str = "", bcc: str = "") -> dict:
-        raw  = _build_message(to, subject, body, from_email=acc.get("email", ""), cc=cc, bcc=bcc)
+                   cc: str = "", bcc: str = "", is_html: bool = False) -> dict:
+        raw  = _build_message(to, subject, body, from_email=acc.get("email", ""), cc=cc, bcc=bcc,
+                              is_html=is_html)
         resp = await _api_post(ctx, "messages/send", acc, json={"raw": raw})
         if resp.status_code in (200, 201):
             return self.ok(sent=True, to=to, subject=subject, from_=acc.get("email", ""))
         return self.err(f"Send failed {resp.status_code}: {resp.text[:200]}")
 
     async def reply(self, ctx: Context, acc: dict, message_id: str, body: str,
-                    to: str = "", cc: str = "", bcc: str = "") -> dict:
+                    to: str = "", cc: str = "", bcc: str = "", is_html: bool = False) -> dict:
         email_addr = acc.get("email", "")
         meta = await _api_get(ctx, f"messages/{message_id}", acc, params={
             "format": "metadata", "metadataHeaders": ["From", "Subject", "Message-ID"],
@@ -43,7 +44,7 @@ class GoogleWriteMixin:
         reply_to   = to.split(",")[0].strip() if to else orig_from
         reply_subj = orig_subj if orig_subj.lower().startswith("re:") else f"Re: {orig_subj}"
         raw        = _build_message(reply_to, reply_subj, body, from_email=email_addr,
-                                    cc=cc, bcc=bcc, reply_to_id=mid_header)
+                                    cc=cc, bcc=bcc, reply_to_id=mid_header, is_html=is_html)
         payload: dict = {"raw": raw}
         if thread_id:
             payload["threadId"] = thread_id

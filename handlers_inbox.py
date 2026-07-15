@@ -122,12 +122,13 @@ async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
 @chat.function("send", action_type="write", event="sent",
                effects=["create:email"],
                data_model=SentEmailResult,
-               description="Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Use reply() or forward() when responding to an existing message.")
+               description="Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Pass is_html=true when body is HTML (e.g. content handed off from another extension's rich-text editor) so formatting renders instead of showing raw tags. Use reply() or forward() when responding to an existing message.")
 async def fn_send(ctx, params: SendParams) -> ActionResult:
     """Send a brand-new email."""
     try:
         r = await impl_send(ctx, to=params.to, subject=params.subject, body=params.body,
-                            cc=params.cc, bcc=params.bcc, account=params.account)
+                            cc=params.cc, bcc=params.bcc, account=params.account,
+                            is_html=params.is_html)
         return ActionResult.success(
             data=build_sent_result(r),
             summary=f"Email sent to {params.to}.",
@@ -146,7 +147,8 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
     """Reply to an email."""
     try:
         r = await impl_reply(ctx, body=params.body, message_id=params.message_id,
-                             to=params.to, cc=params.cc, bcc=params.bcc, account=params.account)
+                             to=params.to, cc=params.cc, bcc=params.bcc, account=params.account,
+                             is_html=params.is_html)
         return ActionResult.success(
             data=build_sent_result(r),
             summary=f"Reply sent to {r.to}.",

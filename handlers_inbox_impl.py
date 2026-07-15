@@ -201,7 +201,8 @@ async def impl_get_thread(ctx, thread_id: str, account: str = "") -> ThreadView:
 
 
 async def impl_send(ctx, to: str, subject: str = "", body: str = "",
-                    cc: str = "", bcc: str = "", account: str = "") -> SendResult:
+                    cc: str = "", bcc: str = "", account: str = "",
+                    is_html: bool = False) -> SendResult:
     if not to:
         raise RuntimeError("Recipient (to) is required.")
     if not body:
@@ -212,7 +213,8 @@ async def impl_send(ctx, to: str, subject: str = "", body: str = "",
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = await provider.send(ctx, acc, to=to, subject=subject, body=body, cc=cc, bcc=bcc)
+    result = await provider.send(ctx, acc, to=to, subject=subject, body=body, cc=cc, bcc=bcc,
+                                 is_html=is_html)
     if result.get("RESULT") == "ERROR":
         raise RuntimeError(result.get("error") or "Send failed")
     return SendResult(sent=True, to=to, subject=subject,
@@ -220,7 +222,8 @@ async def impl_send(ctx, to: str, subject: str = "", body: str = "",
 
 
 async def impl_reply(ctx, body: str, message_id: str = "", to: str = "",
-                     cc: str = "", bcc: str = "", account: str = "") -> SendResult:
+                     cc: str = "", bcc: str = "", account: str = "",
+                     is_html: bool = False) -> SendResult:
     if not ctx.user or not ctx.user.imperal_id or ctx.user.imperal_id == "__system__":
         raise RuntimeError("No authenticated user context.")
     if not body:
@@ -239,7 +242,8 @@ async def impl_reply(ctx, body: str, message_id: str = "", to: str = "",
     acc, provider = await _get_acc(ctx, account)
     if not acc:
         raise RuntimeError("No email account connected. Connect one first.")
-    result = await provider.reply(ctx, acc, message_id=mid, body=body, to=to, cc=cc, bcc=bcc)
+    result = await provider.reply(ctx, acc, message_id=mid, body=body, to=to, cc=cc, bcc=bcc,
+                                  is_html=is_html)
     if result.get("RESULT") == "ERROR":
         raise RuntimeError(result.get("error") or "Reply failed")
     return SendResult(sent=True, to=result.get("to") or to,

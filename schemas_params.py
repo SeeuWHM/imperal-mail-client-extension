@@ -60,7 +60,12 @@ class SendParams(BaseModel):
     body: str = Field(
         default="",
         validation_alias=AliasChoices("body", "content", "message", "text"),
-        description="Email body (plain text)",
+        description="Email body — plain text by default, or HTML if is_html=true",
+    )
+    is_html: bool = Field(
+        default=False,
+        description="Set true when body contains HTML markup (e.g. <h2>, <strong>, <ul>) so it "
+                     "renders as rich formatting instead of showing raw tags as plain text.",
     )
     cc: str = Field(default="", description="CC recipients (comma-separated)")
     bcc: str = Field(default="", description="BCC recipients (comma-separated)")
@@ -71,7 +76,11 @@ class ReplyParams(BaseModel):
     body: str = Field(
         default="",
         validation_alias=AliasChoices("body", "content", "message", "text"),
-        description="Reply body text",
+        description="Reply body text — plain text by default, or HTML if is_html=true",
+    )
+    is_html: bool = Field(
+        default=False,
+        description="Set true when body contains HTML markup so it renders as rich formatting.",
     )
     message_id: str = Field(default="", description="Message ID to reply to (omit = last read)")
     to: str = Field(default="", description="Override reply-to address")

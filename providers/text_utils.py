@@ -104,8 +104,9 @@ def _decode_body_with_type(payload: dict) -> tuple[str, str]:
 
 
 def _build_message(to: str, subject: str, body: str, from_email: str = "",
-                   cc: str = "", bcc: str = "", reply_to_id: str = "") -> str:
-    msg = MIMEText(body, "plain", "utf-8")
+                   cc: str = "", bcc: str = "", reply_to_id: str = "",
+                   is_html: bool = False) -> str:
+    msg = MIMEText(body, "html" if is_html else "plain", "utf-8")
     msg["To"]      = to
     msg["Subject"] = subject
     if from_email: msg["From"] = from_email

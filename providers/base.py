@@ -32,11 +32,11 @@ class BaseMailProvider(ABC):
 
     @abstractmethod
     async def send(self, ctx: Context, acc: dict, to: str, subject: str, body: str,
-                   cc: str = "", bcc: str = "") -> dict: ...
+                   cc: str = "", bcc: str = "", is_html: bool = False) -> dict: ...
 
     @abstractmethod
     async def reply(self, ctx: Context, acc: dict, message_id: str, body: str,
-                    to: str = "", cc: str = "", bcc: str = "") -> dict: ...
+                    to: str = "", cc: str = "", bcc: str = "", is_html: bool = False) -> dict: ...
 
     @abstractmethod
     async def forward(self, ctx: Context, acc: dict, message_id: str,

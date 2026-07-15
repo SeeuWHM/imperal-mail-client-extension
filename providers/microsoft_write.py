@@ -31,11 +31,12 @@ def _recips(s: str) -> list[dict]:
 class MicrosoftWriteMixin:
 
     async def send(self, ctx: Context, acc: dict, to: str, subject: str, body: str,
-                   cc: str = "", bcc: str = "") -> dict:
+                   cc: str = "", bcc: str = "", is_html: bool = False) -> dict:
         email_addr = acc.get("email", "")
         payload: dict = {
             "message": {
-                "subject": subject, "body": {"contentType": "Text", "content": body},
+                "subject": subject,
+                "body": {"contentType": "HTML" if is_html else "Text", "content": body},
                 "toRecipients": _recips(to),
             }
         }
@@ -47,9 +48,9 @@ class MicrosoftWriteMixin:
         return self.err(f"Send failed {resp.status_code}: {resp.text[:200]}")
 
     async def reply(self, ctx: Context, acc: dict, message_id: str, body: str,
-                    to: str = "", cc: str = "", bcc: str = "") -> dict:
+                    to: str = "", cc: str = "", bcc: str = "", is_html: bool = False) -> dict:
         email_addr = acc.get("email", "")
-        payload: dict = {"message": {"body": {"contentType": "Text", "content": body}}}
+        payload: dict = {"message": {"body": {"contentType": "HTML" if is_html else "Text", "content": body}}}
         if to:  payload["message"]["toRecipients"]  = _recips(to)
         if cc:  payload["message"]["ccRecipients"]  = _recips(cc)
         if bcc: payload["message"]["bccRecipients"] = _recips(bcc)

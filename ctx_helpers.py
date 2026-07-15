@@ -5,9 +5,6 @@ re-entering the ``app → tools → handlers_* → app`` cycle.
 """
 from __future__ import annotations
 
-import base64
-import json
-
 from imperal_sdk import Context
 
 from providers import get_provider
@@ -16,16 +13,6 @@ from providers.helpers import _active_account
 
 def _user_id(ctx) -> str:
     return ctx.user.imperal_id if hasattr(ctx, "user") and ctx.user else ""
-
-
-def _oauth_state(ctx, provider: str) -> str:
-    """Build base64-encoded OAuth state payload with null-safe user access."""
-    payload = {
-        "user_id": str(ctx.user.imperal_id) if hasattr(ctx, "user") and ctx.user else "",
-        "tenant_id": getattr(ctx.user, "tenant_id", "default") if hasattr(ctx, "user") else "default",
-        "provider": provider,
-    }
-    return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
 
 
 async def _get_acc(ctx: Context, account: str = ""):

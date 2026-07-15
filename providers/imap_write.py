@@ -16,9 +16,9 @@ log = logging.getLogger(__name__)
 
 def _sync_smtp_send(email_addr: str, password: str, smtp_host: str, smtp_port: int,
                     to: str, subject: str, body: str, cc: str = "", bcc: str = "",
-                    reply_to_mid: str = "") -> tuple[bool, str, bytes]:
+                    reply_to_mid: str = "", is_html: bool = False) -> tuple[bool, str, bytes]:
     try:
-        msg            = MIMEText(body, "plain", "utf-8")
+        msg            = MIMEText(body, "html" if is_html else "plain", "utf-8")
         msg["From"]    = email_addr; msg["To"] = to; msg["Subject"] = subject
         if cc:           msg["Cc"] = cc
         if reply_to_mid: msg["In-Reply-To"] = reply_to_mid; msg["References"] = reply_to_mid
@@ -44,10 +44,10 @@ def _sync_smtp_send(email_addr: str, password: str, smtp_host: str, smtp_port: i
 
 def _sync_smtp_xoauth2_send(email_addr: str, access_token: str, smtp_host: str, smtp_port: int,
                              to: str, subject: str, body: str, cc: str = "", bcc: str = "",
-                             reply_to_mid: str = "") -> tuple[bool, str, bytes]:
+                             reply_to_mid: str = "", is_html: bool = False) -> tuple[bool, str, bytes]:
     try:
         auth_str       = _xoauth2_string(email_addr, access_token)
-        msg            = MIMEText(body, "plain", "utf-8")
+        msg            = MIMEText(body, "html" if is_html else "plain", "utf-8")
         msg["From"]    = email_addr; msg["To"] = to; msg["Subject"] = subject
         if cc:           msg["Cc"] = cc
         if reply_to_mid: msg["In-Reply-To"] = reply_to_mid; msg["References"] = reply_to_mid

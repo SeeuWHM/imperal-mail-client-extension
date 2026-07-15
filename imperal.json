@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.1",
+  "sdk_version": "5.9.3",
   "app_id": "mail",
   "version": "6.3.0",
   "name": "Mail Client",
@@ -4155,7 +4155,7 @@
     },
     {
       "name": "send",
-      "description": "Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Use reply() or forward() when responding to an existing message.",
+      "description": "Send a brand-new email. Requires to and body; subject is auto-generated from the first line of body if omitted. Pass is_html=true when body is HTML (e.g. content handed off from another extension's rich-text editor) so formatting renders instead of showing raw tags. Use reply() or forward() when responding to an existing message.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -4177,9 +4177,15 @@
           },
           "body": {
             "default": "",
-            "description": "Email body (plain text)",
+            "description": "Email body — plain text by default, or HTML if is_html=true",
             "title": "Body",
             "type": "string"
+          },
+          "is_html": {
+            "default": false,
+            "description": "Set true when body contains HTML markup (e.g. <h2>, <strong>, <ul>) so it renders as rich formatting instead of showing raw tags as plain text.",
+            "title": "Is Html",
+            "type": "boolean"
           },
           "cc": {
             "default": "",
@@ -4457,9 +4463,15 @@
         "properties": {
           "body": {
             "default": "",
-            "description": "Reply body text",
+            "description": "Reply body text — plain text by default, or HTML if is_html=true",
             "title": "Body",
             "type": "string"
+          },
+          "is_html": {
+            "default": false,
+            "description": "Set true when body contains HTML markup so it renders as rich formatting.",
+            "title": "Is Html",
+            "type": "boolean"
           },
           "message_id": {
             "default": "",
@@ -6502,7 +6514,7 @@
     },
     {
       "name": "apply_actions",
-      "description": "Apply MULTIPLE operations to the SAME emails in one efficient call. Use when combining actions on same set: ['read','archive'], ['unsubscribe','archive','read']. Gmail: label ops combined into ONE batchModify. Allowed: 'archive', 'read', 'unread', 'star', 'unstar', 'delete', 'unsubscribe'. 'unsubscribe': reads List-Unsubscribe header from most recent matching email and calls it. ALL matching: query='from:neil patel'. Single: message_ids='<id>'. For single-operation use archive/delete/mark_read/star directly.",
+      "description": "Apply MULTIPLE operations to the SAME emails in one efficient call. Use when combining actions on same set: ['read','archive'], ['unsubscribe','archive','read']. Gmail: label ops combined into ONE batchModify. Allowed: 'archive', 'read', 'unread', 'star', 'unstar', 'delete', 'unsubscribe', 'move_to_label:LABEL_NAME'. 'move_to_label:LABEL_NAME': apply a Gmail label/folder by exact name, e.g. 'move_to_label:Work'. 'unsubscribe': reads List-Unsubscribe header from most recent matching email and calls it. ALL matching: query='from:neil patel'. Single: message_ids='<id>'. For single-operation use archive/delete/mark_read/star directly.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -11243,6 +11255,7 @@
       "provider": "yahoo",
       "collection": "gmail_accounts",
       "scopes": [
+        "openid",
         "mail-r",
         "mail-w"
       ],
@@ -11316,17 +11329,16 @@
       "env_fallback": "IMPERAL_APPSECRET_MAIL_YAHOO_CLIENT_SECRET"
     },
     {
-      "name": "imap_encryption_key",
-      "description": "Fernet key for encrypting stored IMAP passwords (set to current IMAP_ENCRYPTION_KEY value)",
-      "required": true,
-      "write_mode": "user",
-      "max_bytes": 4096,
-      "scope": "app",
-      "env_fallback": "IMPERAL_APPSECRET_MAIL_IMAP_ENCRYPTION_KEY"
-    },
-    {
       "name": "google_tokens",
       "description": "Google OAuth tokens per connected account — managed automatically by the extension",
+      "required": false,
+      "write_mode": "extension",
+      "max_bytes": 65536,
+      "scope": "user"
+    },
+    {
+      "name": "imap_credentials",
+      "description": "IMAP account passwords — JSON dict keyed by email, managed automatically by the extension",
       "required": false,
       "write_mode": "extension",
       "max_bytes": 65536,
