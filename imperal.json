@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.9",
+  "sdk_version": "5.9.11",
   "app_id": "mail",
   "version": "6.3.0",
   "name": "Mail Client",
@@ -11343,6 +11343,18 @@
       "write_mode": "extension",
       "max_bytes": 65536,
       "scope": "user"
+    }
+  ],
+  "file_sinks": [
+    {
+      "tool": "send",
+      "accepts": [
+        "text/*",
+        "text/html"
+      ],
+      "arg": "body",
+      "arg_kind": "text",
+      "description": "Send an uploaded document's content as a new email"
     }
   ],
   "panels": [

@@ -35,6 +35,21 @@ chat = ChatExtension(
     ),
 )
 
+# File Mage L3 — declares this app as a valid destination when the user has
+# an uploaded file (via the file-reader system ext) and wants it emailed.
+# `arg="body"` maps the file's EXTRACTED TEXT into the existing `body` field
+# (arg_kind="text") — `send`'s own alias handling (body/content/message/text)
+# and is_html detection are unchanged; this is just another way to fill body.
+# Text-only source formats since body expects text/markup, not a structured
+# document — a plain document upload becomes the actual email content.
+ext.file_sink(
+    "send",
+    accepts=["text/*", "text/html"],
+    arg="body",
+    arg_kind="text",
+    description="Send an uploaded document's content as a new email",
+)
+
 # ── Unified platform OAuth — gateway handles code exchange, account storage ──
 
 ext.oauth("google",
