@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.3",
+  "sdk_version": "5.9.9",
   "app_id": "mail",
   "version": "6.3.0",
   "name": "Mail Client",
@@ -11350,37 +11350,55 @@
       "panel_id": "secrets",
       "slot": "overlay",
       "title": "Secrets",
-      "tree": {}
+      "tree": {},
+      "icon": "Key",
+      "refresh": "manual",
+      "center_overlay": false
     },
     {
       "panel_id": "inbox",
       "slot": "left",
       "title": "Mail",
-      "tree": {}
+      "tree": {},
+      "icon": "Mail",
+      "refresh": "on_event:archived,deleted,bulk_archived,bulk_deleted,marked_read,marked_unread,sent,mail.action,account.switched,account.connected,account.disconnected,prefs.updated",
+      "center_overlay": false
     },
     {
       "panel_id": "email_viewer",
       "slot": "center",
       "title": "Email",
-      "tree": {}
+      "tree": {},
+      "icon": "Mail",
+      "refresh": "manual",
+      "center_overlay": true
     },
     {
       "panel_id": "accounts",
       "slot": "right",
       "title": "Mail",
-      "tree": {}
+      "tree": {},
+      "icon": "Users",
+      "refresh": "on_event:account.switched,account.connected,account.disconnected,filter.created,filter.updated,filter.deleted,folder.created,folder.deleted,prefs.updated",
+      "center_overlay": false
     },
     {
       "panel_id": "compose",
       "slot": "center",
       "title": "Compose",
-      "tree": {}
+      "tree": {},
+      "icon": "PenSquare",
+      "refresh": "on_event:account.switched",
+      "center_overlay": true
     },
     {
       "panel_id": "add_account",
       "slot": "overlay",
       "title": "Add Account",
-      "tree": {}
+      "tree": {},
+      "icon": "UserPlus",
+      "refresh": "manual",
+      "center_overlay": true
     }
   ]
 }
