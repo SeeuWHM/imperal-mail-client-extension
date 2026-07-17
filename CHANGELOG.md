@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-18 — SDK 5.9.9 + English-only tool descriptions (no version bump)
+
+- SDK pin bumped: 5.9.3 → 5.9.9 (README badge only — no `pyproject.toml` in this repo).
+- All `@chat.function` descriptions stripped to English-only (was bilingual `'какая-то русская
+  фраза', 'english phrase'` example lists) — workspace-wide policy, all 9 SeeU extensions.
+  Also translated two non-description spots that were doing the same job with raw Russian text
+  instead of an English hint: `schemas_params.py`'s folder-name alias dict (`{"входящие": "INBOX",
+  ...}` → English keys only) and `handlers_cleanup_impl.py`'s unsubscribe-detection keyword list
+  (dropped the `"отписат"` entry). `skeleton.py`'s comment example translated too.
+- No functional/version change — `imperal build`/`imperal validate` re-run clean, 0 new
+  errors/warnings (same 9 pre-existing `V11` missing-docstring warnings as before).
+
 ## [6.2.0] — 2026-06-16 — background_task for query= bulk ops (SDK 5.3.0)
 
 ### Changed
