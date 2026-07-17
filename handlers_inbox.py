@@ -24,7 +24,7 @@ from schemas_sdl_builders import (
 
 @chat.function("inbox", action_type="read",
                data_model=InboxPage,
-               description="PRIMARY function to LIST recent emails (newest first). Use when the user wants to see/check their inbox or asks for recent/latest/new mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns a CAPPED PAGE of message previews (IDs, subjects, senders, dates, read state) — it is NOT the whole folder and carries no folder total; use has_more to page. ROUTING — do NOT answer these from this capped page: (a) COUNT questions ('how many / сколько / total / all / всего') → call count_emails(); (b) emails for a specific DATE or period ('today / this week / since 1 June / за сегодня') → call search() with a Gmail date operator (today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/07); (c) by sender or keyword → call search(). NEVER report the length of this list as a count or total — it is a capped page.")
+               description="PRIMARY function to LIST recent emails (newest first). Use when the user wants to see/check their inbox or asks for recent/latest/new mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns a CAPPED PAGE of message previews (IDs, subjects, senders, dates, read state) — it is NOT the whole folder and carries no folder total; use has_more to page. ROUTING — do NOT answer these from this capped page: (a) COUNT questions ('how many / total / all') → call count_emails(); (b) emails for a specific DATE or period ('today / this week / since 1 June') → call search() with a Gmail date operator (today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/07); (c) by sender or keyword → call search(). NEVER report the length of this list as a count or total — it is a capped page.")
 async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
     """PRIMARY function to list emails."""
     try:
@@ -67,7 +67,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
                    "(3) No bare keyword for sender — that's body search. "
                    "(4) DATES: today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, "
                    "range=after:2026/06/01 before:2026/06/06. "
-                   "COUNTING: do NOT count rows here — call count_emails() for 'how many / сколько'. "
+                   "COUNTING: do NOT count rows here — call count_emails() for 'how many'. "
                    "BULK ACTIONS: do NOT use search() + bulk_delete/archive loop — "
                    "use archive(query=...) / delete(query=...) / apply_actions(query=...) directly. "
                    "OLDEST EVER: oldest_first=true + max_results=1."
@@ -183,8 +183,8 @@ async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
                    "Analyze what's in your inbox — who writes most, which domains send most. "
                    "group_by='sender' (default): top individual senders ranked by count. "
                    "group_by='domain': top sending domains — useful for newsletter/outreach analysis. "
-                   "Use when user asks: 'who emails me most?', 'кто мне больше всего пишет', "
-                   "'top senders', 'which domains spam me', 'покажи топ отправителей'. "
+                   "Use when user asks: 'who emails me most?', "
+                   "'top senders', 'which domains spam me'. "
                    "Default: top 10 over last 90 days."
                ))
 async def fn_inbox_analytics(ctx, params: InboxAnalyticsParams) -> ActionResult:

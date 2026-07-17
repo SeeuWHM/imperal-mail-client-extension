@@ -223,7 +223,7 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
 
 @chat.function("status", action_type="read",
                data_model=AccountsPage,
-               description="List all connected email accounts with their actual email addresses, provider (Google/Microsoft/Yahoo/IMAP), which is active, and unread count. Use when user asks 'what email addresses do I have', 'покажи мои ящики', 'какие имейлы подключены', 'show my accounts'. Returns exact addresses like ignat@webhostmost.com, NOT generic types.")
+               description="List all connected email accounts with their actual email addresses, provider (Google/Microsoft/Yahoo/IMAP), which is active, and unread count. Use when user asks 'what email addresses do I have', 'show my accounts'. Returns exact addresses like ignat@webhostmost.com, NOT generic types.")
 async def fn_status(ctx, params: EmptyParams) -> ActionResult:
     """List all connected email accounts — shows provider (Google/Microsoft/Yahoo/IMAP), which account is active, and curren..."""
     try:

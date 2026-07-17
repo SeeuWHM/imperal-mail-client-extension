@@ -224,7 +224,7 @@ async def impl_count(ctx, folder: str = "", query: str = "",
 
 @chat.function("count_emails", action_type="read",
                data_model=FolderCountsEntity,
-               description="Return the EXACT NUMBER of emails — use for ANY 'how many / сколько' question. CRITICAL: never answer a count by counting the items returned by inbox()/search()/folder() — those are capped display pages, not totals. Pass folder= for a folder/state count: 'all' (whole-mailbox total), 'unread', 'spam', 'archive', 'inbox', 'today', 'sent', 'trash'. OR pass query= for a date/sender count in Gmail syntax: 'newer_than:1d' (today), 'after:2026/06/05 before:2026/06/06' (one specific day), 'from:reddit'. Counts ALL connected accounts unless account= is given. Returns a per-account breakdown plus a 'total' key.")
+               description="Return the EXACT NUMBER of emails — use for ANY 'how many' question. CRITICAL: never answer a count by counting the items returned by inbox()/search()/folder() — those are capped display pages, not totals. Pass folder= for a folder/state count: 'all' (whole-mailbox total), 'unread', 'spam', 'archive', 'inbox', 'today', 'sent', 'trash'. OR pass query= for a date/sender count in Gmail syntax: 'newer_than:1d' (today), 'after:2026/06/05 before:2026/06/06' (one specific day), 'from:reddit'. Counts ALL connected accounts unless account= is given. Returns a per-account breakdown plus a 'total' key.")
 async def fn_count_emails(ctx, params: CountParams) -> ActionResult:
     """Exact email count by folder/state or query, across one or all accounts."""
     try:

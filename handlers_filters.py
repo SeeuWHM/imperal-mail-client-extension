@@ -217,7 +217,7 @@ async def fn_delete_filter(ctx, params: FilterIdParam) -> ActionResult:
 @chat.function("set_folder_prefs", action_type="write", event="prefs.updated",
                effects=["update:mail_prefs"],
                data_model=MailPrefsResult,
-               description="Set which mail folders are shown in the inbox view. WARNING: this REPLACES the entire visible set — it does NOT add to it. When the user asks to ADD a folder (e.g. 'add starred'), you MUST first call get_folder_prefs to read the current visible folders, then pass the existing list PLUS the new one. Always include 'INBOX' unless the user explicitly asks to hide it. Pass an ordered list like ['INBOX','starred','sent']. Pass an empty list to reset to showing ALL folders. TRIGGERS (this is about PANEL VISIBILITY, NOT listing emails — do NOT call inbox()/folder() for these): 'show/display these folders in the panel', 'покажи/отображай папки X и Y в панели', 'добавь starred в мои ящики/в панель', 'hide trash from the panel'.")
+               description="Set which mail folders are shown in the inbox view. WARNING: this REPLACES the entire visible set — it does NOT add to it. When the user asks to ADD a folder (e.g. 'add starred'), you MUST first call get_folder_prefs to read the current visible folders, then pass the existing list PLUS the new one. Always include 'INBOX' unless the user explicitly asks to hide it. Pass an ordered list like ['INBOX','starred','sent']. Pass an empty list to reset to showing ALL folders. TRIGGERS (this is about PANEL VISIBILITY, NOT listing emails — do NOT call inbox()/folder() for these): 'show/display these folders in the panel', 'add starred to my folders/panel', 'hide trash from the panel'.")
 async def fn_set_folder_prefs(ctx, params: SetFolderPrefsParams) -> ActionResult:
     """Set which mail folders are visible in the inbox panel."""
     try:
@@ -278,7 +278,7 @@ async def fn_get_folder_prefs(ctx, params: EmptyParams) -> ActionResult:
                    "List all available mail folders and custom labels, showing which are visible "
                    "or hidden in the panel. Gmail shows 'All Mail' instead of 'Archive' (Gmail has "
                    "no system Archive folder). Custom folders created via create_mail_folder() also "
-                   "appear here. Use when user asks 'what folders do I have', 'какие папки в почте'."
+                   "appear here. Use when user asks 'what folders do I have'."
                ))
 async def fn_list_mail_folders(ctx, params: EmptyParams) -> ActionResult:
     """List available mail folders + custom labels + current visibility preferences."""

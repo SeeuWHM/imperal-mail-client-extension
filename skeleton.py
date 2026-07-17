@@ -7,7 +7,7 @@ The skeleton does:
    ``per_account`` [≤5 {email, total, unread, spam, archive}].
    Counts come from ``provider.get_counts`` / ``provider.get_today_count``
    (normalized across Google / Microsoft / IMAP) — NOT from search, so the
-   brain answers "сколько всего / непрочитано / спам / архив / сегодня" directly.
+   brain answers "how many total / unread / spam / archive / today" directly.
 2. Diff against ``last_message_ids`` to fire ``ctx.notify()`` for new mail.
 3. Write first page of INBOX to ctx.cache so the panel opens instantly (0 extra API calls).
 """

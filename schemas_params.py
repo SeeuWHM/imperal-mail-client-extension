@@ -254,9 +254,6 @@ _FOLDER_CANONICAL = {
     "sent": "sent",   "drafts": "drafts",
     "spam": "spam",   "trash": "trash",
     "starred": "starred", "archive": "archive",
-    # Russian aliases
-    "входящие": "INBOX", "отправленные": "sent", "черновики": "drafts",
-    "спам": "spam", "корзина": "trash", "помеченные": "starred", "архив": "archive",
 }
 
 

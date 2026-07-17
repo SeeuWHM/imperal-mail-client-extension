@@ -12,7 +12,7 @@ _HTML_LINK_RE = re.compile(r'<a[^>]+href=["\']([^"\']{10,})["\'][^>]*>(.*?)</a>'
                             re.IGNORECASE | re.DOTALL)
 _PLAIN_URL_RE = re.compile(r'https?://\S{10,}', re.IGNORECASE)
 _UNSUB_KEYWORDS = frozenset(["unsubscribe", "opt-out", "opt_out", "optout",
-                              "отписат", "manage preferences", "manage subscription"])
+                              "manage preferences", "manage subscription"])
 
 
 def _extract_unsub_links_from_body(body: str) -> list[str]:

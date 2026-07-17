@@ -589,7 +589,7 @@
     },
     {
       "name": "status",
-      "description": "List all connected email accounts with their actual email addresses, provider (Google/Microsoft/Yahoo/IMAP), which is active, and unread count. Use when user asks 'what email addresses do I have', 'покажи мои ящики', 'какие имейлы подключены', 'show my accounts'. Returns exact addresses like ignat@webhostmost.com, NOT generic types.",
+      "description": "List all connected email accounts with their actual email addresses, provider (Google/Microsoft/Yahoo/IMAP), which is active, and unread count. Use when user asks 'what email addresses do I have', 'show my accounts'. Returns exact addresses like ignat@webhostmost.com, NOT generic types.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -1046,7 +1046,7 @@
     },
     {
       "name": "inbox",
-      "description": "PRIMARY function to LIST recent emails (newest first). Use when the user wants to see/check their inbox or asks for recent/latest/new mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns a CAPPED PAGE of message previews (IDs, subjects, senders, dates, read state) — it is NOT the whole folder and carries no folder total; use has_more to page. ROUTING — do NOT answer these from this capped page: (a) COUNT questions ('how many / сколько / total / all / всего') → call count_emails(); (b) emails for a specific DATE or period ('today / this week / since 1 June / за сегодня') → call search() with a Gmail date operator (today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/07); (c) by sender or keyword → call search(). NEVER report the length of this list as a count or total — it is a capped page.",
+      "description": "PRIMARY function to LIST recent emails (newest first). Use when the user wants to see/check their inbox or asks for recent/latest/new mail. Use folder= for non-inbox folders (sent/spam/trash/drafts/starred/archive). Returns a CAPPED PAGE of message previews (IDs, subjects, senders, dates, read state) — it is NOT the whole folder and carries no folder total; use has_more to page. ROUTING — do NOT answer these from this capped page: (a) COUNT questions ('how many / total / all') → call count_emails(); (b) emails for a specific DATE or period ('today / this week / since 1 June') → call search() with a Gmail date operator (today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/07); (c) by sender or keyword → call search(). NEVER report the length of this list as a count or total — it is a capped page.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -2370,7 +2370,7 @@
     },
     {
       "name": "search",
-      "description": "Find and DISPLAY emails — returns a capped preview page for reading. GMAIL QUERY RULES: (1) from: by BRAND NAME — 'from:reddit' not 'from:reddit.com'; 'from:linkedin' not 'from:linkedin.com'. Bare brand catches all subdomains. (2) Full address only when user gives one: from:noreply@company.com. (3) No bare keyword for sender — that's body search. (4) DATES: today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/06. COUNTING: do NOT count rows here — call count_emails() for 'how many / сколько'. BULK ACTIONS: do NOT use search() + bulk_delete/archive loop — use archive(query=...) / delete(query=...) / apply_actions(query=...) directly. OLDEST EVER: oldest_first=true + max_results=1.",
+      "description": "Find and DISPLAY emails — returns a capped preview page for reading. GMAIL QUERY RULES: (1) from: by BRAND NAME — 'from:reddit' not 'from:reddit.com'; 'from:linkedin' not 'from:linkedin.com'. Bare brand catches all subdomains. (2) Full address only when user gives one: from:noreply@company.com. (3) No bare keyword for sender — that's body search. (4) DATES: today=newer_than:1d, week=newer_than:7d, month=newer_than:30d, range=after:2026/06/01 before:2026/06/06. COUNTING: do NOT count rows here — call count_emails() for 'how many'. BULK ACTIONS: do NOT use search() + bulk_delete/archive loop — use archive(query=...) / delete(query=...) / apply_actions(query=...) directly. OLDEST EVER: oldest_first=true + max_results=1.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -5026,7 +5026,7 @@
     },
     {
       "name": "inbox_analytics",
-      "description": "Analyze what's in your inbox — who writes most, which domains send most. group_by='sender' (default): top individual senders ranked by count. group_by='domain': top sending domains — useful for newsletter/outreach analysis. Use when user asks: 'who emails me most?', 'кто мне больше всего пишет', 'top senders', 'which domains spam me', 'покажи топ отправителей'. Default: top 10 over last 90 days.",
+      "description": "Analyze what's in your inbox — who writes most, which domains send most. group_by='sender' (default): top individual senders ranked by count. group_by='domain': top sending domains — useful for newsletter/outreach analysis. Use when user asks: 'who emails me most?', 'top senders', 'which domains spam me'. Default: top 10 over last 90 days.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -8222,7 +8222,7 @@
     },
     {
       "name": "count_emails",
-      "description": "Return the EXACT NUMBER of emails — use for ANY 'how many / сколько' question. CRITICAL: never answer a count by counting the items returned by inbox()/search()/folder() — those are capped display pages, not totals. Pass folder= for a folder/state count: 'all' (whole-mailbox total), 'unread', 'spam', 'archive', 'inbox', 'today', 'sent', 'trash'. OR pass query= for a date/sender count in Gmail syntax: 'newer_than:1d' (today), 'after:2026/06/05 before:2026/06/06' (one specific day), 'from:reddit'. Counts ALL connected accounts unless account= is given. Returns a per-account breakdown plus a 'total' key.",
+      "description": "Return the EXACT NUMBER of emails — use for ANY 'how many' question. CRITICAL: never answer a count by counting the items returned by inbox()/search()/folder() — those are capped display pages, not totals. Pass folder= for a folder/state count: 'all' (whole-mailbox total), 'unread', 'spam', 'archive', 'inbox', 'today', 'sent', 'trash'. OR pass query= for a date/sender count in Gmail syntax: 'newer_than:1d' (today), 'after:2026/06/05 before:2026/06/06' (one specific day), 'from:reddit'. Counts ALL connected accounts unless account= is given. Returns a per-account breakdown plus a 'total' key.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -10524,7 +10524,7 @@
     },
     {
       "name": "set_folder_prefs",
-      "description": "Set which mail folders are shown in the inbox view. WARNING: this REPLACES the entire visible set — it does NOT add to it. When the user asks to ADD a folder (e.g. 'add starred'), you MUST first call get_folder_prefs to read the current visible folders, then pass the existing list PLUS the new one. Always include 'INBOX' unless the user explicitly asks to hide it. Pass an ordered list like ['INBOX','starred','sent']. Pass an empty list to reset to showing ALL folders. TRIGGERS (this is about PANEL VISIBILITY, NOT listing emails — do NOT call inbox()/folder() for these): 'show/display these folders in the panel', 'покажи/отображай папки X и Y в панели', 'добавь starred в мои ящики/в панель', 'hide trash from the panel'.",
+      "description": "Set which mail folders are shown in the inbox view. WARNING: this REPLACES the entire visible set — it does NOT add to it. When the user asks to ADD a folder (e.g. 'add starred'), you MUST first call get_folder_prefs to read the current visible folders, then pass the existing list PLUS the new one. Always include 'INBOX' unless the user explicitly asks to hide it. Pass an ordered list like ['INBOX','starred','sent']. Pass an empty list to reset to showing ALL folders. TRIGGERS (this is about PANEL VISIBILITY, NOT listing emails — do NOT call inbox()/folder() for these): 'show/display these folders in the panel', 'add starred to my folders/panel', 'hide trash from the panel'.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -10797,7 +10797,7 @@
     },
     {
       "name": "list_mail_folders",
-      "description": "List all available mail folders and custom labels, showing which are visible or hidden in the panel. Gmail shows 'All Mail' instead of 'Archive' (Gmail has no system Archive folder). Custom folders created via create_mail_folder() also appear here. Use when user asks 'what folders do I have', 'какие папки в почте'.",
+      "description": "List all available mail folders and custom labels, showing which are visible or hidden in the panel. Gmail shows 'All Mail' instead of 'Archive' (Gmail has no system Archive folder). Custom folders created via create_mail_folder() also appear here. Use when user asks 'what folders do I have'.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
