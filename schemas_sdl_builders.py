@@ -16,11 +16,13 @@ from schemas import (
     AccountsStatus, ConnectOAuthResult, ConnectImapResult,
     AccountSwitched, AccountDisconnected, MailActionResult,
     FolderCountsResult, OAuthUrlResult, ComposeSendResult,
+    AttachmentContent,
 )
 from schemas_sdl import (
     _strip_html, _cref, _crefs, _pdate, _bfmt, _arefs,
     EmailPreview, EmailMessage, InboxPage, SearchPage,
     EmailThread, SentEmailResult, MailOpResult, BulkMailOpResult,
+    AttachmentEntity,
     ContactEntity, ContactPage, ContactOpResult, ContactSyncResult,
     MailAccountEntity, AccountsPage,
     OAuthConnectResult, ImapConnectResult,
@@ -300,4 +302,22 @@ def build_compose_sent(r: ComposeSendResult, to: str = "") -> ComposeSentResult:
     return ComposeSentResult(
         id=r.to or to or "sent", title=f"Sent to {r.to or to}",
         kind="compose_sent", sent=r.sent, mode=r.mode, recipient=r.to or to,
+    )
+
+
+def build_attachment_entity(r: AttachmentContent, attachment_id: str = "") -> AttachmentEntity:
+    """Convert AttachmentContent (from impl_read_attachment) → AttachmentEntity SDL entity."""
+    return AttachmentEntity(
+        id=attachment_id or r.filename or "attachment",
+        title=r.filename or "Attachment",
+        kind="attachment",
+        body=r.text,
+        body_format="plain",
+        mime_type=r.mime_type,
+        size_bytes=r.size_bytes,
+        extraction_status=r.status,
+        truncated=r.truncated,
+        extraction_method=r.extraction_method,
+        status=r.status,
+        description=r.error,
     )

@@ -1,5 +1,62 @@
 # Changelog
 
+## [6.4.0] — 2026-07-18 — `read_attachment`: read the actual content of email attachments
+
+### Added
+- **New `@chat.function read_attachment(message_id, attachment_id, account="")`** — downloads
+  ONE attachment's real bytes from the provider and extracts its TEXT via the shared
+  doc-extractor engine (`https://api.webhostmost.com/doc-extractor`) that File Reader already
+  uses in production — under its OWN storage partition (`source="mail_attachment"`), so a read
+  attachment's text never mixes with File Reader's own uploaded documents for the same user.
+  `read_email()` already reported an attachment's filename/size/mime; it never opened it — this
+  closes that gap for PDF/DOCX/XLSX/PPTX/images (OCR/vision)/plain text/CSV, etc.
+- **`providers/attachments.py`** — new engine client, modeled 1:1 on file-reader's own
+  `providers/extractor.py` (same `ctx.http` platform client, same retry-on-5xx `_send` helper,
+  same `imperal_id()` hard-fail-if-missing scoping). `ingest_and_wait()` polls the engine's async
+  drain loop (~1s cadence) briefly so a first-time read doesn't come back empty; gives up
+  honestly after 8s with a `status="processing"` result rather than stalling the chat turn.
+- **`BaseMailProvider.download_attachment()`** — new abstract-with-default method (returns an
+  honest "not supported" error by default); implemented per provider:
+  - **Gmail** (`google_read.py`) — `GET .../messages/{id}/attachments/{attachmentId}`, decodes
+    Gmail's url-safe base64 (`base64.urlsafe_b64decode`, distinct from ordinary base64).
+  - **Microsoft Graph** (`microsoft.py`) — `GET .../messages/{id}/attachments/{attachmentId}`,
+    rejects non-`fileAttachment` types (item/reference attachments have no bytes to read),
+    decodes ordinary base64 `contentBytes`.
+  - **IMAP** (`imap.py` + `imap_read_message.py`) — IMAP has no native attachment id (unlike
+    Gmail/Graph), so a new `_walk_imap_attachments()` lists real file parts (named, non-multipart)
+    keyed by their stable `msg.walk()` index; `_sync_imap_download_attachment()` re-fetches the
+    message by UID and decodes that same indexed part. `read_email()`'s IMAP path now actually
+    populates `attachments[]` (was hardcoded absent before — IMAP never parsed attachment
+    structure at all).
+- **`AttachmentContent` (schemas.py) / `AttachmentEntity` (schemas_sdl.py)** — new response model
+  + SDL entity (`sdl.Entity` + `sdl.Bodied`), `status` mirrors the engine's own states
+  (`ready`/`processing`/`unsupported`/`error`) so a caller can tell "still indexing, try again
+  shortly" apart from a real failure.
+- **`tests/test_read_attachment.py`** — 27 pytest cases (new `tests/` dir for this extension),
+  fully mocked `ctx.http` (no live credentials needed): engine client (ingest success/empty
+  content rejected/no documents in response, read_text, overview, retry-on-5xx, retry-on-network-
+  exception, hard-fail after repeated 5xx, `ingest_and_wait` cached-hit/polls-until-processed/
+  gives-up-after-deadline/no-document-id), all three providers' `download_attachment` (Gmail
+  success/404/empty-data, Graph success/404/non-file-attachment/empty-contentBytes, IMAP
+  MIME-walk success/invalid-index/no-filename), and `impl_read_attachment` orchestration
+  (unknown attachment id, happy path, still-processing, unsupported/failed extraction).
+
+### Why not `ctx.files`
+Considered wiring to the new kernel-injected `ctx.files` primitive (imperal-sdk 5.9.11+, per the
+File Mage design doc) instead of a bespoke HTTP client. Its exact method contract could not be
+independently confirmed against a live kernel checkout in this session — the design doc says
+`ctx.files.extract(bytes, filename)`, a later delegation ticket says
+`ctx.files.ingest(content, filename, mime_type=...)` — a real discrepancy, not a formatting
+nuance, and this ships to every Mail Client user. Verified the doc-extractor engine's actual
+`/v1/documents` contract directly against its own source over SSH instead, and reused the
+already-proven client pattern from File Reader's `providers/extractor.py`. Revisit once
+`ctx.files`'s contract is confirmed the same way.
+
+### Fixed (housekeeping, same pass)
+- **9 pre-existing `V11` missing-docstring warnings** (`inbox_analytics`, `archive`, `delete`,
+  `mark_read`, `star`, `move`, `apply_actions`, `inbox_cleanup`, `purge`) — one-line docstrings
+  added to each. `imperal validate` now reports **0 errors, 0 warnings** (was 9 warnings).
+
 ## 2026-07-18 — SDK 5.9.9 + English-only tool descriptions (no version bump)
 
 - SDK pin bumped: 5.9.3 → 5.9.9 (README badge only — no `pyproject.toml` in this repo).

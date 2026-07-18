@@ -16,6 +16,7 @@ from .text_utils import _decode_header
 # Re-export message-level operations so imap.py only needs to import from imap_read
 from .imap_read_message import (  # noqa: F401
     _sync_imap_read, _sync_imap_search, _sync_imap_folder,
+    _sync_imap_download_attachment,
 )
 
 log = logging.getLogger(__name__)

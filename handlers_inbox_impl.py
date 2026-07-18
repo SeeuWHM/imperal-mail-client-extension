@@ -9,7 +9,7 @@ from handlers_ui import _email_ui, _inbox_ui, _search_ui
 from providers import get_provider
 from providers.helpers import encode_cursor, decode_cursor, _all_accounts
 from schemas import (
-    EmailBody, InboxPageResult, SearchResult, SendResult, ThreadView,
+    EmailBody, InboxPageResult, SearchResult, SendResult, ThreadView, AttachmentContent,
 )
 
 log = logging.getLogger(__name__)
@@ -339,3 +339,81 @@ async def impl_top_senders(ctx, days: int = 90, limit: int = 10,
         display = email_re.sub("", orig).strip(" ,") or sender_email
         result.append({"sender": display, "email": sender_email, "count": count})
     return result
+
+
+async def impl_read_attachment(ctx, message_id: str, attachment_id: str,
+                               account: str = "") -> AttachmentContent:
+    """Download one email attachment's real bytes and extract its text via
+    the doc-extractor engine (same engine File Reader uses, own partition).
+
+    Two round trips by design: read_email() first to resolve the attachment's
+    filename/mime/size from its own attachments[] listing (the provider
+    download call alone doesn't always carry them — Gmail's attachments.get
+    never does), then download_attachment() for the actual bytes.
+    """
+    if account:
+        acc, provider = await _get_acc(ctx, account)
+        if not acc:
+            raise RuntimeError("Account not found.")
+    else:
+        accounts = await _all_accounts(ctx)
+        if not accounts:
+            raise RuntimeError("No email account connected. Connect one first.")
+        acc = accounts[0]
+        provider = get_provider(acc)
+
+    meta_result = await provider.read_email(ctx, acc, message_id)
+    if meta_result.get("RESULT") == "ERROR":
+        raise RuntimeError(meta_result.get("error") or "Could not open the email.")
+    known = {
+        str(a.get("id")): a for a in (meta_result.get("attachments") or [])
+    }
+    att_meta = known.get(str(attachment_id))
+    if not att_meta:
+        raise RuntimeError(
+            "That attachment id was not found on this email. "
+            "Call read_email() first and use an id from its attachments[] list."
+        )
+
+    dl = await provider.download_attachment(ctx, acc, message_id, attachment_id)
+    if dl.get("RESULT") == "ERROR":
+        raise RuntimeError(dl.get("error") or "Could not download the attachment.")
+    content: bytes = dl["content"]
+    filename = dl.get("filename") or att_meta.get("filename") or "attachment"
+    mime_type = dl.get("mime_type") or att_meta.get("mime_type") or "application/octet-stream"
+
+    from providers import attachments as attachment_engine
+    doc = await attachment_engine.ingest_and_wait(
+        ctx, filename=filename, content=content, mime_type=mime_type,
+    )
+    del content  # raw bytes must not outlive the ingest call
+
+    status = doc.get("status", "")
+    if status == "failed":
+        return AttachmentContent(
+            filename=filename, mime_type=mime_type,
+            size_bytes=doc.get("size_bytes", 0), status="error",
+            error=doc.get("error") or "Could not extract this attachment's content.",
+        )
+    if status == "unsupported":
+        return AttachmentContent(
+            filename=filename, mime_type=mime_type,
+            size_bytes=doc.get("size_bytes", 0), status="unsupported",
+            error="This attachment's file type isn't supported for text extraction.",
+        )
+    if status not in ("processed", "cached"):
+        return AttachmentContent(
+            filename=filename, mime_type=mime_type,
+            size_bytes=doc.get("size_bytes", 0), status="processing",
+            error="Still extracting this attachment's text — try again in a few seconds.",
+        )
+
+    document_id = doc.get("document_id")
+    text_data = await attachment_engine.read_text(ctx, document_id) if document_id else {}
+    return AttachmentContent(
+        filename=filename, mime_type=mime_type,
+        size_bytes=doc.get("size_bytes", 0), status="ready",
+        text=text_data.get("text", ""),
+        truncated=bool(text_data.get("truncated")),
+        extraction_method=doc.get("extraction_method"),
+    )

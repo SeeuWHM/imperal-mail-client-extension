@@ -19,6 +19,7 @@ from .imap_read import (
     _sync_imap_inbox, _sync_imap_fetch_page, _sync_imap_unread_count,
     _sync_imap_folder_stats, _sync_imap_today_count,
     _sync_imap_read, _sync_imap_search, _sync_imap_folder,
+    _sync_imap_download_attachment,
 )
 from .imap_write import (
     _sync_smtp_send, _sync_smtp_xoauth2_send, _save_to_imap_sent,
@@ -165,6 +166,24 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
                               data.get("message_id_header", ""), "", account=email_addr)
         await _update_read_in_cache(ctx, email_addr, message_id, is_read=True)
         return self.ok(**data, message_id=message_id)
+
+    async def download_attachment(self, ctx: Context, acc: dict, message_id: str,
+                                  attachment_id: str) -> dict:
+        """IMAP: re-fetch the message by UID and pull the same part_index
+        _walk_imap_attachments assigned in read_email's attachments[].id."""
+        email_addr = acc.get("email", "")
+        acc  = await self._ensure_token(ctx, acc)
+        args = await self._imap_args(ctx, acc)
+        try:
+            data = await asyncio.to_thread(
+                _sync_imap_download_attachment, email_addr, args["host"], args["port"],
+                message_id, attachment_id,
+                password=args["password"], access_token=args["access_token"])
+        except Exception as e:
+            return self.err(f"IMAP error: {e}")
+        if data.get("RESULT") != "SUCCESS":
+            return self.err(data.get("error", "Could not read attachment."))
+        return self.ok(content=data["content"], filename=data["filename"], mime_type=data["mime_type"])
 
     async def send(self, ctx: Context, acc: dict, to: str, subject: str, body: str,
                    cc: str = "", bcc: str = "", is_html: bool = False) -> dict:

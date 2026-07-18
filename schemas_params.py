@@ -41,6 +41,12 @@ class MessageIdParams(BaseModel):
     account: str = Field(default="", description="Account email or ID")
 
 
+class ReadAttachmentParams(BaseModel):
+    message_id: str = Field(description="Email message ID (from inbox()/search()/read_email())")
+    attachment_id: str = Field(description="Attachment id, exactly as returned in read_email()'s attachments[].id")
+    account: str = Field(default="", description="Account email or ID")
+
+
 class SearchParams(BaseModel):
     query: str = Field(description="Search query. Gmail syntax: from:x@y.com, subject:keyword, after:2024/01/01, before:2025/01/01, label:name. Free-text for Outlook/IMAP.")
     max_results: int = Field(default=50, description="Max results to fetch (1-200). Use 200 when counting all emails from a sender or doing bulk operations. Default 50 is enough for showing recent results.")

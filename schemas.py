@@ -118,6 +118,22 @@ class EmailBody(BaseModel):
 
     model_config = {"populate_by_name": True}
 
+class AttachmentContent(BaseModel):
+    """read_attachment — the extracted TEXT of one email attachment.
+
+    status mirrors the doc-extractor engine's own states so a caller can
+    tell "still indexing, try again shortly" apart from a real failure.
+    """
+
+    filename: str = ""
+    mime_type: str = ""
+    size_bytes: int = 0
+    status: str = "ready"        # ready | processing | unsupported | error
+    text: Optional[str] = None
+    truncated: bool = False
+    extraction_method: Optional[str] = None
+    error: Optional[str] = None
+
 class ThreadView(BaseModel):
     """get_thread — full conversation view for a message thread."""
 

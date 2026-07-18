@@ -60,6 +60,7 @@ def _single_to_bulk(ok: bool, operation: str) -> BulkOperationResult:
                    "Provide message_ids OR query, not both."
                ))
 async def fn_archive(ctx, params: ArchiveParams) -> ActionResult:
+    """Archive one or more emails (single or bulk via message_ids)."""
     try:
         if params.message_ids:
             ids = _ids(params.message_ids)
@@ -104,6 +105,7 @@ async def fn_archive(ctx, params: ArchiveParams) -> ActionResult:
                    "Use purge() for permanent deletion. Provide message_ids OR query."
                ))
 async def fn_delete(ctx, params: DeleteParams) -> ActionResult:
+    """Move one or more emails to Trash (recoverable; single or bulk)."""
     try:
         if params.message_ids:
             ids = _ids(params.message_ids)
@@ -148,6 +150,7 @@ async def fn_delete(ctx, params: DeleteParams) -> ActionResult:
                    "Provide message_ids OR query."
                ))
 async def fn_mark_read(ctx, params: MarkReadParams) -> ActionResult:
+    """Mark one or more emails read or unread (single or bulk)."""
     op = "read" if params.read else "unread"
     label = "read" if params.read else "unread"
     try:
@@ -198,6 +201,7 @@ async def fn_mark_read(ctx, params: MarkReadParams) -> ActionResult:
                    "Provide message_ids OR query."
                ))
 async def fn_star(ctx, params: StarUnifiedParams) -> ActionResult:
+    """Star or unstar one or more emails (single or bulk)."""
     op = "star" if params.starred else "unstar"
     label = "Starred" if params.starred else "Unstarred"
     try:
@@ -236,6 +240,7 @@ async def fn_star(ctx, params: StarUnifiedParams) -> ActionResult:
                    "Provide message_ids OR query."
                ))
 async def fn_move(ctx, params: MoveUnifiedParams) -> ActionResult:
+    """Move one or more emails to a target folder (single or bulk)."""
     try:
         if params.message_ids:
             ids = _ids(params.message_ids)
@@ -278,6 +283,7 @@ async def fn_move(ctx, params: MoveUnifiedParams) -> ActionResult:
                    "For single-operation use archive/delete/mark_read/star directly."
                ))
 async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
+    """Apply multiple operations (archive/read/star/delete/unsubscribe/move) to the same set of emails in one call."""
     allowed = {"archive", "read", "unread", "star", "unstar", "delete", "unsubscribe"}
     move_label_ops = [o for o in params.operations if o.startswith("move_to_label:")]
     bad = [o for o in params.operations if o not in allowed and not o.startswith("move_to_label:")]
@@ -390,6 +396,7 @@ async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
                    "'unsubscribe' (find List-Unsubscribe header and call it)."
                ))
 async def fn_inbox_cleanup(ctx, params: InboxCleanupParams) -> ActionResult:
+    """Bulk-clean the inbox by category or sender (unsubscribe/archive/delete), no exact query needed."""
     try:
         if params.operation == "unsubscribe":
             from handlers_cleanup_impl import impl_unsubscribe_from_query, _build_cleanup_query
@@ -451,6 +458,7 @@ async def fn_inbox_cleanup(ctx, params: InboxCleanupParams) -> ActionResult:
                    "Provide message_ids OR query."
                ))
 async def fn_purge(ctx, params: PurgeUnifiedParams) -> ActionResult:
+    """Permanently delete one or more emails — cannot be recovered (single or bulk)."""
     try:
         if params.message_ids:
             ids = _ids(params.message_ids)

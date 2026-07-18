@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.11",
   "app_id": "mail",
-  "version": "6.3.0",
+  "version": "6.4.0",
   "name": "Mail Client",
   "description": "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. Inbox, send, reply, forward, search, archive, manage emails, contacts, custom folders/labels. Gmail batchModify for instant bulk operations.",
   "icon": "mail.svg",
@@ -2359,6 +2359,235 @@
           "title"
         ],
         "title": "EmailMessage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_mail_client_chat"
+    },
+    {
+      "name": "read_attachment",
+      "description": "Read the actual TEXT CONTENT of one attachment on an email you already received (PDF/DOCX/XLSX/PPTX/image/txt/csv) — not just its filename/size. ALWAYS call read_email() FIRST to get the attachment's id from its attachments[] list, then pass that id here. Extraction runs in a shared engine and may take a few seconds for a first-time read; if status comes back 'processing', call again shortly. Large attachments are returned truncated (see truncated=true).",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "message_id": {
+            "description": "Email message ID (from inbox()/search()/read_email())",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "attachment_id": {
+            "description": "Attachment id, exactly as returned in read_email()'s attachments[].id",
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "account": {
+            "default": "",
+            "description": "Account email or ID",
+            "title": "Account",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id",
+          "attachment_id"
+        ],
+        "title": "ReadAttachmentParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One attachment's extracted text — returned by read_attachment().",
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Body",
+            "x-sdl-role": "content.body"
+          },
+          "body_format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "md",
+                  "html",
+                  "plain",
+                  "rich"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Body Format",
+            "x-sdl-role": "content.body_format"
+          },
+          "raw_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Raw Body",
+            "x-sdl-role": "content.raw_body"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "attachment",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "mime_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mime Type",
+            "x-sdl-role": "mail.attachment_mime"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Size Bytes",
+            "x-sdl-role": "mail.attachment_size"
+          },
+          "extraction_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Extraction Status",
+            "x-sdl-role": "mail.extraction_status"
+          },
+          "truncated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Truncated",
+            "x-sdl-role": "mail.truncated"
+          },
+          "extraction_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Extraction Method",
+            "x-sdl-role": "mail.extraction_method"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "AttachmentEntity",
         "type": "object",
         "x-sdl": "entity"
       },

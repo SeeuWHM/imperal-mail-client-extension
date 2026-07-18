@@ -279,6 +279,30 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
         hdrs = {h["name"].lower(): h["value"] for h in hdrs_list}
         return hdrs.get("list-unsubscribe", ""), hdrs.get("list-unsubscribe-post", "")
 
+    async def download_attachment(self, ctx: Context, acc: dict, message_id: str,
+                                  attachment_id: str) -> dict:
+        """Graph: GET .../messages/{id}/attachments/{attachmentId} on a
+        fileAttachment returns contentBytes as ORDINARY base64 (RFC 4648 §4)
+        — distinct from Gmail's url-safe variant. name/contentType come back
+        in the same payload so no separate read_email round-trip is needed."""
+        import base64
+        resp = await _graph_get(ctx, f"/me/messages/{message_id}/attachments/{attachment_id}", acc)
+        if resp.status_code == 404:
+            return self.err("Attachment not found — it may belong to a different message or account.")
+        resp.raise_for_status()
+        att = resp.json()
+        if att.get("@odata.type") != "#microsoft.graph.fileAttachment":
+            return self.err("Only file attachments can be read (not item/reference attachments).")
+        content_b64 = att.get("contentBytes", "")
+        if not content_b64:
+            return self.err("Attachment has no content.")
+        try:
+            content = base64.b64decode(content_b64)
+        except Exception as e:
+            return self.err(f"Could not decode attachment content: {e}")
+        return self.ok(content=content, filename=att.get("name", ""),
+                       mime_type=att.get("contentType", "application/octet-stream"))
+
     async def search(self, ctx: Context, acc: dict, query: str, max_results: int = 10) -> dict:
         email_addr = acc.get("email", "")
         acc = await _refresh_token_if_needed(ctx, acc)

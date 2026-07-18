@@ -53,6 +53,40 @@ def _parse_imap_body(msg) -> tuple[str, str]:
     return body, body_type
 
 
+def _walk_imap_attachments(msg) -> list[dict]:
+    """List real file attachments (Content-Disposition: attachment, or an
+    inline part with a filename) as {id, filename, size_kb, mime_type}.
+
+    IMAP has no native attachment id (unlike Gmail's attachmentId / Graph's
+    attachment resource id) — the part's walk() index is used instead. It is
+    stable for a fixed UID: the message's MIME structure never changes once
+    delivered, so re-walking the same message on a later fetch always
+    assigns the same index to the same part.
+    """
+    if not msg.is_multipart():
+        return []
+    attachments = []
+    for idx, part in enumerate(msg.walk()):
+        filename = part.get_filename()
+        disposition = str(part.get("Content-Disposition") or "")
+        if not filename:
+            continue
+        if part.get_content_maintype() == "multipart":
+            continue
+        # A named part is a real attachment whether Content-Disposition says
+        # "attachment" or "inline" (inline images/PDFs still have real bytes
+        # worth reading) — only bodies (no filename at all) are excluded above.
+        payload = part.get_payload(decode=True)
+        size = len(payload) if payload else 0
+        attachments.append({
+            "id": str(idx),
+            "filename": _decode_header(filename),
+            "size_kb": round(size / 1024, 1),
+            "mime_type": part.get_content_type() or "application/octet-stream",
+        })
+    return attachments
+
+
 def _sync_imap_read(email_addr: str, host: str, port: int, message_id: str,
                     *, password: str = "", access_token: str = "") -> dict:
     """Fetch and parse a single message by UID, searching across all common folders."""
@@ -83,7 +117,8 @@ def _sync_imap_read(email_addr: str, host: str, port: int, message_id: str,
                 pass
             imap.logout()
             body, body_type = _parse_imap_body(msg)
-            return {
+            attachments = _walk_imap_attachments(msg)
+            result = {
                 "subject":           _decode_header(msg.get("Subject", "(no subject)")),
                 "from":              _decode_header(msg.get("From", "unknown")),
                 "to":                _decode_header(msg.get("To", "")),
@@ -94,6 +129,9 @@ def _sync_imap_read(email_addr: str, host: str, port: int, message_id: str,
                 "message_id_header": msg.get("Message-ID", ""),
                 "replied":           replied,
             }
+            if attachments:
+                result["attachments"] = attachments
+            return result
         except Exception:
             continue
     imap.logout()
@@ -263,3 +301,55 @@ def _sync_imap_folder(email_addr: str, host: str, port: int, folder_name: str,
     except Exception as e:
         log.warning(f"IMAP folder browse failed: {e}")
         return None
+
+
+def _sync_imap_download_attachment(email_addr: str, host: str, port: int, message_id: str,
+                                   part_index: str, *, password: str = "",
+                                   access_token: str = "") -> dict:
+    """Re-fetch the full RFC822 message by UID, walk() to the same part_index
+    _walk_imap_attachments assigned, and return its decoded bytes.
+
+    Re-fetches (rather than caching from read_email) because IMAP connections
+    are short-lived per-call here (see _sync_imap_read) — simplest correct
+    approach, same one-round-trip-per-operation shape as every other IMAP
+    function in this module.
+    """
+    imap = _imap_connect_auth(email_addr, host, port, password=password, access_token=access_token)
+    uid_bytes = message_id.encode()
+    try:
+        idx = int(part_index)
+    except ValueError:
+        imap.logout()
+        return {"RESULT": "ERROR", "error": "Invalid attachment id."}
+    for folder in _IMAP_READ_FOLDER_ORDER:
+        try:
+            r, _ = imap.select(f'"{folder}"', readonly=True)
+            if r != "OK":
+                continue
+            _, msg_data = imap.uid("FETCH", uid_bytes, "(RFC822)")
+            if not msg_data or not msg_data[0]:
+                continue
+            raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
+            if not raw:
+                continue
+            msg = email_lib.message_from_bytes(raw)
+            imap.logout()
+            parts = list(msg.walk())
+            if idx < 0 or idx >= len(parts):
+                return {"RESULT": "ERROR", "error": "Attachment not found — the message may have changed."}
+            part = parts[idx]
+            filename = part.get_filename()
+            if not filename:
+                return {"RESULT": "ERROR", "error": "That part is not a real attachment."}
+            payload = part.get_payload(decode=True)
+            if not payload:
+                return {"RESULT": "ERROR", "error": "Attachment has no content."}
+            return {
+                "RESULT": "SUCCESS", "content": payload,
+                "filename": _decode_header(filename),
+                "mime_type": part.get_content_type() or "application/octet-stream",
+            }
+        except Exception:
+            continue
+    imap.logout()
+    return {"RESULT": "ERROR", "error": "Message not found in this account."}

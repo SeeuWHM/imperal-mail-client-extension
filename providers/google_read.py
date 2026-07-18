@@ -210,6 +210,28 @@ class GoogleReadMixin:
             result["attachments"] = attachments
         return self.ok(**result)
 
+    async def download_attachment(self, ctx: Context, acc: dict, message_id: str,
+                                  attachment_id: str) -> dict:
+        """Gmail: GET .../messages/{id}/attachments/{attachmentId} -> {size, data}
+        where data is url-safe base64 (RFC 4648 §5) — Gmail's own encoding for
+        attachment bodies, distinct from the base64 used elsewhere in the API.
+        Filename/mime aren't in this response — read_email's own attachment
+        listing (_walk_attachments) already has both, so callers pass them
+        through from there."""
+        import base64
+        resp = await _api_get(ctx, f"messages/{message_id}/attachments/{attachment_id}", acc)
+        if resp.status_code == 404:
+            return self.err("Attachment not found — it may belong to a different message or account.")
+        resp.raise_for_status()
+        data_b64url = resp.json().get("data", "")
+        if not data_b64url:
+            return self.err("Attachment has no content.")
+        try:
+            content = base64.urlsafe_b64decode(data_b64url + "=" * (-len(data_b64url) % 4))
+        except Exception as e:
+            return self.err(f"Could not decode attachment content: {e}")
+        return self.ok(content=content)
+
     async def search_ids_only(self, ctx: Context, acc: dict, query: str,
                               max_results: int = 1000) -> list[str]:
         """Return message IDs for a query WITHOUT metadata fetch.

@@ -112,6 +112,17 @@ class BaseMailProvider(ABC):
         Empty strings if not found. Override per provider."""
         return "", ""
 
+    async def download_attachment(self, ctx: Context, acc: dict, message_id: str,
+                                  attachment_id: str) -> dict:
+        """Download ONE attachment's raw bytes + filename + mime_type.
+
+        Returns {"RESULT": "SUCCESS", "content": bytes, "filename": str,
+        "mime_type": str} or an err() dict. Default: not implemented — a
+        provider without real attachment-byte access (none currently) falls
+        back to this honest error instead of silently returning nothing.
+        """
+        return self.err("Reading attachment content is not supported for this account type.")
+
     @staticmethod
     def ok(**kwargs) -> dict:
         return {"RESULT": "SUCCESS", **kwargs}

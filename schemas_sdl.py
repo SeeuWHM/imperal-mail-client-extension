@@ -168,6 +168,16 @@ class BulkMailOpResult(sdl.Entity):
     total: int | None = sdl_field(role="mail.total")
     errors: list[str] | None = sdl_field(role="mail.errors")
 
+class AttachmentEntity(sdl.Entity, sdl.Bodied):
+    """One attachment's extracted text — returned by read_attachment()."""
+
+    kind: str = "attachment"
+    mime_type: str | None = sdl_field(role="mail.attachment_mime")
+    size_bytes: int | None = sdl_field(role="mail.attachment_size")
+    extraction_status: str | None = sdl_field(role="mail.extraction_status")
+    truncated: bool | None = sdl_field(role="mail.truncated")
+    extraction_method: str | None = sdl_field(role="mail.extraction_method")
+
 # ── Contact entities ───────────────────────────────────────────────────────────
 
 class ContactEntity(sdl.Entity, sdl.ContactPoints):

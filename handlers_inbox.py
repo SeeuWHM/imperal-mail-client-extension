@@ -9,16 +9,18 @@ from pydantic import BaseModel, Field as PField
 from handlers_inbox_impl import (
     impl_inbox, impl_read_email, impl_search, impl_folder,
     impl_get_thread, impl_send, impl_reply, impl_forward,
+    impl_read_attachment,
 )
 from handlers_cleanup_impl import impl_inbox_analytics
 from schemas import InboxParams, MessageIdParams, SearchParams, ThreadParams
 from schemas import SendParams, ReplyParams, ForwardParams
-from schemas_params import InboxAnalyticsParams
+from schemas_params import InboxAnalyticsParams, ReadAttachmentParams
 from schemas_sdl_builders import (
     EmailMessage, InboxPage, SearchPage,
     EmailThread, SentEmailResult,
     build_email_message, build_inbox_page, build_search_page,
     build_email_thread, build_sent_result,
+    AttachmentEntity, build_attachment_entity,
 )
 
 
@@ -52,6 +54,29 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
             data=build_email_message(r, account=params.account),
             summary=f"Email: {subj}",
             ui=_email_ui(r),
+        )
+    except Exception as e:
+        return ActionResult.error(str(e), retryable=True)
+
+
+@chat.function("read_attachment", action_type="read",
+               data_model=AttachmentEntity,
+               description="Read the actual TEXT CONTENT of one attachment on an email you already received (PDF/DOCX/XLSX/PPTX/image/txt/csv) — not just its filename/size. ALWAYS call read_email() FIRST to get the attachment's id from its attachments[] list, then pass that id here. Extraction runs in a shared engine and may take a few seconds for a first-time read; if status comes back 'processing', call again shortly. Large attachments are returned truncated (see truncated=true).")
+async def fn_read_attachment(ctx, params: ReadAttachmentParams) -> ActionResult:
+    """Read the extracted text of one email attachment."""
+    try:
+        r = await impl_read_attachment(ctx, message_id=params.message_id,
+                                       attachment_id=params.attachment_id,
+                                       account=params.account)
+        if r.status == "processing":
+            summary = f"{r.filename}: still extracting text, try again in a few seconds."
+        elif r.status in ("error", "unsupported"):
+            summary = f"{r.filename}: {r.error or 'could not extract text.'}"
+        else:
+            summary = f"{r.filename}: extracted {len(r.text or '')} chars."
+        return ActionResult.success(
+            data=build_attachment_entity(r, attachment_id=params.attachment_id),
+            summary=summary,
         )
     except Exception as e:
         return ActionResult.error(str(e), retryable=True)
@@ -188,6 +213,7 @@ async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
                    "Default: top 10 over last 90 days."
                ))
 async def fn_inbox_analytics(ctx, params: InboxAnalyticsParams) -> ActionResult:
+    """Analyze inbox composition — top senders/domains by volume over a period."""
     try:
         senders = await impl_inbox_analytics(
             ctx,
