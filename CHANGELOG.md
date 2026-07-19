@@ -1,5 +1,39 @@
 # Changelog
 
+## [6.5.0] — 2026-07-19 — Fix: skeleton was re-notifying old mail as "new" (duplicate alerts)
+
+### Fixed
+- **`mail_inbox_summary` skeleton — duplicate new-mail notifications.** Live evidence: the
+  same subject re-announced up to 16x over a 28h window, some byte-identical texts firing
+  5x with gaps as tight as 482s. Root cause: `last_message_ids` was a SNAPSHOT — REPLACED
+  every refresh with just the current INBOX page-1 window (`INBOX_FETCH_SIZE=25` ids)
+  instead of being unioned with what came before. Any message that fell off that 25-id
+  window (page jitter, a burst of >25 new arrivals in one tick, or a `ctx.store.update`
+  write silently swallowed by a bare `except: pass`) got re-classified "new" the next time
+  it resurfaced in page 1, and `ctx.notify` re-fired the identical text.
+- **Fix — three parts:**
+  1. The seen-id set is now MONOTONIC: `curr_ids` is UNIONED into the stored set (keyed by
+     id → last-seen timestamp, capped at the most recent 500) instead of replacing it. An
+     id ever seen is never forgotten and never re-announced. Old bare-list-shaped stored
+     data (`last_message_ids: [...]`) is transparently migrated on read.
+  2. `ctx.store.update` failures are no longer swallowed silently — on a failed persist,
+     notify is SKIPPED for that tick (a watermark we know didn't make it to storage must
+     never be allowed to fire notifications; it will correctly retry next tick instead).
+  3. Belt-and-suspenders: a persisted `last_notified_date` watermark additionally gates
+     notify — a candidate whose own date isn't after the watermark never fires, even if
+     its id looks "new" (defense in depth against any future id-diff edge case).
+- Audited the sibling snapshot-counter pattern in `newsletter-writer-extension` /
+  `article-writer-extension` skeletons (`_load_review_count`/`_save_review_count`) — that
+  pattern counts distinct-status totals rather than diffing an id window, so it does not
+  reproduce this bug; left unchanged.
+- **Upgraded to imperal-sdk 5.9.12** (from 5.9.11) — this release replaces the per-call
+  `httpx.AsyncClient()` in `store`/`notify`/`skeleton`/`secrets`/`cache`/`billing` clients
+  with one shared keep-alive connection pool per process, directly reducing the class of
+  transient write failures (timeouts under load) that could produce the stale watermark
+  this ticket's root cause depended on.
+- New `tests/test_skeleton.py` (21 tests) — full coverage of the monotonic merge, the
+  legacy-shape migration, the failed-write skip, and the date-gate.
+
 ## [6.4.0] — 2026-07-18 — `read_attachment`: read the actual content of email attachments
 
 ### Added
