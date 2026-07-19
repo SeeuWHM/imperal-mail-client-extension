@@ -151,7 +151,11 @@ imperal-mail-client-extension/
 | `MICROSOFT_REDIRECT_URI` | Microsoft OAuth callback URL |
 | `YAHOO_CLIENT_ID` | Yahoo OAuth2 client ID (pending approval) |
 | `YAHOO_CLIENT_SECRET` | Yahoo OAuth2 client secret |
-| `IMAP_ENCRYPTION_KEY` | Fernet key for IMAP password encryption |
+
+IMAP passwords and OAuth tokens are stored via the platform's EXT-SECRETS-V1
+(`ctx.secrets`, HashiCorp Vault transit engine) — no manual encryption key to
+configure; this replaces an older Fernet-based `IMAP_ENCRYPTION_KEY` scheme
+that is no longer used by this extension.
 
 `read_attachment` uses the shared doc-extractor engine already deployed for
 File Reader (`https://api.webhostmost.com/doc-extractor`) — no separate
