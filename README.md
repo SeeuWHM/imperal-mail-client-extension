@@ -1,7 +1,7 @@
 # imperal-mail-client-extension
 
-[![Imperal SDK](https://img.shields.io/badge/imperal--sdk-5.9.11-blue)](https://pypi.org/project/imperal-sdk/)
-[![Version](https://img.shields.io/badge/version-6.4.0-green)](https://github.com/SeeuWHM/imperal-mail-client-extension/releases)
+[![Imperal SDK](https://img.shields.io/badge/imperal--sdk-5.9.12-blue)](https://pypi.org/project/imperal-sdk/)
+[![Version](https://img.shields.io/badge/version-6.5.0-green)](https://github.com/SeeuWHM/imperal-mail-client-extension/releases)
 [![License](https://img.shields.io/badge/license-LGPL--2.1-orange)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Imperal%20Cloud-purple)](https://panel.imperal.io)
 
