@@ -61,3 +61,18 @@ import panels_accounts            # noqa: E402, F401
 import panels_add_account         # noqa: E402, F401
 import panels_inbox_panel         # noqa: E402, F401
 import panels                     # noqa: E402, F401
+
+# Multiple extensions share one worker process and each inserts its own
+# directory at sys.path[0] on load. Leaving it there after our imports are
+# done means a LATER extension's plain `import app` (or any other same-named
+# top-level module -- mail-client and imperal-matomo-analytics-extension both
+# use the flat name `app.py`) can resolve to THIS extension's file instead of
+# its own. Once our modules are cached in sys.modules under their bare names,
+# the directory is no longer needed on sys.path -- remove it so it can't leak
+# into a later/deferred import from another extension (this is exactly the
+# `cannot import name 'SERVER_URL' from 'app'` cross-extension bleed reported
+# against imperal-matomo-analytics-extension's ext_scheduler daily_summary
+# job; same fix already applied in gsc-connector/bing-webmaster-connector
+# after it hit them first).
+if _dir in sys.path:
+    sys.path.remove(_dir)

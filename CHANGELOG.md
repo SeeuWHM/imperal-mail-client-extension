@@ -1,5 +1,24 @@
 # Changelog
 
+## [6.5.1] — 2026-07-29 — Fix: sys.path leak let another extension's bare `import app` resolve to ours
+
+### Fixed
+- **Cross-extension import bleed (`SERVER_URL` missing from `app`).** Signoz report:
+  `imperal-platform-worker`'s `ext_scheduler` was raising `cannot import name 'SERVER_URL'
+  from 'app' (/opt/extensions/mail/app.py)` ~1430x/24h while running
+  `imperal-matomo-analytics-extension.daily_summary` -- a completely different extension.
+  Root cause on our side: `main.py` inserted this extension's directory at `sys.path[0]`
+  on load and never removed it. Multiple extensions share one worker process, and several
+  of them (including `imperal-matomo-analytics-extension`) use the same flat module name
+  `app.py`. With our directory left on `sys.path`, a later/deferred bare `import app`
+  from another extension could resolve to *our* `app.py` instead of its own, which has no
+  `SERVER_URL` constant. Same class of bug already hit `gsc-connector` and
+  `bing-webmaster-connector` before (there it was `accounts.py`); this is the same fix:
+  once our own modules are cached in `sys.modules` under their bare names, we no longer
+  need our directory on `sys.path`, so `main.py` now removes it right after import.
+- No behavior change for mail-client itself -- this only stops it from being a source of
+  contamination for other extensions sharing the worker process.
+
 ## [6.5.0] — 2026-07-19 — Fix: skeleton was re-notifying old mail as "new" (duplicate alerts)
 
 ### Fixed
