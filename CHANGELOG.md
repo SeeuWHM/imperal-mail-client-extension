@@ -1,5 +1,31 @@
 # Changelog
 
+## [6.5.2] — 2026-07-29 — Fix: left inbox panel gone + right panel filters broken (providers package collision)
+
+### Fixed
+- **Left panel missing entirely, right panel filters non-functional.** Root cause: `providers/`
+  is a real Python *package* (`providers/__init__.py` exposing `get_provider`,
+  `GoogleMailProvider`, `MicrosoftMailProvider`, `ImapMailProvider`), not a flat module — but
+  it was missing from `main.py`'s `sys.modules` purge list entirely. Three OTHER extensions
+  in this same platform (`doc-reader`, `file-reader`, `proxmox-connector`) also ship a
+  top-level package named `providers` with completely different (in file-reader's case,
+  empty) contents. In the platform's shared worker process, whichever extension's
+  `providers` package got imported first won the bare name in `sys.modules` — if mail-client
+  loaded/reloaded after one of those, every one of its modules doing
+  `from providers import get_provider` (`panels_inbox_panel.py` — the left `inbox` panel,
+  `panels_accounts.py` / `panels_filters_bar.py` — the right panel's Accounts/Filters tabs,
+  plus `handlers_connect.py`, `skeleton.py`, `handlers_contacts.py`, `handlers_manage_impl.py`,
+  `ctx_helpers.py`) raised `ImportError: cannot import name 'get_provider' from 'providers'`
+  instead of loading — which panel-render-failure surfaces exactly as "left panel is gone,
+  right panel there but its filter tab doesn't work".
+- **Fix:** added `providers` and all 16 of its submodules to `main.py`'s purge list, same
+  pattern `doc-reader` already uses for its own (differently-shaped) `providers` package.
+  Reproduced the exact failure and confirmed the fix live: with a foreign `providers` package
+  pre-cached in `sys.modules`, `from providers import get_provider` raised ImportError before
+  the fix and resolved correctly to mail-client's own package after it.
+- Verified: 48/48 tests pass, all 6 panels (`inbox`, `email_viewer`, `accounts`, `compose`,
+  `add_account`, `secrets`) register cleanly, `providers` resolves to mail-client's own file.
+
 ## [6.5.1] — 2026-07-29 — Fix: sys.path leak let another extension's bare `import app` resolve to ours
 
 ### Fixed

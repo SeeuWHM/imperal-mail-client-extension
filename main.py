@@ -13,6 +13,25 @@ _MODULES = (
     "app", "ctx_helpers", "schemas", "schemas_params",
     "schemas_sdl", "schemas_sdl_builders",
     "schemas_sdl_rules", "schemas_sdl_builders_rules",
+    # `providers` is a real package (providers/__init__.py), not a flat module --
+    # doc-reader, file-reader and proxmox-connector ALL also ship a top-level
+    # package named `providers` with completely different contents. This
+    # package (and every submodule below) was missing from the purge list, so
+    # on reload / cross-extension load order it could resolve to a DIFFERENT
+    # extension's `providers` (e.g. file-reader's, which has no get_provider
+    # at all) instead of ours -- breaking every module that does
+    # `from providers import get_provider` (panels_inbox_panel.py = left inbox
+    # panel, panels_accounts.py / panels_filters_bar.py = right panel filters,
+    # handlers_connect.py, skeleton.py, etc). Same root cause as the sys.path
+    # cross-extension bleed fixed below -- different collision surface
+    # (sys.modules cache vs sys.path lookup order).
+    "providers",
+    "providers.base", "providers.helpers", "providers.token_refresh",
+    "providers.text_utils", "providers.attachments",
+    "providers.google", "providers.google_read", "providers.google_write",
+    "providers.microsoft", "providers.microsoft_write",
+    "providers.imap", "providers.imap_connection", "providers.imap_bulk",
+    "providers.imap_read", "providers.imap_read_message", "providers.imap_write",
     "handlers_ui",
     "handlers_connect",
     "handlers_inbox_impl", "handlers_inbox",
