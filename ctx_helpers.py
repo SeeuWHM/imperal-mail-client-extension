@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from imperal_sdk import Context
 
-from providers import get_provider
-from providers.helpers import _active_account
+from mail_providers import get_provider
+from mail_providers.helpers import _active_account
 
 
 def _user_id(ctx) -> str:

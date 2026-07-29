@@ -15,7 +15,7 @@ log = logging.getLogger("mail")
 async def build_filters_bar(ctx, active_filter_id: str = "") -> ui.UINode | None:
     """Build the Smart Filters dropdown for the current active account."""
     try:
-        from providers.helpers import _active_account
+        from mail_providers.helpers import _active_account
         acc = await _active_account(ctx, "")
         active_email = acc.get("email", "") if acc else ""
         page = await ctx.store.query(FILTERS_COLLECTION,

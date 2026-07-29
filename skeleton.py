@@ -68,8 +68,8 @@ from email.utils import parsedate_to_datetime
 from app import ext
 
 from cache_model_defs import InboxMessages
-from providers import get_provider
-from providers.helpers import (
+from mail_providers import get_provider
+from mail_providers.helpers import (
     _all_accounts, _inbox_messages_key, _refresh_token_if_needed,
     COLLECTION, INBOX_FETCH_SIZE, encode_cursor,
 )

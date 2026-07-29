@@ -8,7 +8,7 @@ from imperal_sdk import ui
 
 from app import ext
 from ctx_helpers import _get_acc
-from providers import get_provider
+from mail_providers import get_provider
 
 log = logging.getLogger(__name__)
 

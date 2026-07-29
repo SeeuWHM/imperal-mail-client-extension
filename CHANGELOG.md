@@ -1,5 +1,33 @@
 # Changelog
 
+## [6.5.3] — 2026-07-29 — Fix (real one this time): renamed providers/ -> mail_providers/ to make the cross-extension collision structurally impossible
+
+### Fixed
+- **v6.5.2 was necessary but not sufficient.** Adding `providers` + its submodules to
+  `main.py`'s purge list only closed the collision window for THIS extension's own
+  reload path. The platform's kernel has a second, independent isolation layer
+  (`executor.py::_ext_isolated_import`, gated by a static `_EXT_BARE_NAMES_FOR_ISOLATION`
+  allowlist that mirrors `loader.py`'s conflict-name list) — and neither list included
+  `providers`. Confirmed live on the server: three extensions ship a top-level package
+  literally named `providers` (`file-reader`, `google-drive-connector`, and this one),
+  so depending on load order and on whether a given import site is deferred (inside a
+  function body, which several of ours are: `panels_filters_bar.py`,
+  `handlers_filters.py`, `panels_filter_view.py`, `panels_inbox_panel.py`,
+  `panels_accounts.py`, `ctx_helpers.py`) vs top-level, the bare name `providers` could
+  still resolve to a DIFFERENT extension's package even after v6.5.2 — which is exactly
+  why the left inbox panel and right panel filters were still broken after that release.
+- **Real fix:** renamed the package `providers/` -> `mail_providers/` everywhere in this
+  extension (16 submodules + all import sites). This makes the name collision
+  structurally impossible regardless of load order, deferred-vs-eager import site, or
+  whether/when the platform's own kernel isolation lists get updated to include
+  `providers` — we no longer depend on that fix landing on their side at all.
+- Reproduced the exact adversarial scenario (foreign `providers` package pre-cached in
+  `sys.modules` before this extension loads) and confirmed `mail_providers` resolves
+  correctly to our own package every time.
+- Verified: 48/48 tests pass, all 6 panels register cleanly, `main.py`'s purge list
+  simplified accordingly (package renamed so the old `providers.*` purge entries are now
+  moot, but kept purging `mail_providers.*` for hot-reload safety).
+
 ## [6.5.2] — 2026-07-29 — Fix: left inbox panel gone + right panel filters broken (providers package collision)
 
 ### Fixed

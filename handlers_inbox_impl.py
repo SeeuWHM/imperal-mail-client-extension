@@ -6,8 +6,8 @@ import logging
 
 from ctx_helpers import _get_acc
 from handlers_ui import _email_ui, _inbox_ui, _search_ui
-from providers import get_provider
-from providers.helpers import encode_cursor, decode_cursor, _all_accounts
+from mail_providers import get_provider
+from mail_providers.helpers import encode_cursor, decode_cursor, _all_accounts
 from schemas import (
     EmailBody, InboxPageResult, SearchResult, SendResult, ThreadView, AttachmentContent,
 )
@@ -382,7 +382,7 @@ async def impl_read_attachment(ctx, message_id: str, attachment_id: str,
     filename = dl.get("filename") or att_meta.get("filename") or "attachment"
     mime_type = dl.get("mime_type") or att_meta.get("mime_type") or "application/octet-stream"
 
-    from providers import attachments as attachment_engine
+    from mail_providers import attachments as attachment_engine
     doc = await attachment_engine.ingest_and_wait(
         ctx, filename=filename, content=content, mime_type=mime_type,
     )

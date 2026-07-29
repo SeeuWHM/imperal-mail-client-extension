@@ -13,25 +13,26 @@ _MODULES = (
     "app", "ctx_helpers", "schemas", "schemas_params",
     "schemas_sdl", "schemas_sdl_builders",
     "schemas_sdl_rules", "schemas_sdl_builders_rules",
-    # `providers` is a real package (providers/__init__.py), not a flat module --
-    # doc-reader, file-reader and proxmox-connector ALL also ship a top-level
-    # package named `providers` with completely different contents. This
-    # package (and every submodule below) was missing from the purge list, so
-    # on reload / cross-extension load order it could resolve to a DIFFERENT
-    # extension's `providers` (e.g. file-reader's, which has no get_provider
-    # at all) instead of ours -- breaking every module that does
-    # `from providers import get_provider` (panels_inbox_panel.py = left inbox
-    # panel, panels_accounts.py / panels_filters_bar.py = right panel filters,
-    # handlers_connect.py, skeleton.py, etc). Same root cause as the sys.path
-    # cross-extension bleed fixed below -- different collision surface
-    # (sys.modules cache vs sys.path lookup order).
-    "providers",
-    "providers.base", "providers.helpers", "providers.token_refresh",
-    "providers.text_utils", "providers.attachments",
-    "providers.google", "providers.google_read", "providers.google_write",
-    "providers.microsoft", "providers.microsoft_write",
-    "providers.imap", "providers.imap_connection", "providers.imap_bulk",
-    "providers.imap_read", "providers.imap_read_message", "providers.imap_write",
+    # Package renamed providers/ -> mail_providers/ (2026-07-29): three OTHER
+    # extensions on this platform (doc-reader, file-reader, proxmox-connector)
+    # also ship a top-level package literally named `providers`, and the
+    # kernel's cross-extension import-isolation guard (executor.py
+    # _EXT_BARE_NAMES_FOR_ISOLATION) did not cover the bare name `providers`,
+    # so a foreign `providers` package could occasionally win sys.modules
+    # before the loader's own namespacing kicked in -- breaking every module
+    # that does `from providers import get_provider` (panels_inbox_panel.py =
+    # left inbox panel, panels_accounts.py / panels_filters_bar.py = right
+    # panel Accounts/Filters tabs, handlers_connect.py, skeleton.py, etc).
+    # Renaming to the platform-unique `mail_providers` removes the collision
+    # surface entirely, independent of when/whether the kernel's isolation
+    # list gets updated on its side.
+    "mail_providers",
+    "mail_providers.base", "mail_providers.helpers", "mail_providers.token_refresh",
+    "mail_providers.text_utils", "mail_providers.attachments",
+    "mail_providers.google", "mail_providers.google_read", "mail_providers.google_write",
+    "mail_providers.microsoft", "mail_providers.microsoft_write",
+    "mail_providers.imap", "mail_providers.imap_connection", "mail_providers.imap_bulk",
+    "mail_providers.imap_read", "mail_providers.imap_read_message", "mail_providers.imap_write",
     "handlers_ui",
     "handlers_connect",
     "handlers_inbox_impl", "handlers_inbox",

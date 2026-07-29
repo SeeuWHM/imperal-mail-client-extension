@@ -4,8 +4,8 @@ from __future__ import annotations
 import asyncio
 
 from ctx_helpers import _get_acc
-from providers import get_provider
-from providers.helpers import _all_accounts, _remove_multiple_from_cache
+from mail_providers import get_provider
+from mail_providers.helpers import _all_accounts, _remove_multiple_from_cache
 from schemas import BulkOperationResult, OperationResult
 
 # Hard cap per bulk call.

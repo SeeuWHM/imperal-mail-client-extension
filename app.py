@@ -13,7 +13,7 @@ log = logging.getLogger("mail")
 
 ext = Extension(
     "mail",
-    version="6.5.2",
+    version="6.5.3",
     display_name="Mail Client",
     description=(
         "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "

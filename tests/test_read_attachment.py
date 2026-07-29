@@ -46,7 +46,7 @@ def make_ctx(imperal_id: str = "imp_u_test123"):
 
 # ── providers/attachments.py (engine client) ─────────────────────────────────
 
-import providers.attachments as eng
+import mail_providers.attachments as eng
 
 
 @pytest.mark.asyncio
@@ -184,7 +184,7 @@ async def test_ingest_and_wait_no_document_id_returns_early():
 
 # ── Gmail download_attachment ─────────────────────────────────────────────────
 
-from providers.google import GoogleMailProvider
+from mail_providers.google import GoogleMailProvider
 
 
 def _far_future_acc():
@@ -231,7 +231,7 @@ async def test_gmail_download_attachment_empty_data():
 
 # ── Microsoft Graph download_attachment ───────────────────────────────────────
 
-import providers.microsoft as ms
+import mail_providers.microsoft as ms
 
 
 def _graph_provider():
@@ -279,7 +279,7 @@ async def test_graph_download_attachment_rejects_non_file_attachment():
 
 # ── IMAP attachment walk + download (pure parsing, no socket) ───────────────
 
-from providers.imap_read_message import (
+from mail_providers.imap_read_message import (
     _walk_imap_attachments, _parse_imap_body, _sync_imap_download_attachment,
 )
 
@@ -320,7 +320,7 @@ def test_parse_imap_body_prefers_html_but_falls_back_to_text():
 
 def test_sync_imap_download_attachment_invalid_index_type(monkeypatch):
     monkeypatch.setattr(
-        "providers.imap_read_message._imap_connect_auth",
+        "mail_providers.imap_read_message._imap_connect_auth",
         lambda *a, **kw: SimpleNamespace(logout=lambda: None),
     )
     result = _sync_imap_download_attachment("u@x.com", "imap.x.com", 993, "5", "not-an-int")
@@ -368,7 +368,7 @@ async def test_impl_read_attachment_happy_path(monkeypatch):
     )
     monkeypatch.setattr(impl, "_get_acc", AsyncMock(return_value=({"email": "u@x.com"}, provider)))
 
-    import providers.attachments as attachment_engine_mod
+    import mail_providers.attachments as attachment_engine_mod
 
     async def fake_ingest_and_wait(ctx, *, filename, content, mime_type):
         return {"document_id": 1, "status": "processed", "size_bytes": len(content)}

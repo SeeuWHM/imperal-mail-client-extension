@@ -9,8 +9,8 @@ from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 
-from providers import get_provider  # noqa: F401
-from providers.helpers import (
+from mail_providers import get_provider  # noqa: F401
+from mail_providers.helpers import (
     _all_accounts,
     COLLECTION,
     _detect_imap_settings,
@@ -20,7 +20,7 @@ from providers.helpers import (
 )
 
 _ALL_FOLDER_KEYS = ["INBOX", "sent", "drafts", "spam", "trash", "starred", "archive"]
-from providers.imap import _sync_imap_test
+from mail_providers.imap import _sync_imap_test
 from cache_model_defs import UnreadSummary
 
 from schemas import (

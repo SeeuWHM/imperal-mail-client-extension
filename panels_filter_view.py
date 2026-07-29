@@ -106,7 +106,7 @@ async def render_filter_panel(ctx, filter_id: str,
                                    page_cursor="", page_num=1)),
     ], direction="h", gap=1)
 
-    from providers.helpers import _active_account
+    from mail_providers.helpers import _active_account
     acc = await _active_account(ctx, "")
     active_email = acc.get("email", "") if acc else ""
 

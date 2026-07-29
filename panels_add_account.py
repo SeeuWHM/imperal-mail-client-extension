@@ -5,7 +5,7 @@ import logging
 
 from imperal_sdk import ui
 
-from providers.helpers import _detect_imap_settings, _imap_hint, IMAP_PROVIDERS
+from mail_providers.helpers import _detect_imap_settings, _imap_hint, IMAP_PROVIDERS
 
 log = logging.getLogger(__name__)
 

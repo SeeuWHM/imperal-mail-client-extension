@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from imperal_sdk import ui
 
 from app import ext
-from providers import get_provider
-from providers.helpers import (
+from mail_providers import get_provider
+from mail_providers.helpers import (
     _all_accounts, _invalidate_first_page,
     _inbox_messages_key, _refresh_token_if_needed,
     encode_cursor, decode_cursor,
@@ -111,7 +111,7 @@ async def inbox_panel(
         for _fkey in [f["key"] for f in FOLDERS] + ["all_mail"]:
             await _invalidate_first_page(ctx, do_switch_account, _fkey)
 
-    from providers.helpers import _active_account as _resolve_active
+    from mail_providers.helpers import _active_account as _resolve_active
     acc = await _resolve_active(ctx, "")
     if not acc: return ui.Empty(message="No email account available")
     provider, active_email = get_provider(acc), acc.get("email", "")

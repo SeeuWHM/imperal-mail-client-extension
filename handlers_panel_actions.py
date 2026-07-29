@@ -7,15 +7,15 @@ import logging
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
-from providers import get_provider
+from mail_providers import get_provider
 import json
 
-from providers.helpers import _invalidate_first_page
-from providers.helpers import (
+from mail_providers.helpers import _invalidate_first_page
+from mail_providers.helpers import (
     _all_accounts, COLLECTION,
     _detect_imap_settings,
 )
-from providers.imap import _sync_imap_test
+from mail_providers.imap import _sync_imap_test
 
 from schemas import (
     MailActionParams, AccountParam, CountParams, OAuthParams, AddImapParams,

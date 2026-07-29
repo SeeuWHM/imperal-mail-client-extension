@@ -10,8 +10,8 @@ from imperal_sdk.chat import TaskCancelled
 from imperal_sdk.chat.action_result import ActionResult
 from ctx_helpers import _get_acc
 
-from providers import get_provider
-from providers.helpers import (
+from mail_providers import get_provider
+from mail_providers.helpers import (
     CONTACTS_COLLECTION, PEOPLE_API, INBOX_FETCH_SIZE,
     _refresh_token_if_needed, _graph_get,
 )
@@ -76,7 +76,7 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
             raise RuntimeError("No email account connected. Connect one first.")
         target_accs = [acc_single]
     else:
-        from providers.helpers import _all_accounts
+        from mail_providers.helpers import _all_accounts
         target_accs = await _all_accounts(ctx)
         if not target_accs:
             raise RuntimeError("No email account connected. Connect one first.")

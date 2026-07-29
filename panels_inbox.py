@@ -7,7 +7,7 @@ import logging
 
 from imperal_sdk import ui
 
-from providers.helpers import _invalidate_first_page, COLLECTION
+from mail_providers.helpers import _invalidate_first_page, COLLECTION
 
 log = logging.getLogger(__name__)
 

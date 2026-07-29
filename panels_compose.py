@@ -7,7 +7,7 @@ import re
 from imperal_sdk import ui
 
 from ctx_helpers import _get_acc
-from providers.helpers import CONTACTS_COLLECTION
+from mail_providers.helpers import CONTACTS_COLLECTION
 
 log = logging.getLogger(__name__)
 
