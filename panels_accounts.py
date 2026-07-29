@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from imperal_sdk import ui
-from mail_providers.helpers import _all_accounts, _is_microsoft_account
+from mail_providers.helpers import _all_accounts, _is_microsoft_account, _active_account
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +83,6 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
 # ── Filters tab ───────────────────────────────────────────────────────────────
 
 async def _build_filters_tab(ctx) -> ui.UINode:
-    from mail_providers.helpers import _active_account, _all_accounts
     acc = await _active_account(ctx, "")
     active_email = acc.get("email", "") if acc else ""
 

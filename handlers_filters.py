@@ -11,6 +11,7 @@ import logging
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
 from handlers_inbox_impl import impl_search
+from mail_providers.helpers import _active_account
 from schemas import SearchResult
 from schemas_params import (
     CreateFilterParams, UpdateFilterParams, FilterIdParam,
@@ -62,7 +63,6 @@ async def _resolve_filter(ctx, filter_id: str) -> tuple:
 async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
     """Create a named smart mailbox filter with search criteria."""
     try:
-        from mail_providers.helpers import _active_account
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         # Resolve which account this filter belongs to
         if params.account:
@@ -113,7 +113,6 @@ async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
 async def fn_list_filters(ctx, params: EmptyParams) -> ActionResult:
     """List smart mailbox filters for the current active account."""
     try:
-        from mail_providers.helpers import _active_account
         acc = await _active_account(ctx, "")
         active_email = acc.get("email", "") if acc else ""
         # Show filters for active account, plus filters with no account (legacy)
@@ -225,8 +224,7 @@ async def fn_set_folder_prefs(ctx, params: SetFolderPrefsParams) -> ActionResult
         existing = await ctx.store.query(PREFS_COLLECTION, where={"owner_id": uid}, limit=1)
         visible = [f.strip() for f in params.visible_folders if f.strip()]
         # Determine standard folders for this account's provider type
-        from mail_providers.helpers import _active_account as _resolve_acc
-        _curr_acc = await _resolve_acc(ctx, "")
+        _curr_acc = await _active_account(ctx, "")
         _ptype = _curr_acc.get("provider", "oauth") if _curr_acc else "oauth"
         from panels_inbox import _ALLMAIL_PROVIDERS
         if _ptype in _ALLMAIL_PROVIDERS:
@@ -283,9 +281,8 @@ async def fn_get_folder_prefs(ctx, params: EmptyParams) -> ActionResult:
 async def fn_list_mail_folders(ctx, params: EmptyParams) -> ActionResult:
     """List available mail folders + custom labels + current visibility preferences."""
     try:
-        from mail_providers.helpers import _active_account as _resolve_acc
         from panels_inbox import FOLDERS, _ALLMAIL_PROVIDERS
-        acc = await _resolve_acc(ctx, "")
+        acc = await _active_account(ctx, "")
         ptype = acc.get("provider", "oauth") if acc else "oauth"
         is_allmail = ptype in _ALLMAIL_PROVIDERS
 

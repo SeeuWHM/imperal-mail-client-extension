@@ -13,7 +13,7 @@ from ctx_helpers import _get_acc
 from mail_providers import get_provider
 from mail_providers.helpers import (
     CONTACTS_COLLECTION, PEOPLE_API, INBOX_FETCH_SIZE,
-    _refresh_token_if_needed, _graph_get,
+    _refresh_token_if_needed, _graph_get, _all_accounts,
 )
 
 from schemas import (
@@ -76,7 +76,6 @@ async def impl_sync_contacts(ctx, account: str = "") -> ContactsSyncResult:
             raise RuntimeError("No email account connected. Connect one first.")
         target_accs = [acc_single]
     else:
-        from mail_providers.helpers import _all_accounts
         target_accs = await _all_accounts(ctx)
         if not target_accs:
             raise RuntimeError("No email account connected. Connect one first.")

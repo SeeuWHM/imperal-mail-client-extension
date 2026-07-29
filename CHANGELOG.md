@@ -1,5 +1,43 @@
 # Changelog
 
+## [6.5.4] — 2026-07-29 — REAL root cause found and fixed: deferred imports raced against our own sys.path cleanup
+
+### Fixed
+- **This is the actual bug.** v6.5.1/6.5.2/6.5.3 all fixed real, reproducible issues,
+  but none of them was the reason the left inbox panel and right panel Accounts/Filters
+  tabs kept failing after every previous deploy ("nothing changed"). Confirmed via live
+  worker logs on the platform: `fast_rpc exit corr_id=... status=error` for
+  `mail/__panel__inbox`, with the underlying exception `ModuleNotFoundError: No module
+  named 'mail_providers'`.
+- **Root cause:** nine files (`panels_accounts.py`, `panels_filters_bar.py`,
+  `panels_filter_view.py`, `panels_inbox_panel.py`, `handlers_filters.py` (4 call
+  sites), `handlers_contacts.py`, `handlers_inbox_impl.py`) imported
+  `mail_providers.helpers` / `mail_providers.attachments` with a **deferred import
+  inside the function body**, re-executed on every single panel/tool call instead of
+  once at module load time. That collided with our OWN v6.5.1 fix, which removes this
+  extension's directory from `sys.path` right after `main.py`'s first load (to stop
+  mail's modules leaking into other extensions sharing the same worker process). Once
+  the platform's loader purges `mail_providers*` from `sys.modules` — which happens
+  routinely whenever another extension loads in the same long-running worker — the next
+  deferred `from mail_providers.helpers import ...` inside a panel function has no
+  cached module AND no `sys.path` entry left to find it fresh with. Result:
+  `ModuleNotFoundError` on every subsequent panel render, silently swallowed into an
+  empty/broken panel by the try/except wrapping — exactly the "left panel gone, right
+  panel filter broken" symptom, and exactly why re-deploying the v6.5.2/v6.5.3 fixes
+  changed nothing: those fixes addressed a *different* collision surface (cross-extension
+  `sys.modules` name clash), not this one (self-inflicted `sys.path` cleanup racing our
+  own deferred imports).
+- **Fix:** moved all 9 deferred imports to normal top-level module imports. The name is
+  now bound once, during the extension's first load — while its directory is still on
+  `sys.path` — so later `sys.modules` purges by the loader (for hot-reload or other
+  extensions) can no longer break it; the module-level reference stays valid regardless
+  of what happens to `sys.path` afterwards.
+- Reproduced the exact failure and fix live: purged `mail_providers*` from
+  `sys.modules` and removed the extension dir from `sys.path` (mirroring exactly what
+  the kernel loader does), then confirmed panel functions raised `ModuleNotFoundError`
+  before this fix and return cleanly after it. 48/48 tests pass.
+
+
 ## [6.5.3] — 2026-07-29 — Fix (real one this time): renamed providers/ -> mail_providers/ to make the cross-extension collision structurally impossible
 
 ### Fixed

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from imperal_sdk import ui
+from mail_providers.helpers import _active_account
 
 FILTERS_COLLECTION = "mail_filters"
 log = logging.getLogger("mail")
@@ -15,7 +16,6 @@ log = logging.getLogger("mail")
 async def build_filters_bar(ctx, active_filter_id: str = "") -> ui.UINode | None:
     """Build the Smart Filters dropdown for the current active account."""
     try:
-        from mail_providers.helpers import _active_account
         acc = await _active_account(ctx, "")
         active_email = acc.get("email", "") if acc else ""
         page = await ctx.store.query(FILTERS_COLLECTION,
