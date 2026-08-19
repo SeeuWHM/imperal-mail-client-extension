@@ -227,7 +227,7 @@ async def build_email_viewer(
         msg_children.append(ui.Alert(
             "This message was too long and has been shortened — some content "
             "at the end may be missing.",
-            variant="warn",
+            type="warn",
         ))
     # Fixed, generous height with its own scrollbar (ui.Html's default is an
     # unbounded auto-height up to 3000px, so a long email pushed the action
@@ -256,7 +256,7 @@ async def build_email_viewer(
                               email_list_ids=email_list_ids, current_index=current_index)
 
     if supports_thread:
-        conv_content = (ui.Alert(thread_error, variant="warn") if thread_error
+        conv_content = (ui.Alert(thread_error, type="warn") if thread_error
                         else _conversation_timeline(thread_messages, message_id))
         content = ui.Tabs(tabs=[
             {"label": "Message", "content": message_tab_content},
