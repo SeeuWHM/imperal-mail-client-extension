@@ -87,6 +87,7 @@ def build_email_message(body: EmailBody, account: str = "") -> EmailMessage:
         thread_id=thread_id,
         folder=body.folder,
         replied=body.replied,
+        truncated=body.truncated,
         account=account,
     )
 

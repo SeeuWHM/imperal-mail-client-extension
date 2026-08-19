@@ -115,6 +115,11 @@ class EmailBody(BaseModel):
     starred: Optional[bool] = None
     replied: Optional[bool] = None
     folder: Optional[str] = None
+    truncated: Optional[bool] = None
+    # Set by the IMAP provider when a body over 4000 chars was cut short
+    # (see mail_providers/imap.py read_email). Was previously silently
+    # dropped here since this field didn't exist on the model — read_email()
+    # chat callers had no way to know the body they got back was incomplete.
 
     model_config = {"populate_by_name": True}
 

@@ -120,6 +120,9 @@ class EmailMessage(
     folder: str | None = sdl_field(role="mail.folder")
     replied: bool | None = sdl_field(role="mail.replied")
     account: str | None = sdl_field(role="mail.account")
+    # Reuses AttachmentEntity's role — same meaning ("content was cut short"),
+    # now on the message body too (IMAP read_email truncates at 4000 chars).
+    truncated: bool | None = sdl_field(role="mail.truncated")
 
 class InboxPage(sdl.EntityList[EmailPreview]):
     """Paginated inbox/folder result — returned by inbox() and folder()."""

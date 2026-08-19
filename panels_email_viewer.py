@@ -13,6 +13,78 @@ from mail_providers import get_provider
 log = logging.getLogger(__name__)
 
 
+def _is_forwarded(subject: str) -> bool:
+    """Honest forward detection: providers themselves stamp this exact prefix
+    when the user hits Forward (see mail_providers/imap.py, google_write.py,
+    microsoft_write.py — all three build 'Fwd: {orig_subj}'). No guessing."""
+    s = (subject or "").strip().lower()
+    return s.startswith("fwd:") or s.startswith("fw:")
+
+
+async def _fetch_thread(ctx, provider, acc, thread_id: str) -> tuple[list[dict], str | None]:
+    """Fetch the thread once — reuses the SAME provider.get_thread() the
+    get_thread() chat.function calls, so panel and chat tool never disagree
+    about what a thread contains. Returns (messages, error_message)."""
+    try:
+        thread_result = await provider.get_thread(ctx, acc, thread_id)
+    except Exception as e:
+        return [], f"Could not load conversation: {e}"
+    if thread_result.get("RESULT") == "ERROR":
+        return [], thread_result.get("error") or "Conversation unavailable"
+    return thread_result.get("messages", []), None
+
+
+def _really_replied(messages: list[dict], current_message_id: str,
+                     current_date: str, account_email: str) -> bool:
+    """Honest 'did I reply to this' for Google/Microsoft: True only if the
+    thread actually contains a LATER message sent from this account's own
+    address — the same real-world fact IMAP's \\Answered flag encodes, just
+    derived from data the providers already give us instead of a flag
+    neither Gmail's nor Graph's read_email response exposes directly.
+    """
+    if not messages or not account_email:
+        return False
+    from email.utils import parsedate_to_datetime
+    def _pd(raw):
+        try:
+            return parsedate_to_datetime(raw)
+        except Exception:
+            return None
+    current_dt = _pd(current_date)
+    for m in messages:
+        if m.get("id") == current_message_id:
+            continue
+        sender = (m.get("from") or "").lower()
+        if account_email.lower() not in sender:
+            continue
+        if current_dt is None:
+            return True  # can't order reliably — presence of our own reply is still real
+        m_dt = _pd(m.get("date"))
+        if m_dt and m_dt > current_dt:
+            return True
+    return False
+
+
+def _conversation_timeline(messages: list[dict], current_message_id: str) -> ui.UINode:
+    if not messages:
+        return ui.Empty(message="No other messages in this conversation", icon="MessagesSquare")
+    items = []
+    for m in messages:
+        is_current = m.get("id") == current_message_id
+        title = f"{m.get('from', 'unknown')} — {m.get('subject', '(no subject)')}"
+        if is_current:
+            title += "  (this message)"
+        body_preview = (m.get("body") or "")[:400]
+        items.append({
+            "title": title,
+            "description": body_preview,
+            "time": m.get("date", ""),
+            "icon": "Mail" if m.get("unread") else "MailOpen",
+            "color": "blue" if is_current else "gray",
+        })
+    return ui.Timeline(items)
+
+
 def _attachment_items(attachments: list[dict]) -> list[ui.UINode]:
     nodes = []
     for att in attachments:
@@ -106,7 +178,26 @@ async def build_email_viewer(
     if body_type != "html" and body and body.lstrip().startswith("<"):
         body_type = "html"
     attachments = result.get("attachments", [])
-    replied     = result.get("replied", False)
+    thread_id   = result.get("thread_id", "")
+    truncated   = result.get("truncated", False)
+    forwarded   = _is_forwarded(subject)
+
+    # Thread support varies by provider — IMAP has no real thread concept
+    # (get_thread() returns a hard error there), so only fetch/show it when
+    # it can actually succeed.
+    supports_thread = bool(thread_id) and acc.get("provider") not in ("imap", "yahoo")
+    thread_messages: list[dict] = []
+    thread_error: str | None = None
+    if supports_thread:
+        thread_messages, thread_error = await _fetch_thread(ctx, provider, acc, thread_id)
+
+    # replied: IMAP already gives us a real \Answered flag from the provider.
+    # Google/Microsoft don't expose an equivalent flag on read_email, so it's
+    # derived honestly from the thread data we just fetched (a later message
+    # from our own address = we really did reply) instead of always False.
+    replied = result.get("replied", False)
+    if not replied and supports_thread and thread_messages:
+        replied = _really_replied(thread_messages, message_id, date_str, account_email)
 
     # ── Tab 0: Message ──────────────────────────────────────────────────
     meta_items = [{"key": "From", "value": from_name}]
@@ -117,10 +208,12 @@ async def build_email_viewer(
     subject_row: list = [ui.Header(text=subject, level=3)]
     if replied:
         subject_row.append(ui.Badge("↩ Replied", color="green"))
+    if forwarded:
+        subject_row.append(ui.Badge("➜ Forwarded", color="blue"))
 
     msg_children: list = [
-        ui.Stack(subject_row, direction="h", gap=2, align="center") if replied
-        else ui.Header(text=subject, level=3),
+        ui.Stack(subject_row, direction="h", gap=2, align="center")
+        if (replied or forwarded) else ui.Header(text=subject, level=3),
         ui.KeyValue(items=meta_items, columns=1),
     ]
     if attachments:
@@ -130,9 +223,19 @@ async def build_email_viewer(
             ui.Stack(_attachment_items(attachments), direction="v", gap=1),
         ]))
     msg_children.append(ui.Divider())
+    if truncated:
+        msg_children.append(ui.Alert(
+            "This message was too long and has been shortened — some content "
+            "at the end may be missing.",
+            variant="warn",
+        ))
+    # Fixed, generous height with its own scrollbar (ui.Html's default is an
+    # unbounded auto-height up to 3000px, so a long email pushed the action
+    # bar and the rest of the panel out of view instead of scrolling in place).
     if body:
         if body_type == "html":
-            msg_children.append(ui.Html(content=body, sandbox=True, theme="light"))
+            msg_children.append(ui.Html(content=body, sandbox=True, theme="light",
+                                         max_height=900))
         else:
             safe_text = html_escape(body)
             msg_children.append(ui.Html(
@@ -141,14 +244,25 @@ async def build_email_viewer(
                     f'font-family:-apple-system,BlinkMacSystemFont,sans-serif;'
                     f'font-size:14px;line-height:1.65;margin:0">{safe_text}</pre>'
                 ),
-                sandbox=True, theme="light",
+                sandbox=True, theme="light", max_height=900,
             ))
     else:
         msg_children.append(ui.Empty(message="No content", icon="FileText"))
 
-    return ui.Stack([
-        _action_bar(message_id, account_email,
-                    has_cc=bool(cc_field), folder=folder,
-                    email_list_ids=email_list_ids, current_index=current_index),
-        ui.Stack(msg_children, gap=2),
-    ], className="px-4 pb-4")
+    message_tab_content = ui.Stack(msg_children, gap=2)
+
+    action_bar = _action_bar(message_id, account_email,
+                              has_cc=bool(cc_field), folder=folder,
+                              email_list_ids=email_list_ids, current_index=current_index)
+
+    if supports_thread:
+        conv_content = (ui.Alert(thread_error, variant="warn") if thread_error
+                        else _conversation_timeline(thread_messages, message_id))
+        content = ui.Tabs(tabs=[
+            {"label": "Message", "content": message_tab_content},
+            {"label": "Conversation", "content": conv_content},
+        ])
+    else:
+        content = message_tab_content
+
+    return ui.Stack([action_bar, content], className="px-4 pb-4")

@@ -1,5 +1,37 @@
 # Changelog
 
+## [6.6.0] — 2026-08-20 — Email viewer: honest reply/forward detection, real conversation tab, no more silent body truncation
+
+### Added
+- **Conversation tab** in the email viewer panel — reuses the existing, already-tested
+  `provider.get_thread()` (previously only reachable as a standalone chat tool, never
+  wired into the panel UI). Shown only for Google/Microsoft accounts, where it can
+  actually succeed; hidden for IMAP/Yahoo, where `get_thread()` is a hard error (no
+  native thread concept there) — no dead-end tab.
+- Honest **"➜ Forwarded"** badge, detected from the `Fwd:`/`FW:` subject prefix that
+  Google/Microsoft/IMAP providers themselves stamp on forward — not a guess.
+
+### Fixed
+- **`replied` badge never worked for Gmail/Outlook.** IMAP has a real `\Answered` flag;
+  Gmail's and Graph's `read_email` responses expose no equivalent, so `replied` was
+  always `False` there. Now derived honestly from the same thread data the new
+  Conversation tab fetches: `True` only when the thread actually contains a later
+  message sent from the account's own address.
+- **Truncated IMAP bodies were silently losing their `truncated` flag** on the way to
+  chat callers — `EmailBody` (schemas.py) never declared the field, so pydantic
+  validation dropped it before `read_email()` chat.function could see it. Added
+  `truncated` to `EmailBody`, `EmailMessage` (SDL, reusing `AttachmentEntity`'s
+  `mail.truncated` role), and `build_email_message`. The panel now shows a warning
+  when a message was cut short.
+- Long email bodies pushed the action bar off-screen — the body now has a bounded,
+  independently-scrollable height instead of unbounded auto-height.
+
+### Tests
+- Added `tests/test_email_viewer_panel.py` (11 tests) covering forward detection,
+  honest replied derivation, truncated-body warning, and conversation-tab gating by
+  provider. Full suite: 59/59 passing.
+
+
 ## [6.5.4] — 2026-07-29 — REAL root cause found and fixed: deferred imports raced against our own sys.path cleanup
 
 ### Fixed
