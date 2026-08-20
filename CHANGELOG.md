@@ -1,5 +1,24 @@
 # Changelog
 
+## [6.6.3] — 2026-08-20 — Real fix: plain-text mail was still dark-on-dark because of a Tailwind `<pre>` code-block rule
+
+### Fixed
+- **Plain-text body was still rendering dark text in dark mode after 6.6.2.**
+  6.6.2 correctly removed the forced `theme="light"` from the plain-text
+  branch, expecting the SDK's theme-reactive default (`.text-body` wired to
+  `--imp-color-text`) to take over. That part was sound — but the text was
+  wrapped in a `<pre>` tag, and Tailwind Typography (the `prose` classes the
+  renderer uses) has a dedicated rule that treats `<pre>` as a **code
+  block**: `.prose :where(pre){color:var(--tw-prose-pre-code);
+  background:var(--tw-prose-pre-bg)}`. That rule force-sets its own color
+  and background, silently overriding the inherited `.text-body` color no
+  matter what theme was passed — so the previous fix never actually took
+  effect. Switched the wrapper from `<pre>` to `<div>` (same
+  `white-space:pre-wrap` for line-break preservation); no prose rule
+  targets plain `<div>`, so the theme-reactive color now genuinely renders.
+  Verified directly against the live panel's compiled CSS bundle to confirm
+  the `<pre>` rule's existence and that no equivalent rule hits `<div>`.
+
 ## [6.6.2] — 2026-08-20 — Fix: plain-text mail now follows app theme (dark/light); Accounts vs Filters tabs get distinct styling
 
 ### Fixed
