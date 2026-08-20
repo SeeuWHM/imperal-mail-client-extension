@@ -167,3 +167,91 @@ async def test_thread_error_surfaces_as_alert_not_swallowed(monkeypatch):
 
     rendered = str(node)
     assert "not found" in rendered
+
+
+# ── HTML body rendering: sandbox=False (not the iframe default) ─────────────
+#
+# sandbox=True puts the body in an <iframe sandbox="allow-popups"> with NO
+# allow-same-origin -- the parent can never read iframe.contentDocument, so
+# the height-fitting ResizeObserver silently fails and the box is stuck at
+# a ~300px floor no matter what max_height is set to (raising max_height
+# alone, tried previously, could not fix this -- the observer never fires).
+# The same sandboxed theme also forces table{display:block} on every table,
+# which shreds table-based HTML email (WHMCS invoices/notices are almost
+# always table-laid-out) into a stack of tiny scroll boxes.
+# sandbox=False renders through sanitized dangerouslySetInnerHTML in the
+# page's own `prose` typography instead -- real auto height, and prose's
+# table rule is table-layout:auto, not display:block.
+
+def _find_html_nodes(n):
+    found = []
+    if getattr(n, "type", None) == "Html":
+        found.append(n)
+    children = (getattr(n, "props", {}) or {}).get("children", []) or []
+    for child in children:
+        found.extend(_find_html_nodes(child))
+    return found
+
+
+@pytest.mark.asyncio
+async def test_html_body_never_sandboxed_for_html_type(monkeypatch):
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    provider = FakeProvider(_base_email_result(
+        body="<table><tr><td>Invoice</td></tr></table>", body_type="html",
+    ))
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    html_nodes = _find_html_nodes(node)
+    assert html_nodes, "expected at least one Html node in the tree"
+    for html_node in html_nodes:
+        assert html_node.props.get("sandbox") is False
+
+
+@pytest.mark.asyncio
+async def test_html_body_never_sandboxed_for_plain_text(monkeypatch):
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    provider = FakeProvider(_base_email_result(body="plain text body", body_type="text"))
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    html_nodes = _find_html_nodes(node)
+    assert html_nodes, "expected at least one Html node in the tree"
+    for html_node in html_nodes:
+        assert html_node.props.get("sandbox") is False
+
+
+# ── Attachments: real 'Read text' action wired to read_attachment() ─────────
+
+@pytest.mark.asyncio
+async def test_attachment_with_id_gets_read_text_button(monkeypatch):
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    provider = FakeProvider(_base_email_result(
+        attachments=[{"id": "att1", "filename": "Invoice-6285.pdf", "size_kb": 42}],
+    ))
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    rendered = str(node)
+    assert "Invoice-6285.pdf" in rendered
+    assert "Read text" in rendered
+    assert "att1" in rendered
+    assert "msg1" in rendered
+
+
+@pytest.mark.asyncio
+async def test_attachment_without_id_gets_no_dead_button(monkeypatch):
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    provider = FakeProvider(
+        _base_email_result(attachments=[{"filename": "mystery.bin", "size_kb": 10}]),
+    )
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    rendered = str(node)
+    assert "mystery.bin" in rendered
+    assert "Read text" not in rendered

@@ -1,5 +1,36 @@
 # Changelog
 
+## [6.6.1] — 2026-08-20 — Fix: HTML body still tiny + broken WHMCS tables; attachments now readable
+
+### Fixed
+- **Email body still rendered in a tiny, non-resizing box.** Root cause: `ui.Html`
+  with `sandbox=True` (the SDK's iframe default) renders into
+  `<iframe sandbox="allow-popups">` with no `allow-same-origin` token, so the
+  parent page can never read `iframe.contentDocument` — the renderer's own
+  height-fitting `ResizeObserver` silently fails and the box is stuck at its
+  ~300px floor. Raising `max_height` (tried in 6.6.0) could not fix this: the
+  observer that reads real content height never fires in the first place.
+- **WHMCS (and other table-based) HTML emails rendered broken/squashed.** Same
+  sandboxed iframe theme force-applies `table{display:block;overflow:auto}` to
+  every `<table>`, which shreds table-laid-out email HTML — the standard way
+  invoices/notices like WHMCS's are built — into a stack of tiny, independently
+  scrolling boxes.
+- Both fixed the same way: switched both `ui.Html` calls (HTML and plain-text
+  bodies) to `sandbox=False`. Content is still DOMPurify-sanitized before
+  reaching the DOM; it now renders through the page's own Tailwind `prose`
+  typography (`table-layout:auto`, real auto height) instead of an isolated
+  iframe. Already the proven pattern for trusted HTML elsewhere in this same
+  codebase (`gemini`, `tasks`, `spotify` extensions all use
+  `ui.Html(sandbox=False)`).
+
+### Added
+- **Attachments in the email viewer are no longer a dead-end label.** Each
+  attachment with a known id now gets a "Read text" button wired to the
+  extension's own already-shipped `read_attachment()` chat function (the
+  doc-extractor engine — PDF/DOCX/XLSX/PPTX/image/txt/csv), previously
+  reachable only by typing a request in chat with no visible way to trigger it
+  from the panel itself.
+
 ## [6.6.0] — 2026-08-20 — Email viewer: honest reply/forward detection, real conversation tab, no more silent body truncation
 
 ### Added

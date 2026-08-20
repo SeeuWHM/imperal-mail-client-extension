@@ -85,17 +85,32 @@ def _conversation_timeline(messages: list[dict], current_message_id: str) -> ui.
     return ui.Timeline(items)
 
 
-def _attachment_items(attachments: list[dict]) -> list[ui.UINode]:
+def _attachment_items(attachments: list[dict], message_id: str,
+                       account_email: str) -> list[ui.UINode]:
+    """One row per attachment: filename/size plus a real 'Read text' action
+    wired to the extension's own read_attachment() (doc-extractor engine —
+    PDF/DOCX/XLSX/PPTX/image/txt/csv). Previously attachments were a dead-end
+    label with no way to reach content the extension can already extract."""
     nodes = []
     for att in attachments:
         filename = att.get("filename", "attachment")
+        att_id   = att.get("id", "")
         size_kb  = att.get("size_kb", att.get("size", 0))
         if isinstance(size_kb, (int, float)) and size_kb > 1024:
             size_str = f"{size_kb / 1024:.1f} MB"
         else:
             size_str = f"{size_kb} KB" if size_kb else ""
         label = filename + (f"  ({size_str})" if size_str else "")
-        nodes.append(ui.Text(label, variant="caption"))
+        row: list = [ui.Text(label, variant="caption")]
+        if att_id:
+            row.append(ui.Button(
+                "Read text", icon="FileSearch", variant="ghost", size="sm",
+                on_click=ui.Send(
+                    f"Read the attachment \"{filename}\" (attachment_id={att_id}, "
+                    f"message_id={message_id}, account={account_email})"
+                ),
+            ))
+        nodes.append(ui.Stack(row, direction="h", gap=2, align="center"))
     return nodes
 
 
@@ -220,7 +235,7 @@ async def build_email_viewer(
         n = len(attachments)
         msg_children.append(ui.Stack([
             ui.Text(f"{n} attachment{'s' if n > 1 else ''}", variant="caption"),
-            ui.Stack(_attachment_items(attachments), direction="v", gap=1),
+            ui.Stack(_attachment_items(attachments, message_id, account_email), direction="v", gap=1),
         ]))
     msg_children.append(ui.Divider())
     if truncated:
@@ -229,13 +244,26 @@ async def build_email_viewer(
             "at the end may be missing.",
             type="warn",
         ))
-    # Fixed, generous height with its own scrollbar (ui.Html's default is an
-    # unbounded auto-height up to 3000px, so a long email pushed the action
-    # bar and the rest of the panel out of view instead of scrolling in place).
+    # sandbox=False (not the SDK's iframe default): with sandbox=True the
+    # renderer puts the body in an <iframe sandbox="allow-popups"> that has
+    # NO allow-same-origin token, so the parent can never read
+    # iframe.contentDocument — the height-fitting ResizeObserver silently
+    # fails and the box is stuck at its 300px floor no matter what
+    # max_height is set to (that's the "still a tiny window" bug: raising
+    # max_height alone can't fix it, the observer never fires). The same
+    # sandboxed iframe theme also force-applies table{display:block} to
+    # EVERY <table>, which shreds table-based layouts (WHMCS invoices/
+    # notifications are almost always table-laid-out HTML email) into a
+    # stack of tiny independently-scrolling boxes.
+    # sandbox=False renders through DOMPurify-sanitized dangerouslySetInnerHTML
+    # inside the page's own Tailwind `prose` typography instead of an iframe:
+    # real auto height, and prose's table rule is `table-layout:auto` (not
+    # display:block), so table-based email HTML lays out the way it was
+    # designed to. Already the proven pattern for trusted HTML in this same
+    # codebase (gemini, tasks, spotify all use ui.Html(sandbox=False)).
     if body:
         if body_type == "html":
-            msg_children.append(ui.Html(content=body, sandbox=True, theme="light",
-                                         max_height=900))
+            msg_children.append(ui.Html(content=body, sandbox=False, theme="light"))
         else:
             safe_text = html_escape(body)
             msg_children.append(ui.Html(
@@ -244,7 +272,7 @@ async def build_email_viewer(
                     f'font-family:-apple-system,BlinkMacSystemFont,sans-serif;'
                     f'font-size:14px;line-height:1.65;margin:0">{safe_text}</pre>'
                 ),
-                sandbox=True, theme="light", max_height=900,
+                sandbox=False, theme="light",
             ))
     else:
         msg_children.append(ui.Empty(message="No content", icon="FileText"))
