@@ -248,6 +248,38 @@ async def test_plain_text_body_follows_app_theme_not_forced_light(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_plain_text_body_not_wrapped_in_pre_tag(monkeypatch):
+    """REAL root cause of "still dark-on-dark" even after omitting theme=:
+    Tailwind Typography (the `prose` classes DHtml renders through) has a
+    dedicated rule for <pre> -- `.prose :where(pre){color:var(
+    --tw-prose-pre-code);background:var(--tw-prose-pre-bg)}` -- it treats
+    <pre> as a CODE BLOCK and force-sets its own color/background, which
+    wins over the inherited .text-body color regardless of theme=. Wrapping
+    plain text in <pre> silently defeated the theme fix. Must use <div> (or
+    any non-pre/code element) with white-space:pre-wrap instead, so the
+    plain inherited .text-body color -- the actually theme-reactive one --
+    is what renders.
+    """
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    provider = FakeProvider(_base_email_result(body="plain text body", body_type="text"))
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    html_nodes = _find_html_nodes(node)
+    assert html_nodes, "expected at least one Html node in the tree"
+    plain_text_nodes = [n for n in html_nodes if "plain text body" in str(n.props.get("content", ""))]
+    assert plain_text_nodes, "expected the plain-text body content in an Html node"
+    for n in plain_text_nodes:
+        content = n.props.get("content", "")
+        assert "<pre" not in content, (
+            "plain-text body must not be wrapped in <pre> -- Tailwind Typography's "
+            "prose classes force their own color/background on <pre> (code-block "
+            "styling), which defeats the theme-reactive .text-body color"
+        )
+
+
+@pytest.mark.asyncio
 async def test_html_body_keeps_light_theme_for_own_design(monkeypatch):
     """HTML mail (WHMCS invoices etc.) ships its own design/colours -- it
     should still force theme="light" so it renders as a white "paper"

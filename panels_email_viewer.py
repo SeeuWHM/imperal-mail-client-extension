@@ -274,15 +274,27 @@ async def build_email_viewer(
             # Deliberately omitting theme= here (SDK default is theme="dark",
             # which DHtml renders as `prose-invert text-body` — and .text-body
             # is the one prose class wired to --imp-color-text, the CSS var
-            # the panel already flips between light/dark. That's what makes
-            # this render dark text in light mode and light text in dark mode
-            # automatically, with no manual theme-detection needed here.
+            # the panel already flips between light/dark.
+            #
+            # REAL FIX: this used to wrap the text in <pre>. Tailwind
+            # Typography (the `prose` classes DHtml renders through) has a
+            # dedicated rule for `pre` — `.prose :where(pre){color:var(
+            # --tw-prose-pre-code);background:var(--tw-prose-pre-bg)}` — it
+            # treats <pre> as a CODE BLOCK and force-sets its own color/bg,
+            # which wins over the inherited .text-body color no matter what
+            # theme= is passed. That's the actual root cause of "still dark
+            # text in dark mode": omitting theme= was correct but powerless
+            # against this more specific rule. Using <div> instead of <pre>
+            # (same white-space:pre-wrap for line-break preservation) avoids
+            # that code-block styling entirely, so the plain inherited
+            # .text-body color (the theme-reactive one) is what actually
+            # renders.
             safe_text = html_escape(body)
             msg_children.append(ui.Html(
                 content=(
-                    f'<pre style="white-space:pre-wrap;word-break:break-word;'
+                    f'<div style="white-space:pre-wrap;word-break:break-word;'
                     f'font-family:-apple-system,BlinkMacSystemFont,sans-serif;'
-                    f'font-size:14px;line-height:1.65;margin:0">{safe_text}</pre>'
+                    f'font-size:14px;line-height:1.65;margin:0">{safe_text}</div>'
                 ),
                 sandbox=False,
             ))
