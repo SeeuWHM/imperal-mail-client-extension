@@ -1,5 +1,38 @@
 # Changelog
 
+## [6.6.2] — 2026-08-20 — Fix: plain-text mail now follows app theme (dark/light); Accounts vs Filters tabs get distinct styling
+
+### Fixed
+- **Plain-text email body ignored the app's dark/light theme.** Both the HTML
+  and plain-text bodies were forced through `ui.Html(..., theme="light")`.
+  That's correct for HTML mail (renders the sender's own design, e.g. WHMCS
+  invoices, as a white "paper" background like a real mail client). But
+  plain-text mail has no design of its own — forcing `theme="light"` on it
+  hardcoded dark text on white regardless of the user's actual theme, so in
+  dark mode the text was unreadable. Removed `theme=` from the plain-text
+  branch so it now uses the SDK's default (theme-reactive) rendering path,
+  which follows `--imp-color-text` — the same CSS variable the rest of the
+  app already flips between light and dark.
+
+### Changed
+- **Accounts and Filters tabs (right panel) now have distinct visual
+  identities** instead of an identical-looking list under a relabeled tab.
+  Accounts gets a blue/green stat-card identity ("Mailboxes" — accounts you
+  own, unread count); Filters gets purple/orange ("Smart Filters" — how many
+  rules, how many distinct colors in use). The panel header text/subtitle
+  now change with the active tab too. Verified live via SDK that filters and
+  their actions (create/apply/delete) actually work end-to-end before
+  styling them.
+
+### Investigated (not fixed here — platform-side)
+- **Reply/compose form relocating to the right panel** after navigating away
+  without pressing Back, and Back subsequently reproducing the same
+  relocation. Confirmed this extension's own code has no right-slot
+  reference to `compose` anywhere — the center-slot routing between
+  `email_viewer` and `compose` (both declared `slot="center"`) is resolved
+  entirely in the platform's panel-discovery/shell code, which is out of
+  this extension's reach.
+
 ## [6.6.1] — 2026-08-20 — Fix: HTML body still tiny + broken WHMCS tables; attachments now readable
 
 ### Fixed
