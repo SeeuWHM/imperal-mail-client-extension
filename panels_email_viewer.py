@@ -263,8 +263,20 @@ async def build_email_viewer(
     # codebase (gemini, tasks, spotify all use ui.Html(sandbox=False)).
     if body:
         if body_type == "html":
+            # theme="light": HTML mail almost always ships its own design
+            # (background/colours baked into the markup, WHMCS invoices
+            # included) — force a white "paper" background so that design
+            # renders as the sender intended, same as a real mail client.
             msg_children.append(ui.Html(content=body, sandbox=False, theme="light"))
         else:
+            # Plain-text mail has NO design of its own — it must follow the
+            # app's own theme instead of being forced to dark-on-white.
+            # Deliberately omitting theme= here (SDK default is theme="dark",
+            # which DHtml renders as `prose-invert text-body` — and .text-body
+            # is the one prose class wired to --imp-color-text, the CSS var
+            # the panel already flips between light/dark. That's what makes
+            # this render dark text in light mode and light text in dark mode
+            # automatically, with no manual theme-detection needed here.
             safe_text = html_escape(body)
             msg_children.append(ui.Html(
                 content=(
@@ -272,7 +284,7 @@ async def build_email_viewer(
                     f'font-family:-apple-system,BlinkMacSystemFont,sans-serif;'
                     f'font-size:14px;line-height:1.65;margin:0">{safe_text}</pre>'
                 ),
-                sandbox=False, theme="light",
+                sandbox=False,
             ))
     else:
         msg_children.append(ui.Empty(message="No content", icon="FileText"))

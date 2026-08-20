@@ -223,6 +223,49 @@ async def test_html_body_never_sandboxed_for_plain_text(monkeypatch):
         assert html_node.props.get("sandbox") is False
 
 
+@pytest.mark.asyncio
+async def test_plain_text_body_follows_app_theme_not_forced_light(monkeypatch):
+    """Plain-text mail has no design of its own -- it must render through the
+    SDK's default (theme-reactive) path, not theme="light" (which forces
+    dark-on-white regardless of the user's app theme). HTML mail keeps
+    theme="light" on purpose (it renders the sender's own design, same as a
+    real mail client) -- this test asserts the plain-text branch specifically
+    does NOT set theme="light".
+    """
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    provider = FakeProvider(_base_email_result(body="plain text body", body_type="text"))
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    html_nodes = _find_html_nodes(node)
+    assert html_nodes, "expected at least one Html node in the tree"
+    for html_node in html_nodes:
+        assert html_node.props.get("theme") != "light", (
+            "plain-text body must not force theme=\"light\" -- it should follow "
+            "the app's own dark/light theme via the SDK default"
+        )
+
+
+@pytest.mark.asyncio
+async def test_html_body_keeps_light_theme_for_own_design(monkeypatch):
+    """HTML mail (WHMCS invoices etc.) ships its own design/colours -- it
+    should still force theme="light" so it renders as a white "paper"
+    background, same as any real mail client renders sender HTML.
+    """
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    provider = FakeProvider(_base_email_result(
+        body="<table><tr><td>Invoice</td></tr></table>", body_type="html",
+    ))
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    html_nodes = _find_html_nodes(node)
+    assert html_nodes, "expected at least one Html node in the tree"
+    assert any(n.props.get("theme") == "light" for n in html_nodes)
+
+
 # ── Attachments: real 'Read text' action wired to read_attachment() ─────────
 
 @pytest.mark.asyncio

@@ -59,6 +59,7 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
         items.append(ui.ListItem(
             id=email, title=email,
             subtitle=subtitle_text,
+            icon="Mail",
             avatar=ui.Avatar(fallback=email[0].upper(), size="sm"),
             badge=ui.Badge(f"✓ {unread}" if unread > 0 else "✓ Active", color="green") if is_active else (
                 ui.Badge(str(unread), color="blue") if unread > 0 else None),
@@ -67,12 +68,15 @@ async def _build_accounts_tab(ctx) -> ui.UINode:
                       "on_click": ui.Call("disconnect", account=email)}],
         ))
 
+    # Accounts get a blue/green identity (mailboxes you own) vs. Filters'
+    # purple/orange (rules you've written) — the two tabs should read as
+    # different modes at a glance, not just a relabeled list underneath.
     return ui.Stack([
         ui.Stats([
-            ui.Stat(label="Unread",   value=total_unread, color="blue" if total_unread else ""),
-            ui.Stat(label="Accounts", value=len(accounts)),
+            ui.Stat(label="Accounts", value=len(accounts), color="blue", icon="Mail"),
+            ui.Stat(label="Unread",   value=total_unread, color="green" if total_unread else "gray"),
         ], columns=2),
-        ui.Divider(),
+        ui.Divider(label="Mailboxes"),
         ui.List(items=items),
         ui.Divider(),
         ui.Button("Add Account", icon="Plus", variant="outline",
@@ -106,6 +110,7 @@ async def _build_filters_tab(ctx) -> ui.UINode:
     COLOR_MAP = {"blue": "blue", "green": "green", "red": "red",
                  "yellow": "yellow", "purple": "purple", "orange": "orange"}
     items = []
+    colors_in_use: set[str] = set()
     for f in page_data:
         d = f.data
         # Criteria subtitle
@@ -126,18 +131,26 @@ async def _build_filters_tab(ctx) -> ui.UINode:
             subtitle = f"{filter_account[:28]} · {criteria_str}"
 
         color = COLOR_MAP.get(d.get("color", "blue"), "blue")
+        colors_in_use.add(color)
         items.append(ui.ListItem(
             id=f.id,
             title=d.get("name", "filter"),
             subtitle=subtitle,
-            badge=ui.Badge("●", color=color),
+            icon="Filter",
+            badge=ui.Badge(d.get("color", "blue").capitalize(), color=color, dot=True),
             actions=[{"label": "Delete", "icon": "Trash2",
                       "on_click": ui.Call("delete_filter", filter_id=f.id)}],
         ))
 
+    # Filters get their own purple/amber identity (vs. blue/green for Accounts)
+    # so the two tabs read as visually distinct modes, not just a relabeled list.
     return ui.Stack([
+        ui.Stats([
+            ui.Stat(label="Filters", value=len(page_data), color="purple", icon="Filter"),
+            ui.Stat(label="Colors used", value=len(colors_in_use), color="orange"),
+        ], columns=2),
         ui.Text(f"Mailbox: {active_email}", variant="caption"),
-        ui.Text(f"{len(page_data)} filter(s)", variant="caption"),
+        ui.Divider(label="Smart Filters"),
         ui.List(items=items),
     ], gap=2)
 
@@ -145,19 +158,29 @@ async def _build_filters_tab(ctx) -> ui.UINode:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def build_accounts_panel(ctx, tab: str = "accounts", **kwargs) -> ui.UINode:
-    """Render accounts/filters right panel with tab switching."""
+    """Render accounts/filters right panel with tab switching.
+
+    The header text/subtitle change with the active tab (not a static "Mail"
+    for both) — together with each tab's own stat-card colour identity
+    (blue/green for Accounts, purple/orange for Filters) this makes the two
+    modes read as visually distinct at a glance, since switching between them
+    is a single click away.
+    """
     tab_bar = _tab_bar(tab)
     try:
         if tab == "filters":
             content = await _build_filters_tab(ctx)
+            header_title, header_subtitle = "Smart Filters", "Rules that sort mail automatically"
         else:
             content = await _build_accounts_tab(ctx)
+            header_title, header_subtitle = "Mailboxes", "Accounts connected to this mail client"
     except Exception as exc:
         log.error(f"accounts panel tab={tab} error: {exc}")
         content = ui.Alert(message=f"Error loading panel: {exc}", type="error")
+        header_title, header_subtitle = "Mail", ""
 
     return ui.Stack([
-        ui.Header(text="Mail", level=3),
+        ui.Header(text=header_title, level=3, subtitle=header_subtitle),
         tab_bar,
         ui.Divider(),
         content,
