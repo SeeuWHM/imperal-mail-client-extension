@@ -1,5 +1,33 @@
 # Changelog
 
+## [6.6.4] — 2026-08-20 — Fix: WHMCS/corporate HTML mail unreadable dark-on-dark (missing white backdrop)
+
+### Fixed
+- **HTML email body (WHMCS order notifications, invoices, corporate mail)
+  rendered dark text with no visible background in dark mode.** The viewer
+  renders HTML mail through `ui.Html(sandbox=False, theme="light")` — chosen
+  over the iframe/sandbox=True variant specifically because that one breaks
+  table-based email layouts (WHMCS mail is almost always table-laid-out).
+  But the non-iframe `sandbox=False` path only has an explicit white
+  background in the removed iframe variant (`bg-white` on the `<iframe>`
+  itself) — its plain `<div class="prose prose-sm max-w-none">` render path
+  carries NO background at all, `theme="light"` only picks the text-color
+  side of the prose classes. Real corporate HTML mail (WHMCS is the classic
+  case) sets its own dark inline text color while relying on landing on a
+  plain white inbox background — it never paints its own background because
+  no honest mail client needs it to. Without an explicit backdrop, that
+  dark-on-assumed-white text sat directly on the app's dark background,
+  unreadable in dark mode. Fixed by wrapping every HTML email body in one
+  inline-styled `<div style="background:#ffffff;color:#1a1a1a;...">` before
+  handing it to `ui.Html` — a fallback backdrop only, so mail that paints
+  its own background/colours on inner elements still wins there via normal
+  CSS cascade. Confirmed live: WHMCS "New Order Notification" mail on a
+  real account, computed style of the body's ancestor chain traced up to
+  the panel root showed every container `background: rgba(0,0,0,0)`
+  (fully transparent) before this fix. Added a regression test simulating a
+  WHMCS-style body (inline dark text, no background) asserting the white
+  backdrop wrapper is present.
+
 ## [6.6.3] — 2026-08-20 — Real fix: plain-text mail was still dark-on-dark because of a Tailwind `<pre>` code-block rule
 
 ### Fixed

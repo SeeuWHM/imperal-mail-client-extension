@@ -267,7 +267,28 @@ async def build_email_viewer(
             # (background/colours baked into the markup, WHMCS invoices
             # included) — force a white "paper" background so that design
             # renders as the sender intended, same as a real mail client.
-            msg_children.append(ui.Html(content=body, sandbox=False, theme="light"))
+            #
+            # BUT theme="light" alone is NOT enough when sandbox=False: DHtml's
+            # non-iframe path renders straight into
+            # `<div class="prose prose-sm max-w-none">` with NO background —
+            # the "paper" white only exists in the iframe/sandbox=True variant
+            # (which we can't use, see the table-layout comment above). Real
+            # mail (WHMCS invoices/order notices are the classic case) sets
+            # its OWN dark text colour inline while assuming it will land on
+            # a plain white inbox background — it never paints its own
+            # background because no honest mail client needs it to. Without
+            # an explicit backdrop here, that dark-on-assumed-white text sits
+            # directly on our dark app background = unreadable in dark mode.
+            # Wrapping in one inline-styled div gives every HTML email a
+            # guaranteed white backdrop + dark fallback text colour; an email
+            # that DOES paint its own background/colours on inner elements
+            # still wins there via normal CSS cascade — this is a fallback,
+            # not an override.
+            safe_html_body = (
+                '<div style="background:#ffffff;color:#1a1a1a;'
+                'padding:0.75rem;border-radius:0.5rem">' + body + "</div>"
+            )
+            msg_children.append(ui.Html(content=safe_html_body, sandbox=False, theme="light"))
         else:
             # Plain-text mail has NO design of its own — it must follow the
             # app's own theme instead of being forced to dark-on-white.

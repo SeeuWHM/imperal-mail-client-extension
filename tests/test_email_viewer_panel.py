@@ -298,6 +298,42 @@ async def test_html_body_keeps_light_theme_for_own_design(monkeypatch):
     assert any(n.props.get("theme") == "light" for n in html_nodes)
 
 
+@pytest.mark.asyncio
+async def test_html_body_gets_explicit_white_backdrop_for_whmcs_style_mail(monkeypatch):
+    """The REAL WHMCS bug: sandbox=False's non-iframe path renders through
+    `<div class="prose prose-sm max-w-none">` with NO background of its own
+    (only the iframe/sandbox=True variant has bg-white) -- theme="light"
+    alone only picks the text-color side of the prose classes. A WHMCS order
+    notification (and most corporate HTML mail) sets its OWN dark inline text
+    color while relying on landing on a plain white inbox background; it
+    never paints a background because no honest mail client needs it to.
+    Without an explicit backdrop, that dark-on-assumed-white text sits
+    directly on our dark app background = unreadable in dark mode. The fix
+    wraps the body in an explicit white/dark-text backdrop div.
+    """
+    acc = {"email": "<EMAIL>", "provider": "oauth"}
+    whmcs_body = (
+        '<div style="color:#333333">'
+        '<h2>Order Information</h2>'
+        '<p>Order ID: 92650</p>'
+        '</div>'
+    )
+    provider = FakeProvider(_base_email_result(body=whmcs_body, body_type="html"))
+    monkeypatch.setattr(pv, "_get_acc", AsyncMock(return_value=(acc, provider)))
+
+    node = await pv.build_email_viewer(object(), "msg1", account="<EMAIL>")
+
+    html_nodes = _find_html_nodes(node)
+    assert html_nodes, "expected at least one Html node in the tree"
+    rendered_content = html_nodes[0].props.get("content", "")
+    assert "background:#ffffff" in rendered_content, (
+        "HTML email body must be wrapped in an explicit white backdrop -- "
+        "otherwise mail that sets its own dark text but no background "
+        "(WHMCS invoices/order notices are the classic case) is unreadable "
+        "dark-on-dark in the app's dark theme."
+    )
+
+
 # ── Attachments: real 'Read text' action wired to read_attachment() ─────────
 
 @pytest.mark.asyncio
