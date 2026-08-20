@@ -137,7 +137,7 @@ async def _build_filters_tab(ctx) -> ui.UINode:
             title=d.get("name", "filter"),
             subtitle=subtitle,
             icon="Filter",
-            badge=ui.Badge(d.get("color", "blue").capitalize(), color=color, dot=True),
+            badge=ui.Badge(d.get("color", "blue").capitalize(), color=color),
             actions=[{"label": "Delete", "icon": "Trash2",
                       "on_click": ui.Call("delete_filter", filter_id=f.id)}],
         ))
