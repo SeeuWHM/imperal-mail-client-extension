@@ -10,9 +10,9 @@ import logging
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
+from mail_providers.errors import mail_error_result
 from handlers_inbox_impl import impl_search
 from mail_providers.helpers import _active_account
-from schemas import SearchResult
 from schemas_params import (
     CreateFilterParams, UpdateFilterParams, FilterIdParam,
     SetFolderPrefsParams, EmptyParams,
@@ -104,7 +104,7 @@ async def fn_create_filter(ctx, params: CreateFilterParams) -> ActionResult:
             summary=summary + ".",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("list_filters", action_type="read",
@@ -127,7 +127,7 @@ async def fn_list_filters(ctx, params: EmptyParams) -> ActionResult:
             summary=f"{len(relevant)} smart filter(s) for {active_email}.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("apply_filter", action_type="read",
@@ -156,7 +156,7 @@ async def fn_apply_filter(ctx, params: FilterIdParam) -> ActionResult:
             summary=f"Filter '{name}': {result.total} matching email(s).",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("update_filter", action_type="write", event="filter.updated",
@@ -185,7 +185,7 @@ async def fn_update_filter(ctx, params: UpdateFilterParams) -> ActionResult:
             summary=f"Filter '{updated.data['name']}' updated.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("delete_filter", action_type="destructive", event="filter.deleted",
@@ -208,7 +208,7 @@ async def fn_delete_filter(ctx, params: FilterIdParam) -> ActionResult:
             summary=f"Smart filter '{name}' deleted.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 # ── Folder preferences ────────────────────────────────────────────────────────
@@ -245,7 +245,7 @@ async def fn_set_folder_prefs(ctx, params: SetFolderPrefsParams) -> ActionResult
             refresh_panels=["inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("get_folder_prefs", action_type="read",
@@ -267,7 +267,7 @@ async def fn_get_folder_prefs(ctx, params: EmptyParams) -> ActionResult:
             summary=f"Visible: {', '.join(d.get('visible_folders', []) or ['all'])}.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("list_mail_folders", action_type="read",
@@ -313,4 +313,4 @@ async def fn_list_mail_folders(ctx, params: EmptyParams) -> ActionResult:
             summary=summary + ".",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)

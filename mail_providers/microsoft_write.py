@@ -9,8 +9,10 @@ from .helpers import (
     MS_GRAPH_BASE,
     _graph_post, _graph_patch,
     _refresh_token_if_needed,
-    _remove_from_cache, _update_read_in_cache, _save_last_read,
+    _remove_from_cache, _update_read_in_cache,
 )
+from mail_providers.errors import MailAuthExpiredError
+from mail_providers.errors import raise_if_auth_expired
 
 _MS_BATCH_URL = f"{MS_GRAPH_BASE}/$batch"
 _MS_BATCH_SIZE = 20  # Graph JSON batching limit
@@ -120,6 +122,7 @@ class MicrosoftWriteMixin:
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
                 params={"$select": "id,displayName", "$top": "100"},
             )
+            raise_if_auth_expired(resp, acc=acc, provider="microsoft")
             if resp.status_code == 200:
                 for folder in resp.json().get("value", []):
                     if folder.get("displayName", "").lower() == name.lower():
@@ -145,6 +148,8 @@ class MicrosoftWriteMixin:
                 return self.ok(moved=True, message_id=message_id,
                                from_folder=from_folder, to_folder=to_folder)
             return self.err(f"Move failed ({resp.status_code}): {resp.text[:200]}")
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Move failed: {e}")
 
@@ -169,9 +174,12 @@ class MicrosoftWriteMixin:
                 f"{MS_GRAPH_BASE}/me/messages/{message_id}",
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
             )
+            raise_if_auth_expired(resp, acc=acc, provider="microsoft")
             if resp.status_code in (204, 404):
                 return self.ok(purged=True, message_id=message_id)
             return self.err(f"Purge failed ({resp.status_code}): {resp.text[:200]}")
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Purge failed: {e}")
 
@@ -191,8 +199,11 @@ class MicrosoftWriteMixin:
                              "Content-Type": "application/json"},
                     json=batch_body,
                 )
+                raise_if_auth_expired(resp, acc=acc, provider="microsoft")
                 if resp.status_code == 200:
                     responses.extend(resp.json().get("responses", []))
+            except MailAuthExpiredError:
+                raise
             except Exception as e:
                 log.warning("ms_batch chunk failed: %s", e)
         return responses

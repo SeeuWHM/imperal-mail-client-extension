@@ -16,6 +16,8 @@ from .helpers import (
     _strip_html, _norm_graph_msg,
     MS_GRAPH_BASE,
 )
+from mail_providers.errors import MailAuthExpiredError
+from mail_providers.errors import raise_if_auth_expired
 
 log = logging.getLogger(__name__)
 
@@ -147,6 +149,8 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
             resp = await _graph_get(ctx, f"/me/mailFolders/{ms_folder}", acc)
             resp.raise_for_status()
             return resp.json().get("unreadItemCount", 0)
+        except MailAuthExpiredError:
+            raise
         except Exception:
             return 0
 
@@ -159,6 +163,8 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
             resp.raise_for_status()
             data = resp.json()
             return {"total": data.get("totalItemCount", 0), "unread": data.get("unreadItemCount", 0)}
+        except MailAuthExpiredError:
+            raise
         except Exception:
             return {"total": 0, "unread": 0}
 
@@ -177,8 +183,11 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
                          "ConsistencyLevel": "eventual"},
                 params={"$top": 1, "$count": "true", "$select": "id"},
             )
+            raise_if_auth_expired(resp, acc=acc, provider="microsoft")
             if resp.status_code == 200:
                 total = int(resp.json().get("@odata.count", total) or total)
+        except MailAuthExpiredError:
+            raise
         except Exception:
             pass
         return {
@@ -201,8 +210,11 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
                 params={"$top": 1, "$count": "true", "$select": "id",
                         "$filter": f"receivedDateTime ge {midnight}"},
             )
+            raise_if_auth_expired(resp, acc=acc, provider="microsoft")
             if resp.status_code == 200:
                 return int(resp.json().get("@odata.count", 0) or 0)
+        except MailAuthExpiredError:
+            raise
         except Exception:
             pass
         return 0
@@ -273,6 +285,7 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
             headers={"Authorization": f"Bearer {acc['access_token']}"},
             params={"$select": "internetMessageHeaders"},
         )
+        raise_if_auth_expired(resp, acc=acc, provider="microsoft")
         if resp.status_code != 200:
             return "", ""
         hdrs_list = resp.json().get("internetMessageHeaders") or []
@@ -298,6 +311,8 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
             return self.err("Attachment has no content.")
         try:
             content = base64.b64decode(content_b64)
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Could not decode attachment content: {e}")
         return self.ok(content=content, filename=att.get("name", ""),
@@ -329,6 +344,7 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
                     "$select": "id,subject,from,receivedDateTime,isRead",
                 },
             )
+            raise_if_auth_expired(resp, acc=acc, provider="microsoft")
             resp.raise_for_status()
             data = resp.json()
             results = [_norm_graph_msg(m) for m in data.get("value", [])]
@@ -354,6 +370,7 @@ class MicrosoftMailProvider(MicrosoftWriteMixin, BaseMailProvider):
                 "$select": "id,subject,from,receivedDateTime,isRead",
             },
         )
+        raise_if_auth_expired(resp, acc=acc, provider="microsoft")
         resp.raise_for_status()
         data = resp.json()
         msgs = [_norm_graph_msg(m) for m in data.get("value", [])]

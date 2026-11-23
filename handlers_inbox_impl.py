@@ -5,12 +5,12 @@ import datetime as _dt
 import logging
 
 from ctx_helpers import _get_acc
-from handlers_ui import _email_ui, _inbox_ui, _search_ui
 from mail_providers import get_provider, attachments as attachment_engine
 from mail_providers.helpers import encode_cursor, decode_cursor, _all_accounts
 from schemas import (
     EmailBody, InboxPageResult, SearchResult, SendResult, ThreadView, AttachmentContent,
 )
+from mail_providers.errors import MailAuthExpiredError
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ async def impl_inbox(ctx, folder: str = "inbox", cursor: str = "",
         messages, next_cursor_data, has_more = await provider.fetch_page(
             ctx, acc, folder, clamped_limit, cursor_data,
         )
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning("fetch_page failed folder=%s: %s", folder, e)
         raise RuntimeError(f"Failed to fetch {folder}: {e}")
@@ -72,6 +74,8 @@ async def impl_read_email(ctx, message_id: str, account: str = "") -> EmailBody:
                 continue
             data = {k: v for k, v in result.items() if k != "RESULT"}
             return EmailBody.model_validate(data)
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             log.warning("read_email failed for %s: %s", acc.get("email", "?"), e)
     raise RuntimeError(last_err)
@@ -125,6 +129,11 @@ async def impl_search(ctx, query: str, max_results: int = 50,
                     msg = {**msg, "message_id": mid}
                 msg["_account"] = acc.get("email", "")
                 all_results.append(msg)
+        except MailAuthExpiredError as e:
+            log.warning("search auth expired for %s: %s", acc.get("email", "?"), e)
+            if len(accounts) == 1:
+                raise
+            auth_expired_err = e
         except Exception as e:
             log.warning("search failed for %s: %s", acc.get("email", "?"), e)
 
@@ -147,6 +156,8 @@ async def impl_search(ctx, query: str, max_results: int = 50,
 
     # Use provider totals (incl. Gmail resultSizeEstimate) as authoritative count.
     # Fall back to len(all_results) only if providers returned 0.
+    if auth_expired_err is not None and not all_results:
+        raise auth_expired_err
     final_total = max(total_across_providers, len(all_results))
     return SearchResult(query=query, results=all_results[:clamped],
                         total=final_total)
@@ -164,6 +175,8 @@ async def impl_folder(ctx, folder: str, cursor: str = "",
         messages, next_cursor_data, has_more = await provider.fetch_page(
             ctx, acc, folder, clamped_limit, cursor_data,
         )
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning("fetch_page failed folder=%s: %s", folder, e)
         raise RuntimeError(f"Failed to fetch folder '{folder}': {e}")
@@ -276,6 +289,8 @@ async def impl_forward(ctx, message_id: str, to: str,
                 continue
             return SendResult(sent=True, to=to,
                               message_id=result.get("message_id") or result.get("id"))
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             log.warning("forward failed for %s: %s", acc.get("email", "?"), e)
     raise RuntimeError(last_err)

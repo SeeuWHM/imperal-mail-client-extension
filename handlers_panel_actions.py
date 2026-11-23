@@ -6,6 +6,7 @@ import logging
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
+from mail_providers.errors import mail_error_result
 from ctx_helpers import _get_acc
 from mail_providers import get_provider
 import json
@@ -153,7 +154,7 @@ async def fn_mail_action(ctx, params: MailActionParams) -> ActionResult:
             refresh_panels=["inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("folder_counts", action_type="read",
@@ -168,7 +169,7 @@ async def fn_folder_counts(ctx, params: AccountParam) -> ActionResult:
             summary=f"INBOX: {r.counts.get('INBOX', 0)} unread.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 async def impl_count(ctx, folder: str = "", query: str = "",
@@ -235,7 +236,7 @@ async def fn_count_emails(ctx, params: CountParams) -> ActionResult:
             summary=f"{r.counts.get('total', 0)} email(s).",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("get_oauth_url", action_type="read",
@@ -250,7 +251,7 @@ async def fn_get_oauth_url(ctx, params: OAuthParams) -> ActionResult:
             summary=f"OAuth URL for {params.provider}.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("add_imap", action_type="write", event="account.connected",
@@ -268,4 +269,4 @@ async def fn_add_imap(ctx, params: AddImapParams) -> ActionResult:
             summary=f"Connected {r.email} via IMAP ({r.imap_server}).",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)

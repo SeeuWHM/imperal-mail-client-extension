@@ -25,6 +25,7 @@ from .imap_write import (
     _sync_smtp_send, _sync_smtp_xoauth2_send, _save_to_imap_sent,
     _sync_imap_move, _sync_imap_flag_op, _sync_imap_purge,
 )
+from mail_providers.errors import MailAuthExpiredError
 
 log = logging.getLogger(__name__)
 
@@ -124,6 +125,8 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
             return await asyncio.to_thread(
                 _sync_imap_unread_count, acc.get("email", ""), args["host"], args["port"],
                 imap_folder, password=args["password"], access_token=args["access_token"])
+        except MailAuthExpiredError:
+            raise
         except Exception:
             return 0
 
@@ -135,6 +138,8 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
             return await asyncio.to_thread(
                 _sync_imap_folder_stats, acc.get("email", ""), args["host"], args["port"],
                 imap_folder, password=args["password"], access_token=args["access_token"])
+        except MailAuthExpiredError:
+            raise
         except Exception:
             return {"total": 0, "unread": 0}
 
@@ -146,6 +151,8 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
             return await asyncio.to_thread(
                 _sync_imap_today_count, acc.get("email", ""), args["host"], args["port"],
                 password=args["password"], access_token=args["access_token"])
+        except MailAuthExpiredError:
+            raise
         except Exception:
             return 0
 
@@ -157,6 +164,8 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
             data = await asyncio.to_thread(
                 _sync_imap_read, email_addr, args["host"], args["port"], message_id,
                 password=args["password"], access_token=args["access_token"])
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"IMAP error: {e}")
         if not data: return self.err(f"Message {message_id} not found.")
@@ -179,6 +188,8 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
                 _sync_imap_download_attachment, email_addr, args["host"], args["port"],
                 message_id, attachment_id,
                 password=args["password"], access_token=args["access_token"])
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"IMAP error: {e}")
         if data.get("RESULT") != "SUCCESS":
@@ -205,6 +216,8 @@ class ImapMailProvider(ImapBulkMixin, BaseMailProvider):
             orig = await asyncio.to_thread(
                 _sync_imap_read, email_addr, args["host"], args["port"], message_id,
                 password=args["password"], access_token=args["access_token"])
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Could not read original: {e}")
         if not orig: return self.err(f"Message {message_id} not found.")

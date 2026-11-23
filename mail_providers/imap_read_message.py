@@ -8,6 +8,7 @@ import re
 from .text_utils import _decode_header
 from .helpers import IMAP_FOLDER_CANDIDATES
 from .imap_connection import _imap_connect_auth
+from mail_providers.errors import MailAuthExpiredError
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +69,6 @@ def _walk_imap_attachments(msg) -> list[dict]:
     attachments = []
     for idx, part in enumerate(msg.walk()):
         filename = part.get_filename()
-        disposition = str(part.get("Content-Disposition") or "")
         if not filename:
             continue
         if part.get_content_maintype() == "multipart":
@@ -264,6 +264,8 @@ def _sync_imap_search(email_addr: str, host: str, port: int, query: str, max_res
 
         imap.logout()
         return messages, total_found
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning(f"IMAP search failed: {e}")
         return None, 0
@@ -298,6 +300,8 @@ def _sync_imap_folder(email_addr: str, host: str, port: int, folder_name: str,
             })
         imap.logout()
         return messages
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning(f"IMAP folder browse failed: {e}")
         return None

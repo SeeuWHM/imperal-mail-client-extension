@@ -7,6 +7,7 @@ import time
 
 from imperal_sdk import Context
 
+from .errors import MailAuthExpiredError, raise_if_auth_expired
 from .helpers import (
     COLLECTION,
     GOOGLE_TOKEN_URL, GMAIL_API,
@@ -20,47 +21,52 @@ log = logging.getLogger(__name__)
 
 async def _api_get(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.get(
+    resp = await ctx.http.get(
         f"{GMAIL_API}/{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="google")
 
 
 async def _api_post(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.post(
+    resp = await ctx.http.post(
         f"{GMAIL_API}/{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="google")
 
 
 async def _graph_get(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.get(
+    resp = await ctx.http.get(
         f"{MS_GRAPH_BASE}{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="microsoft")
 
 
 async def _graph_post(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.post(
+    resp = await ctx.http.post(
         f"{MS_GRAPH_BASE}{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="microsoft")
 
 
 async def _graph_patch(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.patch(
+    resp = await ctx.http.patch(
         f"{MS_GRAPH_BASE}{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="microsoft")
 
 
 async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
@@ -77,6 +83,22 @@ async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
     })
     if resp.status_code != 200:
         log.warning(f"Google token refresh failed: {resp.status_code}")
+        if resp.status_code in (400, 401):
+            acc["_needs_reauth"] = True
+            doc_id = acc.get("doc_id")
+            if doc_id:
+                try:
+                    await ctx.store.update(COLLECTION, doc_id, {"_needs_reauth": True})
+                except Exception:
+                    pass
+            email = str(acc.get("email") or "")
+            who = f" for {email}" if email else ""
+            raise MailAuthExpiredError(
+                f"Google mailbox token expired{who} (HTTP {resp.status_code}) — reconnect mailbox.",
+                email=email,
+                provider="google",
+                status_code=resp.status_code,
+            )
         return acc
     tokens = resp.json()
     acc["access_token"] = tokens["access_token"]
@@ -104,7 +126,7 @@ async def _refresh_microsoft_token(ctx: Context, acc: dict) -> dict:
         except Exception:
             err_body = resp.text[:200] if hasattr(resp, 'text') else "unknown"
         log.warning(f"Microsoft token refresh failed: {resp.status_code} — {err_body}")
-        if resp.status_code == 400:
+        if resp.status_code in (400, 401):
             acc["_needs_reauth"] = True
             doc_id = acc.get("doc_id")
             if doc_id:
@@ -112,6 +134,14 @@ async def _refresh_microsoft_token(ctx: Context, acc: dict) -> dict:
                     await ctx.store.update(COLLECTION, doc_id, {"_needs_reauth": True})
                 except Exception:
                     pass
+            email = str(acc.get("email") or "")
+            who = f" for {email}" if email else ""
+            raise MailAuthExpiredError(
+                f"Microsoft mailbox token expired{who} (HTTP {resp.status_code}) — reconnect mailbox.",
+                email=email,
+                provider="microsoft",
+                status_code=resp.status_code,
+            )
         return acc
     tokens = resp.json()
     acc["access_token"] = tokens["access_token"]
@@ -136,7 +166,24 @@ async def _refresh_yahoo_token(ctx: Context, acc: dict) -> dict:
         headers={"Authorization": f"Basic {creds}"},
     )
     if resp.status_code != 200:
-        log.warning(f"Yahoo token refresh failed: {resp.status_code}"); return acc
+        log.warning(f"Yahoo token refresh failed: {resp.status_code}")
+        if resp.status_code in (400, 401):
+            acc["_needs_reauth"] = True
+            doc_id = acc.get("doc_id")
+            if doc_id:
+                try:
+                    await ctx.store.update(COLLECTION, doc_id, {"_needs_reauth": True})
+                except Exception:
+                    pass
+            email = str(acc.get("email") or "")
+            who = f" for {email}" if email else ""
+            raise MailAuthExpiredError(
+                f"Yahoo mailbox token expired{who} (HTTP {resp.status_code}) — reconnect mailbox.",
+                email=email,
+                provider="yahoo",
+                status_code=resp.status_code,
+            )
+        return acc
     tokens = resp.json()
     acc["access_token"] = tokens["access_token"]
     acc["expires_at"]   = int(time.time()) + tokens.get("expires_in", 3600)

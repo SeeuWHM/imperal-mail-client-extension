@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
+from mail_providers.errors import mail_error_result
 from ctx_helpers import _get_acc
 from schemas_sdl_builders_rules import build_rule_op, RuleOpResult
 
@@ -107,7 +108,7 @@ async def fn_create_mail_folder(ctx, params: CreateFolderParams) -> ActionResult
             refresh_panels=["inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("delete_mail_folder", action_type="destructive", event="folder.deleted",
@@ -141,4 +142,4 @@ async def fn_delete_mail_folder(ctx, params: DeleteFolderParams) -> ActionResult
             refresh_panels=["inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)

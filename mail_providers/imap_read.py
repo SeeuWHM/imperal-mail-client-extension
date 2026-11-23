@@ -18,6 +18,7 @@ from .imap_read_message import (  # noqa: F401
     _sync_imap_read, _sync_imap_search, _sync_imap_folder,
     _sync_imap_download_attachment,
 )
+from mail_providers.errors import MailAuthExpiredError
 
 log = logging.getLogger(__name__)
 
@@ -98,6 +99,8 @@ def _sync_imap_folder_stats(email_addr: str, host: str, port: int, imap_folder: 
                 continue
     finally:
         try: imap.logout()
+        except MailAuthExpiredError:
+            raise
         except Exception: pass
     return {"total": 0, "unread": 0}
 
@@ -116,6 +119,8 @@ def _sync_imap_today_count(email_addr: str, host: str, port: int,
         if r != "OK" or not data or not data[0]:
             return 0
         return len(data[0].split())
+    except MailAuthExpiredError:
+        raise
     except Exception:
         return 0
     finally:

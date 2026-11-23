@@ -8,8 +8,8 @@ import time
 from email.mime.text import MIMEText
 
 from .text_utils import _xoauth2_string
-from .helpers import IMAP_FOLDER_CANDIDATES
 from .imap_connection import _imap_connect_auth
+from mail_providers.errors import MailAuthExpiredError
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +38,14 @@ def _sync_smtp_send(email_addr: str, password: str, smtp_host: str, smtp_port: i
         smtp.sendmail(email_addr, all_recipients, msg_bytes)
         smtp.quit()
         return True, "", msg_bytes
+    except smtplib.SMTPAuthenticationError as e:
+        raise MailAuthExpiredError(
+            f"SMTP authentication failed for {email_addr}: {e} — reconnect mailbox.",
+            email=email_addr,
+            provider="imap",
+        ) from e
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         return False, str(e), b""
 
@@ -65,6 +73,14 @@ def _sync_smtp_xoauth2_send(email_addr: str, access_token: str, smtp_host: str, 
         smtp.sendmail(email_addr, all_recipients, msg_bytes)
         smtp.quit()
         return True, "", msg_bytes
+    except smtplib.SMTPAuthenticationError as e:
+        raise MailAuthExpiredError(
+            f"SMTP authentication failed for {email_addr}: {e} — reconnect mailbox.",
+            email=email_addr,
+            provider="imap",
+        ) from e
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         return False, str(e), b""
 
@@ -109,6 +125,8 @@ def _sync_imap_move(email_addr: str, host: str, port: int, message_id: str,
         imap.expunge()
         imap.logout()
         return True, ""
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         return False, str(e)
 
@@ -147,6 +165,8 @@ def _sync_imap_flag_op(email_addr: str, host: str, port: int, message_id: str,
                 continue
         imap.logout()
         return False, f"Message UID {message_id} not found in any folder"
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         return False, str(e)
 
@@ -212,6 +232,8 @@ def _sync_imap_purge(email_addr: str, host: str, port: int, message_id: str,
         imap.expunge()
         imap.logout()
         return True, ""
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         return False, str(e)
 
@@ -233,6 +255,8 @@ def _sync_imap_bulk_flag(email_addr: str, host: str, port: int, message_ids: lis
         imap.uid("STORE", uid_set, flag_cmd, flag_str)
         imap.logout()
         return True, len(message_ids)
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning("imap bulk_flag failed: %s", e)
         return False, 0
@@ -265,6 +289,8 @@ def _sync_imap_bulk_move(email_addr: str, host: str, port: int, message_ids: lis
         imap.expunge()
         imap.logout()
         return True, len(message_ids)
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning("imap bulk_move failed: %s", e)
         return False, 0
@@ -298,6 +324,8 @@ def _sync_imap_bulk_read_and_move(email_addr: str, host: str, port: int, message
         imap.expunge()
         imap.logout()
         return True, len(message_ids)
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning("imap bulk_read_and_move failed: %s", e)
         return False, 0
@@ -325,6 +353,8 @@ def _sync_imap_bulk_purge(email_addr: str, host: str, port: int, message_ids: li
                 continue
         imap.logout()
         return False, 0
+    except MailAuthExpiredError:
+        raise
     except Exception as e:
         log.warning("imap bulk_purge failed: %s", e)
         return False, 0
