@@ -240,3 +240,95 @@ async def test_skeleton_refresh_emits_needs_human_on_auth_expired_while_preservi
     assert result["needs_human"]["kind"] == "means"
     assert "alice@gmail.com" in result["needs_human"]["what"]
     ctx.notify.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_google_token_refresh_invalid_client_does_not_raise_auth_expired():
+    acc = {
+        "doc_id": "d1",
+        "email": "alice@gmail.com",
+        "provider": "google",
+        "access_token": "old",
+        "refresh_token": "rt",
+        "expires_at": 0,
+    }
+    ctx = _ctx_with_http(
+        post=_FakeResp(400, {"error": "invalid_client", "error_description": "Unauthorized"}),
+    )
+    with pytest.raises(RuntimeError) as exc_info:
+        await token_refresh._refresh_google_token(ctx, acc)
+    assert not isinstance(exc_info.value, MailAuthExpiredError)
+    assert "invalid_client" in str(exc_info.value)
+    assert not acc.get("_needs_reauth")
+    ctx.store.update.assert_not_awaited()
+    res = mail_error_result(exc_info.value).to_dict()
+    assert res["status"] == "error"
+    assert res.get("error_code") != AUTH_EXPIRED_CODE
+
+
+@pytest.mark.asyncio
+async def test_google_token_refresh_400_unknown_body_does_not_raise_auth_expired():
+    acc = {
+        "doc_id": "d1",
+        "email": "alice@gmail.com",
+        "provider": "google",
+        "access_token": "old",
+        "refresh_token": "rt",
+        "expires_at": 0,
+    }
+    ctx = _ctx_with_http(post=_FakeResp(400, {"error": "invalid_request"}))
+    with pytest.raises(RuntimeError) as exc_info:
+        await token_refresh._refresh_google_token(ctx, acc)
+    assert not isinstance(exc_info.value, MailAuthExpiredError)
+    assert not acc.get("_needs_reauth")
+    ctx.store.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_yahoo_token_refresh_invalid_grant_raises_auth_expired_but_invalid_client_does_not():
+    acc_grant = {
+        "doc_id": "dy1",
+        "email": "bob@yahoo.com",
+        "provider": "yahoo",
+        "access_token": "old",
+        "refresh_token": "rt",
+        "expires_at": 0,
+    }
+    ctx_grant = _ctx_with_http(post=_FakeResp(400, {"error": "invalid_grant"}))
+    with pytest.raises(MailAuthExpiredError) as exc_grant:
+        await token_refresh._refresh_yahoo_token(ctx_grant, acc_grant)
+    assert exc_grant.value.provider == "yahoo"
+    assert acc_grant.get("_needs_reauth") is True
+
+    acc_client = {
+        "doc_id": "dy2",
+        "email": "bob@yahoo.com",
+        "provider": "yahoo",
+        "access_token": "old",
+        "refresh_token": "rt",
+        "expires_at": 0,
+    }
+    ctx_client = _ctx_with_http(post=_FakeResp(401, {"error": "invalid_client"}))
+    with pytest.raises(RuntimeError) as exc_client:
+        await token_refresh._refresh_yahoo_token(ctx_client, acc_client)
+    assert not isinstance(exc_client.value, MailAuthExpiredError)
+    assert not acc_client.get("_needs_reauth")
+    ctx_client.store.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_microsoft_token_refresh_invalid_client_does_not_raise_auth_expired():
+    acc = {
+        "doc_id": "dm1",
+        "email": "carol@outlook.com",
+        "provider": "microsoft",
+        "access_token": "old",
+        "refresh_token": "rt",
+        "expires_at": 0,
+    }
+    ctx = _ctx_with_http(post=_FakeResp(400, {"error": "invalid_client"}))
+    with pytest.raises(RuntimeError) as exc_info:
+        await token_refresh._refresh_microsoft_token(ctx, acc)
+    assert not isinstance(exc_info.value, MailAuthExpiredError)
+    assert not acc.get("_needs_reauth")
+    ctx.store.update.assert_not_awaited()
