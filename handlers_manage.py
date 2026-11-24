@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
+from mail_providers.errors import mail_error_result
 
 from handlers_manage_impl import (
     impl_archive, impl_delete, impl_mark_read, impl_mark_unread, impl_star,
@@ -90,7 +91,7 @@ async def fn_archive(ctx, params: ArchiveParams) -> ActionResult:
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
                                     refresh_panels=["inbox"])
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 # ── delete ────────────────────────────────────────────────────────────────────
@@ -135,7 +136,7 @@ async def fn_delete(ctx, params: DeleteParams) -> ActionResult:
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
                                     refresh_panels=["inbox"])
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 # ── mark_read ─────────────────────────────────────────────────────────────────
@@ -186,7 +187,7 @@ async def fn_mark_read(ctx, params: MarkReadParams) -> ActionResult:
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
                                     refresh_panels=["inbox"])
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 # ── star ──────────────────────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ async def fn_star(ctx, params: StarUnifiedParams) -> ActionResult:
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
                                     refresh_panels=["inbox"])
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 # ── move ──────────────────────────────────────────────────────────────────────
@@ -264,7 +265,7 @@ async def fn_move(ctx, params: MoveUnifiedParams) -> ActionResult:
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
                                     refresh_panels=["inbox"])
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 # ── apply_actions ─────────────────────────────────────────────────────────────
@@ -311,7 +312,7 @@ async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
                 refresh_panels=["inbox"],
             )
         except Exception as e:
-            return ActionResult.error(str(e), retryable=False)
+            return mail_error_result(e, retryable=False)
 
     # Unsubscribe is handled separately — it's a one-shot HTTP call, not a batch label op.
     unsub_note = ""
@@ -377,7 +378,7 @@ async def fn_apply_actions(ctx, params: ApplyActionsParams) -> ActionResult:
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
                                     refresh_panels=["inbox"])
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 # ── inbox_cleanup ─────────────────────────────────────────────────────────────
@@ -442,7 +443,7 @@ async def fn_inbox_cleanup(ctx, params: InboxCleanupParams) -> ActionResult:
     except ValueError as e:
         return ActionResult.error(str(e), retryable=False)
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 # ── purge ─────────────────────────────────────────────────────────────────────
@@ -491,4 +492,4 @@ async def fn_purge(ctx, params: PurgeUnifiedParams) -> ActionResult:
         return ActionResult.success(data=build_bulk_mail_op(result), summary=summary,
                                     refresh_panels=["inbox"])
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)

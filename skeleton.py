@@ -69,6 +69,7 @@ from app import ext
 
 from cache_model_defs import InboxMessages
 from mail_providers import get_provider
+from mail_providers.errors import AUTH_EXPIRED_CODE, MailAuthExpiredError
 from mail_providers.helpers import (
     _all_accounts, _inbox_messages_key, _refresh_token_if_needed,
     COLLECTION, INBOX_FETCH_SIZE, encode_cursor,
@@ -163,6 +164,7 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
         }}
 
     per_account: list[dict] = []
+    auth_expired_errors: list[MailAuthExpiredError] = []
     unread_total = 0
     today_total = 0
     total_all = 0
@@ -181,11 +183,15 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
             # per provider (Gmail profile / Graph $count / IMAP STATUS), not search.
             try:
                 counts = await asyncio.wait_for(provider.get_counts(ctx, acc), timeout=8.0)
+            except MailAuthExpiredError:
+                raise
             except (asyncio.TimeoutError, Exception):
                 counts = {}
             try:
                 today = int(await asyncio.wait_for(
                     provider.get_today_count(ctx, acc), timeout=8.0))
+            except MailAuthExpiredError:
+                raise
             except (asyncio.TimeoutError, Exception):
                 today = 0
 
@@ -319,6 +325,16 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
                                 log.debug("date watermark persist failed %s: %s", email, e)
                 except Exception:
                     pass
+        except MailAuthExpiredError as e:
+            log.warning(f"Mail auth expired {email}: {e}")
+            auth_expired_errors.append(e)
+            _last_unread = int(acc.get("unread_count", 0) or 0)
+            per_account.append({
+                "email": email, "total": 0, "unread": _last_unread,
+                "spam": 0, "archive": 0,
+                "is_active": bool(acc.get("is_active", False)),
+            })
+            unread_total += _last_unread
         except (asyncio.TimeoutError, Exception) as e:
             log.error(f"Mail refresh error {email}: {e}")
             # Best-effort fallback — preserve last known per-account unread.
@@ -349,13 +365,21 @@ async def skeleton_refresh_mail_inbox_summary(ctx) -> dict:
     if not active_account and pa_list:
         active_account = pa_list[0]["email"]
 
-    return {"response": {
+    out: dict = {"response": {
         "active_account": str(active_account),
         "unread_total":   int(unread_total),
         "today_total":    int(today_total),
         "total_all":      int(total_all),
         "per_account":    pa_list[:5],
     }}
+    if auth_expired_errors:
+        first_err = auth_expired_errors[0]
+        out["error_code"] = AUTH_EXPIRED_CODE
+        out["needs_human"] = {
+            "what": str(first_err),
+            "kind": "means",
+        }
+    return out
 
 
 @ext.tool("skeleton_alert_mail_inbox_summary",

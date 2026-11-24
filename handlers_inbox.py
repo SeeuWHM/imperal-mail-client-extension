@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
+from mail_providers.errors import mail_error_result
 from handlers_ui import _email_ui, _inbox_ui, _search_ui
-from pydantic import BaseModel, Field as PField
 
 from handlers_inbox_impl import (
     impl_inbox, impl_read_email, impl_search, impl_folder,
@@ -38,7 +38,7 @@ async def fn_inbox(ctx, params: InboxParams) -> ActionResult:
             ui=_inbox_ui(r.messages, params.folder),
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("read_email", action_type="read",
@@ -56,7 +56,7 @@ async def fn_read_email(ctx, params: MessageIdParams) -> ActionResult:
             ui=_email_ui(r),
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("read_attachment", action_type="read",
@@ -79,7 +79,7 @@ async def fn_read_attachment(ctx, params: ReadAttachmentParams) -> ActionResult:
             summary=summary,
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("search", action_type="read",
@@ -109,7 +109,7 @@ async def fn_search(ctx, params: SearchParams) -> ActionResult:
             ui=_search_ui(r.results, params.query),
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("folder", action_type="read",
@@ -125,7 +125,7 @@ async def fn_folder(ctx, params: InboxParams) -> ActionResult:
             summary=f"{len(r.messages)} message(s) in {params.folder}.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("get_thread", action_type="read",
@@ -141,7 +141,7 @@ async def fn_get_thread(ctx, params: ThreadParams) -> ActionResult:
             summary=f"Thread '{r.subject}' — {r.total} message(s).",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("send", action_type="write", event="sent",
@@ -160,7 +160,7 @@ async def fn_send(ctx, params: SendParams) -> ActionResult:
             refresh_panels=["inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("reply", action_type="write", event="sent",
@@ -180,7 +180,7 @@ async def fn_reply(ctx, params: ReplyParams) -> ActionResult:
             refresh_panels=["inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("forward", action_type="write", event="sent",
@@ -199,7 +199,7 @@ async def fn_forward(ctx, params: ForwardParams) -> ActionResult:
             refresh_panels=["inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("inbox_analytics", action_type="read",
@@ -243,4 +243,4 @@ async def fn_inbox_analytics(ctx, params: InboxAnalyticsParams) -> ActionResult:
                                    "results": fake_results, "total": len(senders)})()
         return ActionResult.success(data=build_search_page(fake_sr), summary=summary)
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)

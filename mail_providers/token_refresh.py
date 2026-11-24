@@ -7,6 +7,7 @@ import time
 
 from imperal_sdk import Context
 
+from .errors import MailAuthExpiredError, raise_if_auth_expired
 from .helpers import (
     COLLECTION,
     GOOGLE_TOKEN_URL, GMAIL_API,
@@ -20,47 +21,147 @@ log = logging.getLogger(__name__)
 
 async def _api_get(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.get(
+    resp = await ctx.http.get(
         f"{GMAIL_API}/{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="google")
 
 
 async def _api_post(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.post(
+    resp = await ctx.http.post(
         f"{GMAIL_API}/{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="google")
 
 
 async def _graph_get(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.get(
+    resp = await ctx.http.get(
         f"{MS_GRAPH_BASE}{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="microsoft")
 
 
 async def _graph_post(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.post(
+    resp = await ctx.http.post(
         f"{MS_GRAPH_BASE}{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="microsoft")
 
 
 async def _graph_patch(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
-    return await ctx.http.patch(
+    resp = await ctx.http.patch(
         f"{MS_GRAPH_BASE}{path}",
         headers={"Authorization": f"Bearer {acc['access_token']}"},
         **kwargs,
     )
+    return raise_if_auth_expired(resp, acc=acc, provider="microsoft")
+
+
+_OAUTH_USER_GRANT_ERRORS = frozenset({
+    "invalid_grant",
+    "invalid_token",
+    "interaction_required",
+    "consent_required",
+    "login_required",
+})
+_OAUTH_CLIENT_ERRORS = frozenset({
+    "invalid_client",
+    "unauthorized_client",
+    "invalid_request",
+    "unsupported_grant_type",
+    "invalid_scope",
+})
+
+
+def _extract_oauth_error_code(resp) -> str:
+    """Extract RFC 6749 OAuth token-endpoint ``error`` code (lowercased) if present."""
+    try:
+        body = resp.json()
+    except Exception:
+        return ""
+    if not isinstance(body, dict):
+        return ""
+    err = body.get("error")
+    if isinstance(err, str):
+        return err.strip().lower()
+    if isinstance(err, dict):
+        code = err.get("code") or err.get("error")
+        if isinstance(code, str):
+            return code.strip().lower()
+    return ""
+
+
+def _is_oauth_user_grant_expired(resp) -> tuple[bool, str]:
+    """Distinguish expired/revoked user OAuth grant from OAuth client errors.
+
+    On HTTP 400 from Google/Microsoft/Yahoo token endpoints, only an explicit
+    user-grant error (e.g. ``invalid_grant``) means the user must reconnect
+    their mailbox. Client-side OAuth failures (``invalid_client``,
+    ``unauthorized_client``, ``invalid_request``, etc.) indicate a broken app
+    secret/config on our side and must NEVER ask every user to reconnect.
+    """
+    err_code = _extract_oauth_error_code(resp)
+    if err_code in _OAUTH_USER_GRANT_ERRORS:
+        return True, err_code
+    if err_code in _OAUTH_CLIENT_ERRORS:
+        return False, err_code
+    status = getattr(resp, "status_code", None)
+    if status == 400:
+        return False, err_code
+    if status == 401:
+        return (not err_code), err_code
+    return False, err_code
+
+
+async def _handle_oauth_refresh_failure(
+    ctx: Context,
+    acc: dict,
+    resp,
+    *,
+    provider: str,
+    label: str,
+) -> dict:
+    """Handle non-200 OAuth token refresh response uniformly across providers."""
+    status = getattr(resp, "status_code", 0)
+    is_user_grant, err_code = _is_oauth_user_grant_expired(resp)
+    detail = f" ({err_code})" if err_code else ""
+    log.warning(f"{label} token refresh failed: {status}{detail}")
+    if is_user_grant:
+        acc["_needs_reauth"] = True
+        doc_id = acc.get("doc_id")
+        if doc_id:
+            try:
+                await ctx.store.update(COLLECTION, doc_id, {"_needs_reauth": True})
+            except Exception:
+                pass
+        email = str(acc.get("email") or "")
+        who = f" for {email}" if email else ""
+        raise MailAuthExpiredError(
+            f"{label} mailbox token expired{who} (HTTP {status}) — reconnect mailbox.",
+            email=email,
+            provider=provider,
+            status_code=status,
+        )
+    if status in (400, 401):
+        # OAuth client/config error (e.g. invalid_client): abort immediately so
+        # we do NOT proceed with a stale access_token and trigger a misleading
+        # HTTP 401 -> MailAuthExpiredError on the provider API.
+        raise RuntimeError(
+            f"{label} OAuth token refresh failed (HTTP {status}{detail}) — OAuth client error."
+        )
+    return acc
 
 
 async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
@@ -76,8 +177,9 @@ async def _refresh_google_token(ctx: Context, acc: dict) -> dict:
         "grant_type":    "refresh_token",
     })
     if resp.status_code != 200:
-        log.warning(f"Google token refresh failed: {resp.status_code}")
-        return acc
+        return await _handle_oauth_refresh_failure(
+            ctx, acc, resp, provider="google", label="Google",
+        )
     tokens = resp.json()
     acc["access_token"] = tokens["access_token"]
     acc["expires_at"]   = int(time.time()) + tokens.get("expires_in", 3600)
@@ -99,20 +201,9 @@ async def _refresh_microsoft_token(ctx: Context, acc: dict) -> dict:
         "scope": MS_SCOPE,
     })
     if resp.status_code != 200:
-        try:
-            err_body = resp.json()
-        except Exception:
-            err_body = resp.text[:200] if hasattr(resp, 'text') else "unknown"
-        log.warning(f"Microsoft token refresh failed: {resp.status_code} — {err_body}")
-        if resp.status_code == 400:
-            acc["_needs_reauth"] = True
-            doc_id = acc.get("doc_id")
-            if doc_id:
-                try:
-                    await ctx.store.update(COLLECTION, doc_id, {"_needs_reauth": True})
-                except Exception:
-                    pass
-        return acc
+        return await _handle_oauth_refresh_failure(
+            ctx, acc, resp, provider="microsoft", label="Microsoft",
+        )
     tokens = resp.json()
     acc["access_token"] = tokens["access_token"]
     acc["expires_at"]   = int(time.time()) + tokens.get("expires_in", 3600)
@@ -136,7 +227,9 @@ async def _refresh_yahoo_token(ctx: Context, acc: dict) -> dict:
         headers={"Authorization": f"Basic {creds}"},
     )
     if resp.status_code != 200:
-        log.warning(f"Yahoo token refresh failed: {resp.status_code}"); return acc
+        return await _handle_oauth_refresh_failure(
+            ctx, acc, resp, provider="yahoo", label="Yahoo",
+        )
     tokens = resp.json()
     acc["access_token"] = tokens["access_token"]
     acc["expires_at"]   = int(time.time()) + tokens.get("expires_in", 3600)

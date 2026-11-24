@@ -7,6 +7,7 @@ from ctx_helpers import _get_acc
 from mail_providers import get_provider
 from mail_providers.helpers import _all_accounts, _remove_multiple_from_cache
 from schemas import BulkOperationResult, OperationResult
+from mail_providers.errors import MailAuthExpiredError
 
 # Hard cap per bulk call.
 # Gmail: uses batchModify (1 HTTP call for all IDs — no concurrency concern).
@@ -41,6 +42,8 @@ async def _try_all_accounts(ctx, message_id: str, op_name: str, op_fn) -> Operat
             if result.get("RESULT") != "ERROR":
                 return _unwrap(result, op_name, message_id)
             last_err = result.get("error") or last_err
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             last_err = str(e) or last_err
     raise RuntimeError(last_err)
@@ -296,7 +299,6 @@ async def impl_bulk_star(ctx, message_ids: str, starred: bool = True,
             op = "star" if starred else "unstar"
             return _make_bulk_result(op, r.get("succeeded", len(ids)), len(ids))
     # Parallel fallback
-    ids_str = ",".join(ids)
     sem = asyncio.Semaphore(_BULK_CONCURRENCY)
     async def _do(mid):
         async with sem:

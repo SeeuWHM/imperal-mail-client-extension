@@ -1,5 +1,25 @@
 # Changelog
 
+## [6.6.5] — 2026-11-23 — K2: Structured `AUTH_EXPIRED` signal on mailbox OAuth/IMAP/SMTP auth failures
+
+### Added
+- **Structured `AUTH_EXPIRED` error code on mailbox authentication expiry (`mail_providers/errors.py`).**
+  Introduced `MailAuthExpiredError` and `mail_error_result(...)` across Google, Microsoft, Yahoo,
+  IMAP, and SMTP read/write/skeleton paths so the kernel can surface a structured `needs_human`
+  reconnection request instead of an opaque error string.
+- **Per-account reauth reporting in `skeleton.py`.**
+  `skeleton_refresh_mail_inbox_summary` tracks and reports accounts requiring reconnection without
+  silently swallowing auth expiry.
+
+### Fixed
+- **Distinguish user OAuth grant expiry from OAuth client/app errors on HTTP 400/401 (`mail_providers/token_refresh.py`).**
+  When refreshing Google, Microsoft, or Yahoo OAuth tokens, inspect the RFC 6749 JSON `error` field:
+  only explicit user-grant errors (`invalid_grant`, `invalid_token`, `interaction_required`,
+  `consent_required`, `login_required`) or non-client HTTP 401 trigger `MailAuthExpiredError` and
+  `_needs_reauth`. Client-side OAuth configuration errors (`invalid_client`, `unauthorized_client`,
+  `invalid_request`, `unsupported_grant_type`, `invalid_scope`) now raise a regular `RuntimeError`
+  so an app-secret outage does not prompt every user to reconnect their mailbox.
+
 ## [6.6.4] — 2026-08-20 — Fix: WHMCS/corporate HTML mail unreadable dark-on-dark (missing white backdrop)
 
 ### Fixed

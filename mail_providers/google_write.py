@@ -10,6 +10,8 @@ from .helpers import (
     _remove_from_cache, _update_read_in_cache,
     _build_message, _decode_body, _header, _short_sender,
 )
+from mail_providers.errors import MailAuthExpiredError
+from mail_providers.errors import raise_if_auth_expired
 
 
 class GoogleWriteMixin:
@@ -67,6 +69,8 @@ class GoogleWriteMixin:
             orig_from = _header(headers, "From") or "unknown"
             orig_date = _header(headers, "Date") or ""
             orig_body = _decode_body(data.get("payload", {}))
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Could not read original for forward: {e}")
         fwd_subj = f"Fwd: {orig_subj}" if not orig_subj.lower().startswith("fwd:") else orig_subj
@@ -82,6 +86,8 @@ class GoogleWriteMixin:
             resp = await _api_post(ctx, f"messages/{message_id}/modify", acc,
                                    json={"removeLabelIds": ["INBOX"]})
             resp.raise_for_status()
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Gmail archive error: {e}")
         await _remove_from_cache(ctx, email_addr, message_id)
@@ -92,6 +98,8 @@ class GoogleWriteMixin:
         try:
             resp = await _api_post(ctx, f"messages/{message_id}/trash", acc, json={})
             resp.raise_for_status()
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Gmail delete error: {e}")
         await _remove_from_cache(ctx, email_addr, message_id)
@@ -122,6 +130,7 @@ class GoogleWriteMixin:
                 f"{GMAIL_API}/labels",
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
             )
+            raise_if_auth_expired(resp, acc=acc, provider="google")
             if resp.status_code == 200:
                 for label in resp.json().get("labels", []):
                     if label.get("name", "").lower() == name.lower():
@@ -162,6 +171,8 @@ class GoogleWriteMixin:
             await _remove_from_cache(ctx, email_addr, message_id)
             return self.ok(moved=True, message_id=message_id,
                            from_folder=from_folder, to_folder=to_folder)
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Gmail move error: {e}")
 
@@ -181,9 +192,12 @@ class GoogleWriteMixin:
                 f"{GMAIL_API}/messages/{message_id}",
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
             )
+            raise_if_auth_expired(resp, acc=acc, provider="google")
             if resp.status_code in (200, 204, 404):
                 return self.ok(purged=True, message_id=message_id)
             return self.err(f"Gmail permanent delete failed: {resp.status_code}")
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Gmail purge failed: {e}")
 
@@ -205,9 +219,12 @@ class GoogleWriteMixin:
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
                 json=payload,
             )
+            raise_if_auth_expired(resp, acc=acc, provider="google")
             if resp.status_code in (200, 204):
                 return self.ok(succeeded=len(message_ids), total=len(message_ids))
             return self.err(f"batchModify {resp.status_code}: {resp.text[:200]}")
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"batchModify failed: {e}")
 
@@ -248,9 +265,12 @@ class GoogleWriteMixin:
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
                 json={"ids": message_ids[:1000]},
             )
+            raise_if_auth_expired(resp, acc=acc, provider="google")
             if resp.status_code in (200, 204):
                 return self.ok(succeeded=len(message_ids), total=len(message_ids))
             return self.err(f"batchDelete {resp.status_code}: {resp.text[:200]}")
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"batchDelete failed: {e}")
 
@@ -269,6 +289,8 @@ class GoogleWriteMixin:
             if resp.status_code == 409:
                 return self.err(f"Gmail label '{folder_name}' already exists.")
             return self.err(f"Create label failed {resp.status_code}: {resp.text[:200]}")
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Gmail create_folder failed: {e}")
 
@@ -281,6 +303,7 @@ class GoogleWriteMixin:
                 f"{GMAIL_API}/labels",
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
             )
+            raise_if_auth_expired(list_resp, acc=acc, provider="google")
             if list_resp.status_code != 200:
                 return self.err(f"Could not list labels: {list_resp.status_code}")
             labels = list_resp.json().get("labels", [])
@@ -299,8 +322,11 @@ class GoogleWriteMixin:
                 f"{GMAIL_API}/labels/{label['id']}",
                 headers={"Authorization": f"Bearer {acc['access_token']}"},
             )
+            raise_if_auth_expired(del_resp, acc=acc, provider="google")
             if del_resp.status_code in (200, 204, 404):
                 return self.ok(deleted=True, folder_name=folder_name)
             return self.err(f"Delete label failed {del_resp.status_code}: {del_resp.text[:200]}")
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Gmail delete_folder failed: {e}")

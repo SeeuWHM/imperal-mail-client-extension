@@ -8,6 +8,7 @@ import time as _time
 from app import chat
 from imperal_sdk.chat import TaskCancelled
 from imperal_sdk.chat.action_result import ActionResult
+from mail_providers.errors import mail_error_result
 from ctx_helpers import _get_acc
 
 from mail_providers import get_provider
@@ -190,7 +191,7 @@ async def fn_contacts(ctx, params: ContactsParams) -> ActionResult:
             summary=f"{r.total} contact(s).",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("add_contact", action_type="write", event="contact.added",
@@ -206,7 +207,7 @@ async def fn_add_contact(ctx, params: AddContactParams) -> ActionResult:
             summary=f"Added contact {r.email}.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("sync_contacts", action_type="write", event="contacts.synced",
@@ -224,7 +225,7 @@ async def fn_sync_contacts(ctx, params: AccountParam) -> ActionResult:
     except TaskCancelled:
         return ActionResult.error("Sync cancelled.", retryable=True)
     except Exception as e:
-        return ActionResult.error(str(e), retryable=True)
+        return mail_error_result(e, retryable=True)
 
 
 @chat.function("delete_contact", action_type="destructive", event="contact.deleted",
@@ -241,4 +242,4 @@ async def fn_delete_contact(ctx, params: DeleteContactParams) -> ActionResult:
             summary=f"Deleted contact {r.email}.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)

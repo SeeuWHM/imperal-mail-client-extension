@@ -6,6 +6,7 @@ import logging
 import smtplib
 import ssl
 
+from .errors import MailAuthExpiredError
 from .text_utils import _xoauth2_string
 
 log = logging.getLogger(__name__)
@@ -15,11 +16,22 @@ def _imap_connect_auth(email_addr: str, host: str, port: int,
                         password: str = "", access_token: str = "") -> imaplib.IMAP4_SSL:
     ctx_ssl = ssl.create_default_context()
     imap    = imaplib.IMAP4_SSL(host, port, ssl_context=ctx_ssl)
-    if access_token:
-        auth_str = _xoauth2_string(email_addr, access_token)
-        imap.authenticate("XOAUTH2", lambda challenge: auth_str.encode())
-    else:
-        imap.login(email_addr, password)
+    try:
+        if access_token:
+            auth_str = _xoauth2_string(email_addr, access_token)
+            imap.authenticate("XOAUTH2", lambda challenge: auth_str.encode())
+        else:
+            imap.login(email_addr, password)
+    except imaplib.IMAP4.error as e:
+        try:
+            imap.logout()
+        except Exception:
+            pass
+        raise MailAuthExpiredError(
+            f"IMAP authentication failed for {email_addr}: {e} — reconnect mailbox.",
+            email=email_addr,
+            provider="imap",
+        ) from e
     return imap
 
 
@@ -28,7 +40,7 @@ def _sync_imap_test(email_addr: str, password: str, host: str, port: int) -> tup
         imap = _imap_connect_auth(email_addr, host, port, password=password)
         imap.logout()
         return True, ""
-    except imaplib.IMAP4.error as e:
+    except (MailAuthExpiredError, imaplib.IMAP4.error) as e:
         return False, f"IMAP auth failed: {e}"
     except Exception as e:
         return False, f"Connection error: {e}"

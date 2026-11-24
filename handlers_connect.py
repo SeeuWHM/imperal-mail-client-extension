@@ -7,7 +7,7 @@ import logging
 
 from app import chat
 from imperal_sdk.chat.action_result import ActionResult
-from ctx_helpers import _get_acc
+from mail_providers.errors import mail_error_result
 
 from mail_providers import get_provider  # noqa: F401
 from mail_providers.helpers import (
@@ -169,7 +169,7 @@ async def fn_connect(ctx, params: EmptyParams) -> ActionResult:
             summary="Already connected." if r.already_connected else "OAuth URL ready.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("connect_microsoft", action_type="read",
@@ -184,7 +184,7 @@ async def fn_connect_microsoft(ctx, params: EmptyParams) -> ActionResult:
             summary="Already connected." if r.already_connected else "OAuth URL ready.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("connect_yahoo", action_type="read",
@@ -199,7 +199,7 @@ async def fn_connect_yahoo(ctx, params: EmptyParams) -> ActionResult:
             summary="Already connected." if r.already_connected else "OAuth URL ready.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("connect_imap", action_type="write", event="account.connected",
@@ -218,7 +218,7 @@ async def fn_connect_imap(ctx, params: ConnectImapParams) -> ActionResult:
             refresh_panels=["accounts", "inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("status", action_type="read",
@@ -233,7 +233,7 @@ async def fn_status(ctx, params: EmptyParams) -> ActionResult:
             summary=f"{r.total} account(s) connected." if r.connected else "No accounts connected.",
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("switch_account", action_type="write", event="account.switched",
@@ -250,7 +250,7 @@ async def fn_switch_account(ctx, params: AccountParam) -> ActionResult:
             refresh_panels=["inbox", "accounts"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 @chat.function("disconnect", action_type="destructive", event="account.disconnected",
@@ -267,7 +267,7 @@ async def fn_disconnect(ctx, params: AccountParam) -> ActionResult:
             refresh_panels=["accounts", "inbox"],
         )
     except Exception as e:
-        return ActionResult.error(str(e), retryable=False)
+        return mail_error_result(e, retryable=False)
 
 
 

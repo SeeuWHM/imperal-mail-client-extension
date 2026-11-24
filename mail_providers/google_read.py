@@ -9,8 +9,9 @@ from imperal_sdk import Context
 from .helpers import (
     _api_get, _api_post,
     _update_read_in_cache, _save_last_read,
-    _decode_body, _decode_body_with_type, _strip_html, _header, _short_sender,
+    _decode_body_with_type, _header, _short_sender,
 )
+from mail_providers.errors import MailAuthExpiredError
 
 _PAGE_FOLDER_LABELS: dict[str, str] = {
     "inbox": "INBOX", "sent": "SENT", "spam": "SPAM",
@@ -130,6 +131,8 @@ class GoogleReadMixin:
             resp = await _api_get(ctx, "profile", acc)
             if resp.status_code == 200:
                 total = int(resp.json().get("messagesTotal", 0) or 0)
+        except MailAuthExpiredError:
+            raise
         except Exception:
             total = 0
         inbox = await self.get_folder_stats(ctx, acc, "inbox")
@@ -228,6 +231,8 @@ class GoogleReadMixin:
             return self.err("Attachment has no content.")
         try:
             content = base64.urlsafe_b64decode(data_b64url + "=" * (-len(data_b64url) % 4))
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Could not decode attachment content: {e}")
         return self.ok(content=content)
@@ -342,6 +347,8 @@ class GoogleReadMixin:
             resp = await _api_get(ctx, "messages", acc, params=params)
             resp.raise_for_status()
             refs = resp.json().get("messages", [])
+        except MailAuthExpiredError:
+            raise
         except Exception as e:
             return self.err(f"Folder error: {e}")
         if not refs:
