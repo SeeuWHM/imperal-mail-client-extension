@@ -13,7 +13,7 @@ log = logging.getLogger("mail")
 
 ext = Extension(
     "mail",
-    version="6.5.4",
+    version="6.6.6",
     display_name="Mail Client",
     description=(
         "Multi-provider email client — Google, Microsoft, Yahoo, IMAP. "
@@ -55,7 +55,8 @@ ext.file_sink(
 ext.oauth("google",
           collection="gmail_accounts",
           scopes=["https://www.googleapis.com/auth/gmail.modify",
-                  "https://www.googleapis.com/auth/contacts.readonly"])
+                  "https://www.googleapis.com/auth/contacts.readonly",
+                  "https://www.googleapis.com/auth/gmail.settings.basic"])
 ext.oauth("microsoft",
           collection="gmail_accounts",
           scopes=["https://graph.microsoft.com/Mail.ReadWrite",

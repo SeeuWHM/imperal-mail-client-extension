@@ -40,9 +40,28 @@ def _decode_header(value: str) -> str:
     return "".join(decoded)
 
 
+def _parse_sender(raw: str) -> tuple[str, str]:
+    """Parse 'Display Name <email@domain.com>' into (display_name, email).
+    
+    Returns (display_name, email). If no '<...>' pattern is found,
+    checks if raw is an email address, otherwise treats raw as display name.
+    """
+    if not raw:
+        return "unknown", ""
+    raw = raw.strip()
+    match = re.search(r"<([^>]+)>", raw)
+    if match:
+        email = match.group(1).strip().lower()
+        name = raw[:match.start()].strip().strip('"\'')
+        return name or email, email
+    if "@" in raw:
+        return raw.strip().strip('"\''), raw.strip().lower()
+    return raw.strip().strip('"\''), ""
+
+
 def _short_sender(raw: str) -> str:
-    if "<" in raw: return raw.split("<")[0].strip().strip('"')
-    return raw.strip()
+    name, email = _parse_sender(raw)
+    return name or email or raw.strip()
 
 
 def _strip_html(text: str) -> str:

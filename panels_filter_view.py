@@ -16,7 +16,7 @@ _FILTERS_COLLECTION = "mail_filters"
 
 
 def _build_filter_query(doc_data: dict) -> str:
-    """Build Gmail-compatible search query from stored filter criteria."""
+    """Build Gmail-compatible search query from stored or native filter criteria."""
     parts = []
     from_emails = doc_data.get("criteria_from_emails") or []
     if from_emails:
@@ -24,12 +24,27 @@ def _build_filter_query(doc_data: dict) -> str:
             parts.append(f"from:{from_emails[0]}")
         else:
             or_clause = " OR ".join(f"from:{e}" for e in from_emails)
-            parts.append(f"{{{or_clause}}}")
+            parts.append(f"({or_clause})")
     elif doc_data.get("criteria_from"):
         parts.append(f"from:{doc_data['criteria_from']}")
+
+    if doc_data.get("criteria_to"):
+        parts.append(f"to:{doc_data['criteria_to']}")
+
     if doc_data.get("criteria_subject"):
         subj = doc_data["criteria_subject"]
         parts.append(f'subject:"{subj}"' if " " in subj else f"subject:{subj}")
+
+    if doc_data.get("criteria_folder"):
+        folder = doc_data["criteria_folder"].lower().strip()
+        if folder in ("archive", "all_mail"):
+            parts.append("-in:inbox")
+        else:
+            parts.append(f"in:{folder}")
+
+    if doc_data.get("criteria_query"):
+        parts.append(doc_data["criteria_query"])
+
     return " ".join(parts) if parts else ""
 
 

@@ -123,6 +123,24 @@ class BaseMailProvider(ABC):
         """
         return self.err("Reading attachment content is not supported for this account type.")
 
+    async def list_filters(self, ctx: Context, acc: dict) -> list[dict]:
+        """List provider-native filters/rules (e.g. Gmail users.settings.filters).
+        Returns list of normalized dicts, or empty list if unsupported.
+        """
+        return []
+
+    async def create_filter(self, ctx: Context, acc: dict, criteria: dict, action: dict) -> dict:
+        """Create a provider-native filter/rule (e.g. Gmail users.settings.filters.create).
+        Returns ok(id=..., filter=...) or err(...).
+        """
+        return self.err("Native filter creation is not supported for this provider")
+
+    async def delete_filter(self, ctx: Context, acc: dict, filter_id: str) -> dict:
+        """Delete a provider-native filter/rule by provider filter ID.
+        Returns ok(deleted=True, id=...) or err(...).
+        """
+        return self.err("Native filter deletion is not supported for this provider")
+
     @staticmethod
     def ok(**kwargs) -> dict:
         return {"RESULT": "SUCCESS", **kwargs}
