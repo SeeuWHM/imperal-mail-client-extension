@@ -71,7 +71,7 @@ YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
 from .token_refresh import (  # noqa: E402, F401
     _refresh_google_token, _refresh_microsoft_token, _refresh_yahoo_token,
     _refresh_token_if_needed,
-    _api_get, _api_post, _graph_get, _graph_post, _graph_patch,
+    _api_get, _api_post, _api_delete, _graph_get, _graph_post, _graph_patch,
 )
 from .text_utils import (  # noqa: E402, F401
     _encrypt_password, _decrypt_password,

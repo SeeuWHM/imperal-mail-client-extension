@@ -323,12 +323,17 @@ class GoogleReadMixin:
                 return None
             data    = meta.json()
             headers = data.get("payload", {}).get("headers", [])
+            raw_from = _header(headers, "From") or "unknown"
+            from .text_utils import _parse_sender
+            sender_name, sender_email = _parse_sender(raw_from)
             return {
-                "id":      ref["id"],
-                "subject": _header(headers, "Subject") or "(no subject)",
-                "from":    _short_sender(_header(headers, "From") or "unknown"),
-                "date":    _header(headers, "Date") or "",
-                "unread":  "UNREAD" in data.get("labelIds", []),
+                "id":         ref["id"],
+                "subject":    _header(headers, "Subject") or "(no subject)",
+                "from":       _short_sender(raw_from),
+                "from_email": sender_email,
+                "from_raw":   raw_from,
+                "date":       _header(headers, "Date") or "",
+                "unread":     "UNREAD" in data.get("labelIds", []),
             }
 
         fetched = await asyncio.gather(*[_preview(r) for r in refs])

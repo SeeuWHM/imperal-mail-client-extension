@@ -39,6 +39,16 @@ async def _api_post(ctx: Context, path: str, acc: dict, **kwargs):
     return raise_if_auth_expired(resp, acc=acc, provider="google")
 
 
+async def _api_delete(ctx: Context, path: str, acc: dict, **kwargs):
+    acc = await _refresh_token_if_needed(ctx, acc)
+    resp = await ctx.http.delete(
+        f"{GMAIL_API}/{path}",
+        headers={"Authorization": f"Bearer {acc['access_token']}"},
+        **kwargs,
+    )
+    return raise_if_auth_expired(resp, acc=acc, provider="google")
+
+
 async def _graph_get(ctx: Context, path: str, acc: dict, **kwargs):
     acc = await _refresh_token_if_needed(ctx, acc)
     resp = await ctx.http.get(

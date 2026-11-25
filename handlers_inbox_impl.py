@@ -311,47 +311,73 @@ async def impl_top_senders(ctx, days: int = 90, limit: int = 10,
     if not acc:
         raise RuntimeError("No email account connected.")
 
-    email_re = re.compile(r"<([^>]+)>")
+    from mail_providers.text_utils import _parse_sender
 
     # Phase 1: sample to discover candidates
     sample = await impl_search(ctx, query=f"newer_than:{days}d",
                                max_results=500, account=account)
 
     raw_counts: dict[str, int] = {}
+    sender_display_names: dict[str, str] = {}
+
     for msg in sample.results:
-        from_str = (msg.get("from") or "").strip()
-        m = email_re.search(from_str)
-        sender_email = m.group(1).lower() if m else from_str.lower()
+        raw_from = msg.get("from_raw") or msg.get("from") or ""
+        parsed_name, parsed_email = _parse_sender(raw_from)
+        sender_email = (msg.get("from_email") or parsed_email or "").strip().lower()
+        display_name = parsed_name or msg.get("from") or sender_email
+
+        if not sender_email or "@" not in sender_email:
+            # Fall back to display name or raw string if no email could be parsed
+            sender_email = (msg.get("from") or "unknown").strip().lower()
+            display_name = parsed_name or msg.get("from") or sender_email
+
         raw_counts[sender_email] = raw_counts.get(sender_email, 0) + 1
+        if sender_email not in sender_display_names and display_name:
+            sender_display_names[sender_email] = display_name
 
     if not raw_counts:
         return []
 
-    candidates = sorted(raw_counts, key=lambda e: raw_counts[e], reverse=True)[:30]
+    # If sample captured all messages in the period (< 500), raw_counts is exact
+    # No need for slow secondary searches
+    is_sample_complete = len(sample.results) < 500
 
-    # Phase 2: accurate count per candidate (concurrent, max 5)
+    if is_sample_complete:
+        top_items = sorted(raw_counts.items(), key=lambda x: x[1], reverse=True)[:limit]
+        return [
+            {
+                "sender": sender_display_names.get(e, e),
+                "email": e,
+                "count": c,
+            }
+            for e, c in top_items
+        ]
+
+    # Phase 2: only verify the top candidates when sample was capped at 500
+    # Restrict to at most limit + 5 candidates to avoid dozens of slow API round trips
+    candidate_limit = min(max(limit + 5, 10), 20)
+    candidates = sorted(raw_counts, key=lambda e: raw_counts[e], reverse=True)[:candidate_limit]
+
     sem = asyncio.Semaphore(5)
 
     async def _count(sender_email: str) -> tuple[str, int]:
-        async with sem:
-            try:
-                r = await impl_search(ctx, query=f"from:{sender_email} newer_than:{days}d",
-                                      max_results=1, account=account)
-                return sender_email, r.total or raw_counts.get(sender_email, 0)
-            except Exception:
-                return sender_email, raw_counts.get(sender_email, 0)
+        # Only search if valid email syntax
+        if "@" in sender_email:
+            async with sem:
+                try:
+                    r = await impl_search(ctx, query=f"from:{sender_email} newer_than:{days}d",
+                                          max_results=1, account=account)
+                    return sender_email, r.total or raw_counts.get(sender_email, 0)
+                except Exception:
+                    return sender_email, raw_counts.get(sender_email, 0)
+        return sender_email, raw_counts.get(sender_email, 0)
 
     counted = await asyncio.gather(*[_count(e) for e in candidates])
     top = sorted(counted, key=lambda x: x[1], reverse=True)[:limit]
 
     result = []
     for sender_email, count in top:
-        orig = next(
-            (msg.get("from", sender_email) for msg in sample.results
-             if sender_email in (msg.get("from") or "").lower()),
-            sender_email,
-        )
-        display = email_re.sub("", orig).strip(" ,") or sender_email
+        display = sender_display_names.get(sender_email, sender_email)
         result.append({"sender": display, "email": sender_email, "count": count})
     return result
 
